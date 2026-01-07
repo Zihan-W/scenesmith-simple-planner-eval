@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import numpy as np
 import xml.etree.ElementTree as ET
-
+import argparse
 import trimesh
 import trimesh.transformations as tf
 
@@ -18,6 +18,9 @@ from pydrake.all import (
     RobotDiagramBuilder,
     VisualizationConfig,
     ApplyVisualizationConfig,
+    RigidTransform,
+    RotationMatrix,
+    ModelInstanceIndex,
 )
 
 
@@ -122,11 +125,104 @@ def transform_points_to_world(
 
     return points_W
 
+def generate_single_antipodal_grasp(
+    plant,
+    scene_graph,
+    context,
+    gripper_model_name: str,
+    points_world: np.ndarray,
+    meshcat,
+    target_model_name: str,
+    visualize=True,
+):
+    """
+    Sample a single antipodal grasp on a point cloud and visualize it.
+
+    Args:
+        plant: MultibodyPlant
+        scene_graph: SceneGraph
+        context: diagram's Context
+        gripper_model_name: str, name of the gripper model instance (e.g., "wsg_50")
+        points_world: (N,3) ndarray of object points in world frame
+        meshcat: Meshcat instance for visualization
+        visualize: whether to publish the gripper pose
+    Returns:
+        RigidTransform of the gripper pose in world frame
+    """
+    # 1. Sample a random point
+    idx = np.random.randint(points_world.shape[0])
+    point = points_world[idx]
+    print("Point cloud min:", points_world.min(axis=0))
+    print("Point cloud max:", points_world.max(axis=0))
+    print("Sampled point:", point)
+
+    # 2. Estimate a normal at that point (simple approximation: use vector to mean)
+    normal = point - points_world.mean(axis=0)
+    normal /= np.linalg.norm(normal)
+
+    # 3. Compute gripper orientation
+    # We'll align the gripper x-axis along -normal (finger approach)
+    # We'll pick arbitrary y, z axes to form a right-handed frame
+    approach = -normal
+    # Avoid degenerate case if approach is aligned with world z
+    world_z = np.array([0.0, 0.0, 1.0])
+    if np.abs(np.dot(approach, world_z)) > 0.95:
+        world_z = np.array([0.0, 1.0, 0.0])
+    gripper_y = np.cross(world_z, approach)
+    gripper_y /= np.linalg.norm(gripper_y)
+    gripper_z = np.cross(approach, gripper_y)
+    gripper_rot = RotationMatrix(np.column_stack([approach, gripper_y, gripper_z]))
+
+    # 4. Place the gripper slightly offset along approach (so fingers are outside object)
+    # You can tune the offset (here 0.1 m)
+    offset = 0.1
+    gripper_pos = point + approach * offset
+    X_WG = RigidTransform(gripper_rot, gripper_pos)
+
+    # 5. Temporarily move the gripper in the plant to this pose
+    gripper_instance = (
+        gripper_model_name
+        if isinstance(gripper_model_name, ModelInstanceIndex)
+        else plant.GetModelInstanceByName(gripper_model_name)
+    )
+    gripper_body = plant.GetBodyByName("body", gripper_instance)
+    plant.SetFreeBodyPose(plant.GetMyContextFromRoot(context), gripper_body, X_WG)
+
+    # 6. Check collisions against only the target object
+    sg_context = scene_graph.GetMyContextFromRoot(context)
+    query_object = scene_graph.get_query_output_port().Eval(sg_context)
+
+    # Geometries of the gripper
+    gripper_geometry_ids = plant.GetCollisionGeometriesForBody(gripper_body)
+
+    # Geometries of the target object
+    target_model_instance = plant.GetModelInstanceByName(target_model_name)
+    target_geometries = []
+    for body_index in plant.GetBodyIndices(target_model_instance):
+        body = plant.get_body(body_index)
+        target_geometries.extend(plant.GetCollisionGeometriesForBody(body))
+
+    # Check distances between gripper and target geometries
+    for g_geom in gripper_geometry_ids:
+        for t_geom in target_geometries:
+            signed_distance_pair = query_object.ComputeSignedDistancePairClosestPoints(
+                g_geom, t_geom
+            )
+            if signed_distance_pair.distance <= 0.0:
+                print("Gripper in collision with target! Rejecting grasp.")
+                return None
+
+    print("Grasp candidate is collision-free!")
+
+    # 7. Visualize in Meshcat
+    # if visualize:
+    #     meshcat.SetTransform("gripper_candidate", X_WG)
+
+    return X_WG
 
 def main():
-    import argparse
     parser = argparse.ArgumentParser(
-        description="Compute and visualize a sparse point cloud for the task's target object"
+        description="Compute and visualize a sparse point cloud for the task's target object and a grasp"
     )
     parser.add_argument("task_file", type=str)
     parser.add_argument("dmd_file", type=str)
@@ -154,14 +250,26 @@ def main():
     builder = RobotDiagramBuilder()
     parser_drake = builder.parser()
 
+    # Register packages
     for pkg_xml in package_xmls:
         register_package_xml(parser_drake, pkg_xml)
 
+    # Load DMD directives
     directives = LoadModelDirectives(str(dmd_file))
     ProcessModelDirectives(directives, parser_drake)
 
     plant = builder.plant()
     scene_graph = builder.scene_graph()
+
+    # ---------------------------------------------------------------------
+    # Add a free "ghost" WSG50 gripper for visualization
+    # ---------------------------------------------------------------------
+    ghost_parser = Parser(plant)
+    ghost_gripper_instances = ghost_parser.AddModelsFromUrl(
+        "package://drake_models/wsg_50_description/sdf/schunk_wsg_50_welded_fingers.sdf"
+    )
+    ghost_gripper_instance = ghost_gripper_instances[0]
+    ghost_body = plant.GetBodyByName("body", ghost_gripper_instance)
 
     plant.Finalize()
 
@@ -174,12 +282,11 @@ def main():
     )
 
     diagram = builder.Build()
-    context = diagram.CreateDefaultContext()
-
-    diagram.ForcedPublish(context)
+    diagram_context = diagram.CreateDefaultContext()
+    plant_context = diagram.GetSubsystemContext(plant, diagram_context)
 
     # ---------------------------------------------------------------------
-    # Sample points and visualize them in THE SAME Meshcat
+    # Sample points and visualize point cloud
     # ---------------------------------------------------------------------
     points_body = sample_points_from_body(
         plant,
@@ -189,7 +296,7 @@ def main():
     )
 
     points_world = transform_points_to_world(
-        plant, context, target_obj_name, points_body
+        plant, diagram_context, target_obj_name, points_body
     )
 
     pc = PointCloud(points_world.shape[0])
@@ -204,6 +311,29 @@ def main():
 
     print(f"Visualizing: {dmd_file}")
     print(f"Point cloud for '{target_obj_name}' with {points_world.shape[0]} points")
+
+    # ---------------------------------------------------------------------
+    # Generate a single grasp candidate and visualize with ghost gripper
+    # ---------------------------------------------------------------------
+    X_grasp = generate_single_antipodal_grasp(
+        plant,
+        scene_graph,
+        diagram_context,
+        gripper_model_name=ghost_gripper_instance,  # This is ModelInstanceIndex
+        points_world=points_world,
+        meshcat=meshcat,
+        target_model_name=target_obj_name,
+        visualize=True,
+    )
+
+    if X_grasp is not None:
+        print("Grasp candidate pose (world frame):")
+        print(X_grasp)
+
+    # ---------------------------------------------------------------------
+    # Publish diagram continuously
+    # ---------------------------------------------------------------------
+    diagram.ForcedPublish(diagram_context)
     print("Meshcat server running. Press Ctrl+C to exit.")
 
     try:
