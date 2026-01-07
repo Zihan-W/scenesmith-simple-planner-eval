@@ -6,46 +6,52 @@ import json
 def load_task(task_path):
     with open(task_path, "r") as f:
         task = json.load(f)
-    start_xy = task.get("robot_start_xy", [0.0, 0.0])
-    return start_xy
+    return task.get("robot_start_xy", [0.0, 0.0])
 
-# --- Generate robot + weld YAML as raw text ---
-def make_robot_and_weld_yaml(name, urdf_path, start_xy):
+# --- Generate robot + gripper YAML as raw text ---
+def make_robot_and_gripper_yaml(start_xy):
     x, y = start_xy
-
     return f"""- add_model:
-    name: {name}
-    file: {urdf_path}
+    name: mobile_iiwa
+    file: package://mobile_iiwa/mobile_iiwa.urdf
     default_joint_positions:
       world_x_joint: [{x}]
       world_y_joint: [{y}]
 - add_weld:
     parent: world
-    child: {name}::base
+    child: mobile_iiwa::base
     X_PC:
       translation: [0.0, 0.0, 0.0]
       rotation: !AngleAxis
         angle_deg: 0.0
         axis: [0.0, 0.0, 1.0]
+
+- add_model:
+    name: wsg_50
+    file: package://drake_models/wsg_50_description/sdf/schunk_wsg_50.sdf
+- add_weld:
+    parent: mobile_iiwa::iiwa_link_7
+    child: wsg_50::body
+    X_PC:
+      translation: [0, 0, 0.09]
+      rotation: !Rpy {{ deg: [90, 0, 68] }}
 """
 
 # --- Main ---
 def main():
     parser = argparse.ArgumentParser(
-        description="Prepend a robot directive as raw YAML text."
+        description="Prepend mobile_iiwa + wsg_50 to a Drake directives YAML file."
     )
     parser.add_argument("directives", help="Original directives YAML file")
-    parser.add_argument("robot_urdf", help="Robot URDF (package://...)")
-    parser.add_argument("robot_name", help="Name of the robot model")
-    parser.add_argument("task_json", help="Task JSON file")
+    parser.add_argument("task_json", help="Task JSON file for start XY")
     parser.add_argument("output", help="Output directives YAML file")
     args = parser.parse_args()
 
     # Load task start position
     start_xy = load_task(args.task_json)
 
-    # Generate robot YAML block
-    robot_yaml = make_robot_and_weld_yaml(args.robot_name, args.robot_urdf, start_xy)
+    # Generate robot + gripper YAML block
+    robot_yaml = make_robot_and_gripper_yaml(start_xy)
 
     # Read existing directives file
     with open(args.directives, "r") as f:
@@ -64,7 +70,7 @@ def main():
     with open(args.output, "w") as f:
         f.write(output_text)
 
-    print(f"Saved new directives file with robot at '{args.output}'")
+    print(f"Saved new directives file with mobile_iiwa + wsg_50 at '{args.output}'")
 
 if __name__ == "__main__":
     main()

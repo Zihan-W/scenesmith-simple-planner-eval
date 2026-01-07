@@ -4,7 +4,7 @@
 
 Add the robot to the directives (based on the task):
 ```
-python3 scripts/add_robot_to_directives.py models/scene_008/combined_house/house.dmd.yaml package://mobile_iiwa/mobile_iiwa.urdf mobile_iiwa models/scene_008/pick_candle_task.json pick_candle_task.dmd.yaml
+python3 scripts/add_robot_to_directives.py models/scene_008/combined_house/house.dmd.yaml models/scene_008/pick_candle_task.json pick_candle_task.dmd.yaml
 ```
 
 Visualize the directives file (with the robot):
