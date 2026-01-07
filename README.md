@@ -1,0 +1,24 @@
+### Useful commands:
+
+*All commands should be run from the root of the repository.*
+
+Add the robot to the directives (based on the task):
+```
+python3 scripts/add_robot_to_directives.py models/scene_008/combined_house/house.dmd.yaml package://mobile_iiwa/mobile_iiwa.urdf mobile_iiwa models/scene_008/pick_candle_task.json pick_candle_task.dmd.yaml
+```
+
+Visualize the directives file (with the robot):
+```
+python3 scripts/visualize_dmd_scene.py pick_candle_task.dmd.yaml --package-xml models/iiwa/package.xml --package-xml models/scene_008/package.xml
+```
+
+Visualize the directives file with Drake's `model_visualizer`:
+```
+export ROS_PACKAGE_PATH=/home/tommy/Documents/programming/work/rlg/snippets/policy-eval-for-nicholas/models/iiwa:/home/tommy/Documents/programming/work/rlg/snippets/policy-eval-for-nicholas/models/scene_008;
+python3 -m pydrake.visualization.model_visualizer pick_candle_task.dmd.yaml
+```
+
+Compute a grasp configuration for the manipuland:
+```
+python3 scripts/compute_grasp_config.py models/scene_008/pick_candle_task.json pick_candle_task.dmd.yaml     --package-xml models/iiwa/package.xml --package-xml models/scene_008/package.xml
+```
