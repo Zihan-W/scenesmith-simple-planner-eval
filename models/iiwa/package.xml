@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mobile_iiwa</name>
+  <version>0.0.0</version>
+  <maintainer email="tcohn@mit.edu">Thomas Cohn</maintainer>
+  <author>Thomas Cohn</author>
+  <license>N/A</license>
+</package>
