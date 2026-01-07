@@ -9,17 +9,25 @@ def load_task(task_path):
     start_xy = task.get("robot_start_xy", [0.0, 0.0])
     return start_xy
 
-# --- Generate robot directive as YAML string ---
-def make_robot_directive_yaml(name, urdf_path, start_xy):
+# --- Generate robot + weld YAML as raw text ---
+def make_robot_and_weld_yaml(name, urdf_path, start_xy):
     x, y = start_xy
-    yaml_block = f"""- add_model:
+
+    return f"""- add_model:
     name: {name}
     file: {urdf_path}
     default_joint_positions:
       world_x_joint: [{x}]
       world_y_joint: [{y}]
+- add_weld:
+    parent: world
+    child: {name}::base
+    X_PC:
+      translation: [0.0, 0.0, 0.0]
+      rotation: !AngleAxis
+        angle_deg: 0.0
+        axis: [0.0, 0.0, 1.0]
 """
-    return yaml_block
 
 # --- Main ---
 def main():
@@ -37,7 +45,7 @@ def main():
     start_xy = load_task(args.task_json)
 
     # Generate robot YAML block
-    robot_yaml = make_robot_directive_yaml(args.robot_name, args.robot_urdf, start_xy)
+    robot_yaml = make_robot_and_weld_yaml(args.robot_name, args.robot_urdf, start_xy)
 
     # Read existing directives file
     with open(args.directives, "r") as f:
