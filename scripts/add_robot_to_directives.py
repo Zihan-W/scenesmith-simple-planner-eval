@@ -28,7 +28,10 @@ def make_robot_and_gripper_yaml(start_xy):
 
 - add_model:
     name: wsg_50
-    file: package://drake_models/wsg_50_description/sdf/schunk_wsg_50.sdf
+    file: package://drake_models/wsg_50_description/sdf/schunk_wsg_50_no_tip.sdf
+    default_joint_positions:
+      left_finger_sliding_joint: [-0.054]
+      right_finger_sliding_joint: [0.054]
 - add_weld:
     parent: mobile_iiwa::iiwa_link_7
     child: wsg_50::body
