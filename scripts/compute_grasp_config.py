@@ -21,6 +21,9 @@ from pydrake.all import (
     RigidTransform,
     RotationMatrix,
     ModelInstanceIndex,
+    InverseKinematics,
+    JointIndex,
+    Solve,
 )
 
 
@@ -262,6 +265,95 @@ def generate_single_antipodal_grasp(
 
     return X_WG
 
+def solve_ik_for_grasp(X_grasp, diagram, plant):
+    """
+    Set up an IK problem for a desired gripper pose X_grasp.
+
+    For now:
+      - Use a fresh diagram root context
+      - Lock all joints whose position indices are NOT in the first 11
+      - Construct InverseKinematics with joint limits enabled
+      - (No constraints yet; we'll add them next)
+    """
+    # Create a root context for the diagram, then obtain the plant subcontext.
+    diagram_context = diagram.CreateDefaultContext()
+    plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
+
+    # Lock all joints whose DOFs are outside the first 11 position variables.
+    # (Hardcoded assumption: positions[0:11] are the arm; everything else fixed.)
+    arm_position_count = 11
+
+    for i in range(plant.num_joints()):
+        joint = plant.get_joint(JointIndex(i))
+        npos = joint.num_positions()
+        if npos == 0:
+            continue
+
+        start = joint.position_start()
+        pos_indices = range(start, start + npos)
+
+        # Keep joint unlocked iff *all* its position indices lie in [0, 10].
+        is_arm_joint = all(k < arm_position_count for k in pos_indices)
+        if not is_arm_joint:
+            # Locks the joint at its current value in plant_context.
+            joint.Lock(plant_context)
+
+    # Now construct IK on the (diagram-connected) plant, with the provided plant_context.
+    ik = InverseKinematics(plant, plant_context, with_joint_limits=True)
+
+    # ------------------------------------------------------------------
+    # End-effector pose constraint: robot gripper "wsg_50" matches X_grasp
+    # ------------------------------------------------------------------
+    # Get the robot gripper model instance by name. (This must be the real gripper,
+    # not your ghost gripper instance.)
+    ee_instance = plant.GetModelInstanceByName("wsg_50")
+
+    # The gripper body in Drake’s WSG models is typically named "body".
+    ee_body = plant.GetBodyByName("body", ee_instance)
+    frame_E = ee_body.body_frame()
+
+    frame_W = plant.world_frame()
+
+    # Desired pose (world -> end-effector)
+    X_WE = X_grasp
+
+    # Position tolerance (meters). Tune later.
+    p_tol = 0.002
+    p_WE = X_WE.translation()
+
+    p_BQ = np.zeros((3, 1))
+    p_AQ_lower = (p_WE - p_tol).reshape(3, 1)
+    p_AQ_upper = (p_WE + p_tol).reshape(3, 1)
+
+    ik.AddPositionConstraint(
+        frameB=frame_E,
+        p_BQ=p_BQ,
+        frameA=frame_W,
+        p_AQ_lower=p_AQ_lower,
+        p_AQ_upper=p_AQ_upper,
+    )
+
+    # Orientation tolerance (radians). Tune later.
+    theta_tol = 0.02  # ~1.1 deg
+    R_WE = X_WE.rotation()
+    ik.AddOrientationConstraint(
+        frameAbar=frame_W,
+        R_AbarA=R_WE,
+        frameBbar=frame_E,
+        R_BbarB=RotationMatrix(),  # identity => constrain frame_E itself
+        theta_bound=theta_tol,
+    )
+
+    result = Solve(ik.prog())
+    q = result.GetSolution(ik.q())
+
+    if result.is_success():
+        print("IK succeeded")
+    else:
+        print("IK failed")
+
+    return q
+
 def main():
     parser = argparse.ArgumentParser(
         description="Compute and visualize a sparse point cloud for the task's target object and a grasp"
@@ -391,6 +483,9 @@ def main():
                 grasp_count += 1
                 print(f"\nGrasp #{grasp_count} candidate pose (world frame):")
                 print(X_grasp)
+
+                q = solve_ik_for_grasp(X_grasp, diagram, plant)
+                plant.SetPositions(plant_context, q)
             else:
                 print("\nRejected grasp (collision).")
 
