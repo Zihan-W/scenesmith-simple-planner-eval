@@ -160,24 +160,45 @@ def generate_single_antipodal_grasp(
     normal = point - points_world.mean(axis=0)
     normal /= np.linalg.norm(normal)
 
-    # 3. Compute gripper orientation
-    # We'll align the gripper x-axis along -normal (finger approach)
-    # We'll pick arbitrary y, z axes to form a right-handed frame
-    approach = -normal
-    # Avoid degenerate case if approach is aligned with world z
+    # 3. Choose a gripper frame aligned to the estimated surface normal.
+    # We set the gripper x-axis to align with the (outward) normal at the sampled point.
+    # To fix the remaining rotation about x, we construct the gripper y-axis as the
+    # cross product of a world-up reference direction and the approach direction,
+    # then compute z to complete a right-handed frame.
+
+    approach = normal
+    approach /= np.linalg.norm(approach)
+
+    # Choose world z as gripper up
     world_z = np.array([0.0, 0.0, 1.0])
-    if np.abs(np.dot(approach, world_z)) > 0.95:
+    if np.abs(np.dot(approach, world_z)) > 0.95:  # avoid degenerate
         world_z = np.array([0.0, 1.0, 0.0])
+
     gripper_y = np.cross(world_z, approach)
     gripper_y /= np.linalg.norm(gripper_y)
     gripper_z = np.cross(approach, gripper_y)
+
+    # Column order: [x-axis, y-axis, z-axis]
     gripper_rot = RotationMatrix(np.column_stack([approach, gripper_y, gripper_z]))
 
-    # 4. Place the gripper slightly offset along approach (so fingers are outside object)
-    # You can tune the offset (here 0.1 m)
-    offset = 0.1
-    gripper_pos = point + approach * offset
-    X_WG = RigidTransform(gripper_rot, gripper_pos)
+    # 4. Place the gripper so the sampled point lands between the fingers.
+    # p_GS_G is the position of the sampled point S expressed in the gripper frame G when
+    # the object is correctly centered between the fingers (taken from Drake's bin-picking example).
+    # Therefore, the gripper origin position is: p_WG = p_WS - R_WG * p_GS_G.
+
+    p_GS_G = np.array([0.054 - 0.01, 0.10625, 0.0])  # [x, y, z] in gripper frame
+
+    # Construct R_WG: x = approach, y = orthogonal, z = cross
+    Gx = approach
+    Gy = np.array([0.0, 0.0, -1.0])
+    Gy -= np.dot(Gy, Gx) * Gx  # make orthogonal
+    Gy /= np.linalg.norm(Gy)
+    Gz = np.cross(Gx, Gy)
+    R_WG = RotationMatrix(np.column_stack([Gx, Gy, Gz]))
+
+    # Transform finger-box offset into world
+    p_WG = point - R_WG.multiply(p_GS_G)
+    X_WG = RigidTransform(R_WG, p_WG)
 
     # 5. Temporarily move the gripper in the plant to this pose
     gripper_instance = (
@@ -213,10 +234,6 @@ def generate_single_antipodal_grasp(
                 return None
 
     print("Grasp candidate is collision-free!")
-
-    # 7. Visualize in Meshcat
-    # if visualize:
-    #     meshcat.SetTransform("gripper_candidate", X_WG)
 
     return X_WG
 
