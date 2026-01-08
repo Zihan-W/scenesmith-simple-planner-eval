@@ -347,15 +347,29 @@ def solve_ik_for_grasp(X_grasp, diagram, plant):
         theta_bound=theta_tol,
     )
 
-    result = Solve(ik.prog())
-    q = result.GetSolution(ik.q())
+    prog = ik.prog()
+    q = ik.q()
+
+    # Nominal posture (pick whatever you want; this uses current positions in the IK context)
+    q_nom = plant.GetPositions(plant_context).copy()
+
+    # Cost only on indices 3..11 inclusive
+    idx = np.arange(3, 12)
+
+    w = 1.0  # tune weight
+    Q = w * np.eye(len(idx))
+
+    prog.AddQuadraticErrorCost(Q, q_nom[idx], q[idx])
+
+    result = Solve(prog)
+    q_star = result.GetSolution(ik.q())
 
     if result.is_success():
         print("IK succeeded")
     else:
         print("IK failed")
 
-    return q
+    return q_star
 
 def main():
     parser = argparse.ArgumentParser(
