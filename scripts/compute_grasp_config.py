@@ -126,6 +126,7 @@ def transform_points_to_world(
     return points_W
 
 def generate_single_antipodal_grasp(
+    diagram,
     plant,
     scene_graph,
     context,
@@ -139,6 +140,7 @@ def generate_single_antipodal_grasp(
     Sample a single antipodal grasp on a point cloud and visualize it.
 
     Args:
+        diagram: Parent Diagram object
         plant: MultibodyPlant
         scene_graph: SceneGraph
         context: diagram's Context
@@ -196,9 +198,17 @@ def generate_single_antipodal_grasp(
     Gz = np.cross(Gx, Gy)
     R_WG = RotationMatrix(np.column_stack([Gx, Gy, Gz]))
 
-    # Transform finger-box offset into world
-    p_WG = point - R_WG.multiply(p_GS_G)
-    X_WG = RigidTransform(R_WG, p_WG)
+    # Sample a single roll about the gripper x-axis (approach axis).
+    min_roll = -np.pi / 3.0
+    max_roll =  np.pi / 3.0
+    theta = np.random.uniform(min_roll, max_roll)
+
+    # Apply roll in the gripper frame: R_WG2 = R_WG * Rx(theta)
+    R_WG2 = R_WG.multiply(RotationMatrix.MakeXRotation(theta))
+
+    # Transform finger-box offset into world using the rolled rotation
+    p_WG = point - R_WG2.multiply(p_GS_G)
+    X_WG = RigidTransform(R_WG2, p_WG)
 
     # 5. Temporarily move the gripper in the plant to this pose
     gripper_instance = (
@@ -208,29 +218,34 @@ def generate_single_antipodal_grasp(
     )
     gripper_body = plant.GetBodyByName("body", gripper_instance)
     plant.SetFreeBodyPose(plant.GetMyContextFromRoot(context), gripper_body, X_WG)
+    diagram.ForcedPublish(context)
 
-    # 6. Check collisions against only the target object
+    X_check = plant.GetFreeBodyPose(plant.GetMyContextFromRoot(context), gripper_body)
+    print("Set pose:", X_WG)
+    print("Plant pose:", X_check)
+
+    # 6. Check collisions: gripper vs everything else (proximity role only)
     sg_context = scene_graph.GetMyContextFromRoot(context)
     query_object = scene_graph.get_query_output_port().Eval(sg_context)
+    inspector = query_object.inspector()
 
-    # Geometries of the gripper
-    gripper_geometry_ids = plant.GetCollisionGeometriesForBody(gripper_body)
+    # Proximity geometries of the gripper (these are always proximity)
+    gripper_geometry_ids = set(plant.GetCollisionGeometriesForBody(gripper_body))
 
-    # Geometries of the target object
-    target_model_instance = plant.GetModelInstanceByName(target_model_name)
-    target_geometries = []
-    for body_index in plant.GetBodyIndices(target_model_instance):
-        body = plant.get_body(body_index)
-        target_geometries.extend(plant.GetCollisionGeometriesForBody(body))
+    # Collect all proximity geometries in the scene (including world + objects + robot)
+    all_proximity_ids = set(inspector.GetAllGeometryIds())
+    all_proximity_ids = {gid for gid in all_proximity_ids if inspector.GetProximityProperties(gid) is not None}
 
-    # Check distances between gripper and target geometries
+    # Only check gripper vs "everything else"
+    other_proximity_ids = all_proximity_ids - gripper_geometry_ids
+
+    eps = 1e-4  # margin
+
     for g_geom in gripper_geometry_ids:
-        for t_geom in target_geometries:
-            signed_distance_pair = query_object.ComputeSignedDistancePairClosestPoints(
-                g_geom, t_geom
-            )
-            if signed_distance_pair.distance <= 0.0:
-                print("Gripper in collision with target! Rejecting grasp.")
+        for other in other_proximity_ids:
+            pair = query_object.ComputeSignedDistancePairClosestPoints(g_geom, other)
+            if pair.distance <= eps:
+                print("Gripper in collision with scene! Rejecting grasp.")
                 return None
 
     print("Grasp candidate is collision-free!")
@@ -351,6 +366,7 @@ def main():
             # meshcat.Delete("gripper_candidate")
 
             X_grasp = generate_single_antipodal_grasp(
+                diagram,
                 plant,
                 scene_graph,
                 diagram_context,
