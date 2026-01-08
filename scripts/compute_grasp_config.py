@@ -330,34 +330,52 @@ def main():
     print(f"Point cloud for '{target_obj_name}' with {points_world.shape[0]} points")
 
     # ---------------------------------------------------------------------
-    # Generate a single grasp candidate and visualize with ghost gripper
+    # Interactive grasp sampling loop
     # ---------------------------------------------------------------------
-    X_grasp = generate_single_antipodal_grasp(
-        plant,
-        scene_graph,
-        diagram_context,
-        gripper_model_name=ghost_gripper_instance,  # This is ModelInstanceIndex
-        points_world=points_world,
-        meshcat=meshcat,
-        target_model_name=target_obj_name,
-        visualize=True,
-    )
+    print("Press <space> then <enter> to sample a new grasp. Type 'q' then <enter> to quit.")
 
-    if X_grasp is not None:
-        print("Grasp candidate pose (world frame):")
-        print(X_grasp)
-
-    # ---------------------------------------------------------------------
-    # Publish diagram continuously
-    # ---------------------------------------------------------------------
+    # Make sure the world is drawn once.
     diagram.ForcedPublish(diagram_context)
-    print("Meshcat server running. Press Ctrl+C to exit.")
 
+    grasp_count = 0
     try:
         while True:
-            pass
+            s = input().strip("\n")
+            if s.lower() == "q":
+                break
+            if s != "" and s != " ":
+                # Ignore other inputs; only accept blank or a single space.
+                continue
+
+            # Optional: clear previous visualization path if you want
+            # meshcat.Delete("gripper_candidate")
+
+            X_grasp = generate_single_antipodal_grasp(
+                plant,
+                scene_graph,
+                diagram_context,
+                gripper_model_name=ghost_gripper_instance,  # ModelInstanceIndex
+                points_world=points_world,
+                meshcat=meshcat,
+                target_model_name=target_obj_name,
+                visualize=True,
+            )
+
+            if X_grasp is not None:
+                grasp_count += 1
+                print(f"\nGrasp #{grasp_count} candidate pose (world frame):")
+                print(X_grasp)
+            else:
+                print("\nRejected grasp (collision).")
+
+            # Publish so Meshcat updates any SceneGraph visuals (not strictly
+            # required for SetTransform, but good practice if you add more later).
+            diagram.ForcedPublish(diagram_context)
+
     except KeyboardInterrupt:
-        print("\nExiting.")
+        pass
+
+    print("\nExiting.")
 
 
 if __name__ == "__main__":
