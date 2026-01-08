@@ -220,10 +220,6 @@ def generate_single_antipodal_grasp(
     plant.SetFreeBodyPose(plant.GetMyContextFromRoot(context), gripper_body, X_WG)
     diagram.ForcedPublish(context)
 
-    X_check = plant.GetFreeBodyPose(plant.GetMyContextFromRoot(context), gripper_body)
-    print("Set pose:", X_WG)
-    print("Plant pose:", X_check)
-
     # 6. Check collisions: gripper vs everything else (proximity role only)
     sg_context = scene_graph.GetMyContextFromRoot(context)
     query_object = scene_graph.get_query_output_port().Eval(sg_context)
@@ -239,13 +235,67 @@ def generate_single_antipodal_grasp(
     # Only check gripper vs "everything else"
     other_proximity_ids = all_proximity_ids - gripper_geometry_ids
 
-    eps = 1e-4  # margin
+    def describe_geometry(gid):
+        name = inspector.GetName(gid)
+        frame_id = inspector.GetFrameId(gid)
+
+        roles = []
+        if inspector.GetProximityProperties(gid) is not None:
+            roles.append("proximity")
+        if inspector.GetIllustrationProperties(gid) is not None:
+            roles.append("illustration")
+        if inspector.GetPerceptionProperties(gid) is not None:
+            roles.append("perception")
+
+        # Try to map frame -> body (works for geometries registered by MultibodyPlant)
+        body_info = "body=<unknown>"
+        try:
+            body = plant.GetBodyFromFrameId(frame_id)
+            body_info = (
+                f"body={body.name()} "
+                f"model={plant.GetModelInstanceName(body.model_instance())}"
+            )
+        except Exception:
+            pass
+
+        return f"gid={gid} name='{name}' frame_id={frame_id} {body_info} roles={roles}"
+
+    bad = []
+    for g_geom in gripper_geometry_ids:
+        for t_geom in other_proximity_ids:
+            pair = query_object.ComputeSignedDistancePairClosestPoints(g_geom, t_geom)
+
+            if pair.distance <= 0.0:
+                bad.append((pair.distance, g_geom, t_geom, pair.p_ACa, pair.p_BCb))
+
+    if bad:
+        bad.sort(key=lambda x: x[0])  # most negative first
+        print(f"\n[DEBUG] {len(bad)} signed-distance collisions:")
+        for dist, a, b, pA, pB in bad[:20]:
+            print(f"  dist={dist:.6f}")
+            print(f"    A: {describe_geometry(a)}")
+            print(f"    B: {describe_geometry(b)}")
+            print(f"    p_ACa={pA}  p_BCb={pB}")
 
     for g_geom in gripper_geometry_ids:
+        frame_A = inspector.GetFrameId(g_geom)
+        body_A = plant.GetBodyFromFrameId(frame_A)
+
         for other in other_proximity_ids:
+            frame_B = inspector.GetFrameId(other)
+
+            try:
+                body_B = plant.GetBodyFromFrameId(frame_B)
+            except Exception:
+                continue  # non-MBP geometry (rare)
+
+            # Ignore self-collisions (gripper vs gripper)
+            if body_A.model_instance() == body_B.model_instance():
+                continue
+
             pair = query_object.ComputeSignedDistancePairClosestPoints(g_geom, other)
-            if pair.distance <= eps:
-                print("Gripper in collision with scene! Rejecting grasp.")
+            if pair.distance <= 0.0:
+                print("Gripper in collision with scene!")
                 return None
 
     print("Grasp candidate is collision-free!")
