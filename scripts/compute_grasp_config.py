@@ -24,6 +24,13 @@ from pydrake.all import (
     InverseKinematics,
     JointIndex,
     Solve,
+    CollisionFilterDeclaration,
+    GeometrySet,
+    MinimumDistanceLowerBoundConstraint,
+    BodyIndex,
+    SnoptSolver,
+    SolverOptions,
+    CommonSolverOption,
 )
 
 
@@ -268,24 +275,14 @@ def generate_single_antipodal_grasp(
 
     return X_WG
 
-def solve_ik_for_grasp(X_grasp, diagram, plant):
+def lock_joints_outside_first_n_positions(plant, plant_context, n_active_positions: int):
     """
-    Set up an IK problem for a desired gripper pose X_grasp.
+    Locks any joint whose position indices are not entirely within [0, n_active_positions-1].
+    This is a robust way to keep only a prefix of the plant's position vector free.
 
-    For now:
-      - Use a fresh diagram root context
-      - Lock all joints whose position indices are NOT in the first 11
-      - Construct InverseKinematics with joint limits enabled
-      - (No constraints yet; we'll add them next)
+    Example:
+      n_active_positions=11 => positions[0:11] are free, all others are locked.
     """
-    # Create a root context for the diagram, then obtain the plant subcontext.
-    diagram_context = diagram.CreateDefaultContext()
-    plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
-
-    # Lock all joints whose DOFs are outside the first 11 position variables.
-    # (Hardcoded assumption: positions[0:11] are the arm; everything else fixed.)
-    arm_position_count = 11
-
     for i in range(plant.num_joints()):
         joint = plant.get_joint(JointIndex(i))
         npos = joint.num_positions()
@@ -295,35 +292,110 @@ def solve_ik_for_grasp(X_grasp, diagram, plant):
         start = joint.position_start()
         pos_indices = range(start, start + npos)
 
-        # Keep joint unlocked iff *all* its position indices lie in [0, 10].
-        is_arm_joint = all(k < arm_position_count for k in pos_indices)
-        if not is_arm_joint:
-            # Locks the joint at its current value in plant_context.
+        keep_unlocked = all(k < n_active_positions for k in pos_indices)
+        if not keep_unlocked:
             joint.Lock(plant_context)
 
-    # Now construct IK on the (diagram-connected) plant, with the provided plant_context.
+def _collision_geometry_ids_for_instance(plant, instance):
+    ids = set()
+    for body_index in plant.GetBodyIndices(instance):
+        body = plant.get_body(body_index)
+        ids.update(plant.GetCollisionGeometriesForBody(body))
+    return ids
+
+
+def _all_collision_geometry_ids(plant):
+    ids = set()
+    for body_index in range(plant.num_bodies()):
+        body = plant.get_body(BodyIndex(body_index))
+        ids.update(plant.GetCollisionGeometriesForBody(body))
+    return ids
+
+def apply_robot_environment_collision_filters(
+    *,
+    plant,
+    scene_graph,
+    sg_context,
+    mobile_iiwa_instance,
+    wsg_instance,
+    ghost_gripper_instance,
+    mode: str,  # "arm_only" or "gripper_only"
+):
+    """
+    Configures SceneGraph collision filters so that the only remaining candidate
+    pairs are:
+      - mode="arm_only":     mobile_iiwa <-> environment
+      - mode="gripper_only": wsg_50      <-> environment
+
+    Always excludes anything involving the ghost gripper, and excludes env<->env,
+    robot<->robot, etc.
+    """
+    if mode not in ("arm_only", "gripper_only"):
+        raise ValueError(f"Unknown mode: {mode}")
+
+    A = _collision_geometry_ids_for_instance(plant, mobile_iiwa_instance)   # arm
+    G = _collision_geometry_ids_for_instance(plant, wsg_instance)          # real gripper
+    H = _collision_geometry_ids_for_instance(plant, ghost_gripper_instance)  # ghost
+    ALL = _all_collision_geometry_ids(plant)
+    E = set(ALL) - set(A) - set(G) - set(H)  # environment
+
+    setA = GeometrySet(list(A))
+    setG = GeometrySet(list(G))
+    setH = GeometrySet(list(H))
+    setE = GeometrySet(list(E))
+
+    cfm = scene_graph.collision_filter_manager(sg_context)
+    decl = CollisionFilterDeclaration()
+
+    # 1) Ghost should never collide with anything (robot or env).
+    decl.ExcludeWithin(setH)
+    decl.ExcludeBetween(setH, setA)
+    decl.ExcludeBetween(setH, setG)
+    decl.ExcludeBetween(setH, setE)
+
+    # 2) Never care about env-env or self collisions within components.
+    decl.ExcludeWithin(setE)
+    decl.ExcludeWithin(setA)
+    decl.ExcludeWithin(setG)
+
+    # 3) Never care about robot internal collisions between arm and gripper here.
+    decl.ExcludeBetween(setA, setG)
+
+    # 4) Remove whichever robot-vs-env pairs we *don't* want, leaving only one family.
+    if mode == "arm_only":
+        # Leave only A <-> E; so exclude G <-> E.
+        decl.ExcludeBetween(setG, setE)
+    else:
+        # Leave only G <-> E; so exclude A <-> E.
+        decl.ExcludeBetween(setA, setE)
+
+    cfm.Apply(decl)
+
+def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance):
+    # -------------------------
+    # Main IK context (decision variables live here)
+    # -------------------------
+    diagram_context = diagram.CreateDefaultContext()
+    plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
+
+    arm_position_count = 11
+    lock_joints_outside_first_n_positions(plant, plant_context, arm_position_count)
+
     ik = InverseKinematics(plant, plant_context, with_joint_limits=True)
 
-    # ------------------------------------------------------------------
-    # End-effector pose constraint: robot gripper "wsg_50" matches X_grasp
-    # ------------------------------------------------------------------
-    # Get the robot gripper model instance by name. (This must be the real gripper,
-    # not your ghost gripper instance.)
-    ee_instance = plant.GetModelInstanceByName("wsg_50")
-
-    # The gripper body in Drake’s WSG models is typically named "body".
-    ee_body = plant.GetBodyByName("body", ee_instance)
+    # -------------------------
+    # End-effector pose constraint: "wsg_50" body frame matches X_grasp
+    # -------------------------
+    wsg_instance = plant.GetModelInstanceByName("wsg_50")
+    ee_body = plant.GetBodyByName("body", wsg_instance)
     frame_E = ee_body.body_frame()
-
     frame_W = plant.world_frame()
 
-    # Desired pose (world -> end-effector)
     X_WE = X_grasp
 
-    # Position tolerance (meters). Tune later.
+    # Position constraint (origin of E)
     p_tol = 0.002
     p_WE = X_WE.translation()
-
     p_BQ = np.zeros((3, 1))
     p_AQ_lower = (p_WE - p_tol).reshape(3, 1)
     p_AQ_upper = (p_WE + p_tol).reshape(3, 1)
@@ -336,40 +408,105 @@ def solve_ik_for_grasp(X_grasp, diagram, plant):
         p_AQ_upper=p_AQ_upper,
     )
 
-    # Orientation tolerance (radians). Tune later.
-    theta_tol = 0.02  # ~1.1 deg
+    # Orientation constraint
+    theta_tol = 0.02
     R_WE = X_WE.rotation()
     ik.AddOrientationConstraint(
         frameAbar=frame_W,
         R_AbarA=R_WE,
         frameBbar=frame_E,
-        R_BbarB=RotationMatrix(),  # identity => constrain frame_E itself
+        R_BbarB=RotationMatrix(),
         theta_bound=theta_tol,
     )
 
     prog = ik.prog()
     q = ik.q()
 
-    # Nominal posture (pick whatever you want; this uses current positions in the IK context)
+    # -------------------------
+    # Quadratic posture cost on q[3:12]
+    # -------------------------
     q_nom = plant.GetPositions(plant_context).copy()
-
-    # Cost only on indices 3..11 inclusive
-    idx = np.arange(3, 12)
-
-    w = 1.0  # tune weight
+    idx = np.arange(3, 12)  # 3..11 inclusive
+    w = 1.0
     Q = w * np.eye(len(idx))
-
+    Q[0] *= 10.0
     prog.AddQuadraticErrorCost(Q, q_nom[idx], q[idx])
+    prog.SetInitialGuess(q, q_nom)
 
-    result = Solve(prog)
-    q_star = result.GetSolution(ik.q())
+    # -------------------------
+    # Collision constraints: two contexts + two explicit constraints
+    # -------------------------
+    mobile_iiwa_instance = plant.GetModelInstanceByName("mobile_iiwa")
+    influence_distance = 0.02  # tune
 
-    if result.is_success():
-        print("IK succeeded")
-    else:
+    # Context A: arm<->environment, lower bound 1 cm
+    diagram_context_arm = diagram.CreateDefaultContext()
+    plant_context_arm = diagram.GetMutableSubsystemContext(plant, diagram_context_arm)
+    sg_context_arm = diagram.GetMutableSubsystemContext(scene_graph, diagram_context_arm)
+    lock_joints_outside_first_n_positions(plant, plant_context_arm, arm_position_count)
+
+    apply_robot_environment_collision_filters(
+        plant=plant,
+        scene_graph=scene_graph,
+        sg_context=sg_context_arm,
+        mobile_iiwa_instance=mobile_iiwa_instance,
+        wsg_instance=wsg_instance,
+        ghost_gripper_instance=ghost_gripper_instance,
+        mode="arm_only",
+    )
+
+    c_arm = MinimumDistanceLowerBoundConstraint(
+        plant,
+        0.01,              # bound (1 cm)
+        plant_context_arm,
+        influence_distance_offset=0.02,
+    )
+    prog.AddConstraint(c_arm, q)
+
+    # Context B: gripper<->environment, lower bound 0 cm
+    diagram_context_grip = diagram.CreateDefaultContext()
+    plant_context_grip = diagram.GetMutableSubsystemContext(plant, diagram_context_grip)
+    sg_context_grip = diagram.GetMutableSubsystemContext(scene_graph, diagram_context_grip)
+    lock_joints_outside_first_n_positions(plant, plant_context_grip, arm_position_count)
+
+    apply_robot_environment_collision_filters(
+        plant=plant,
+        scene_graph=scene_graph,
+        sg_context=sg_context_grip,
+        mobile_iiwa_instance=mobile_iiwa_instance,
+        wsg_instance=wsg_instance,
+        ghost_gripper_instance=ghost_gripper_instance,
+        mode="gripper_only",
+    )
+
+    c_grip = MinimumDistanceLowerBoundConstraint(
+        plant,
+        0.0,               # bound (0 cm)
+        plant_context_grip,
+        influence_distance_offset=0.02,
+    )
+    prog.AddConstraint(c_grip, q)
+
+    # -------------------------
+    # Solve
+    # -------------------------
+
+    solver = SnoptSolver()
+    options = SolverOptions()
+
+    options.SetOption(CommonSolverOption.kPrintFileName, "snopt.log")
+    options.SetOption(SnoptSolver().solver_id(), "Major print level", 1)  # 1 = summary, 0 = none, >1 = verbose
+    options.SetOption(SnoptSolver().solver_id(), "Timing level", 3)  # Need to enable timing for time limits to work
+    options.SetOption(SnoptSolver().solver_id(), "Time Limit", 60)
+    options.SetOption(SnoptSolver().solver_id(), "Major optimality tolerance", 1e-1)
+
+    result = solver.Solve(prog, None, options)
+    if not result.is_success():
         print("IK failed")
+    else:
+        print("IK succeeded")
 
-    return q_star
+    return result.GetSolution(q)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -501,7 +638,7 @@ def main():
                 print(f"\nGrasp #{grasp_count} candidate pose (world frame):")
                 print(X_grasp)
 
-                q = solve_ik_for_grasp(X_grasp, diagram, plant)
+                q = solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance)
                 plant.SetPositions(plant_context, q)
             else:
                 print("\nRejected grasp (collision).")
