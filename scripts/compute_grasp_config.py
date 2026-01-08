@@ -503,10 +503,53 @@ def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_insta
     result = solver.Solve(prog, None, options)
     if not result.is_success():
         print("IK failed")
-    else:
-        print("IK succeeded")
+        return None
+
+    print("IK succeeded")
 
     return result.GetSolution(q)
+
+def compute_target_pose(
+    *,
+    task,
+    plant,
+    diagram_context,
+    target_obj_name: str,
+    X_grasp: RigidTransform,
+    z_offset: float = 0.002,
+):
+    """
+    Given:
+      - X_grasp = X_WG at pick time (world->gripper)
+      - current object pose X_WO (world->object) from the diagram_context
+      - task["commands"][0]["target_position"] (world position for object)
+
+    Returns:
+      - X_WG_goal: world->gripper pose that realizes the same relative grasp
+        when the object is at its target pose.
+
+    Notes:
+      - We keep the object's *orientation* the same as its current orientation.
+      - We set the object's position to target_position + [0,0,z_offset].
+    """
+    # Current object pose in world at pick time
+    obj_instance = plant.GetModelInstanceByName(target_obj_name)
+    obj_body = plant.GetBodyByName("base_link", obj_instance)  # may differ; see note below
+    X_WO = plant.EvalBodyPoseInWorld(
+        plant.GetMyContextFromRoot(diagram_context), obj_body
+    )
+
+    # Relative grasp transform: object -> gripper
+    X_OG = X_WO.inverse() @ X_grasp
+
+    # Desired object target pose (world->object): keep current rotation, change translation
+    cmd = task["commands"][0]
+    p_WO_goal = np.array(cmd["target_position"], dtype=float) + np.array([0.0, 0.0, z_offset])
+    X_WO_goal = RigidTransform(X_WO.rotation(), p_WO_goal)
+
+    # Desired gripper pose at place time
+    X_WG_goal = X_WO_goal @ X_OG
+    return X_WG_goal
 
 def main():
     parser = argparse.ArgumentParser(
@@ -603,7 +646,13 @@ def main():
     # ---------------------------------------------------------------------
     # Interactive grasp sampling loop
     # ---------------------------------------------------------------------
-    print("Press <space> then <enter> to sample a new grasp. Type 'q' then <enter> to quit.")
+    last_grasp_pose = None   # stores last successful grasp pose (X_WG)
+    last_grasp_q = None      # stores last successful grasp configuration
+
+    print("Controls:")
+    print("  <enter> or <space> + <enter> : sample grasp + solve IK")
+    print("  p + <enter>                  : compute place pose + solve IK there (requires successful grasp)")
+    print("  q + <enter>                  : quit")
 
     # Make sure the world is drawn once.
     diagram.ForcedPublish(diagram_context)
@@ -612,14 +661,42 @@ def main():
     try:
         while True:
             s = input().strip("\n")
+
             if s.lower() == "q":
                 break
-            if s != "" and s != " ":
-                # Ignore other inputs; only accept blank or a single space.
+
+            # ---- placement request ----
+            if s.lower() == "p":
+                if last_grasp_pose is None:
+                    print("No successful grasp yet — sample a grasp first.")
+                    continue
+
+                X_target = compute_target_pose(
+                    task=task,
+                    plant=plant,
+                    diagram_context=diagram_context,
+                    target_obj_name=target_obj_name,
+                    X_grasp=last_grasp_pose,
+                    z_offset=0.002,  # optional; default is 2mm anyway
+                )
+
+                print("\nTarget/place hand pose (world frame):")
+                print(X_target)
+
+                q_place = solve_ik_for_grasp(X_target, diagram, plant, scene_graph, ghost_gripper_instance)
+                if q_place is None:
+                    print("Place IK failed.")
+                    continue
+
+                plant.SetPositions(plant_context, q_place)
+                diagram.ForcedPublish(diagram_context)
+                print("Place IK succeeded.")
                 continue
 
-            # Optional: clear previous visualization path if you want
-            # meshcat.Delete("gripper_candidate")
+            # ---- grasp sampling request ----
+            if s != "" and s != " ":
+                # Ignore other inputs
+                continue
 
             X_grasp = generate_single_antipodal_grasp(
                 diagram,
@@ -633,19 +710,30 @@ def main():
                 visualize=True,
             )
 
-            if X_grasp is not None:
-                grasp_count += 1
-                print(f"\nGrasp #{grasp_count} candidate pose (world frame):")
-                print(X_grasp)
-
-                q = solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance)
-                plant.SetPositions(plant_context, q)
-            else:
+            if X_grasp is None:
                 print("\nRejected grasp (collision).")
+                diagram.ForcedPublish(diagram_context)
+                continue
 
-            # Publish so Meshcat updates any SceneGraph visuals (not strictly
-            # required for SetTransform, but good practice if you add more later).
+            grasp_count += 1
+            print(f"\nGrasp #{grasp_count} candidate pose (world frame):")
+            print(X_grasp)
+
+            q_grasp = solve_ik_for_grasp(
+                X_grasp, diagram, plant, scene_graph, ghost_gripper_instance
+            )
+            if q_grasp is None:
+                print("Grasp IK failed.")
+                diagram.ForcedPublish(diagram_context)
+                continue
+
+            print("Grasp IK succeeded (robot moved to grasp configuration).")
+            plant.SetPositions(plant_context, q_grasp)
             diagram.ForcedPublish(diagram_context)
+
+            # Store for later placement attempts
+            last_grasp_pose = X_grasp
+            last_grasp_q = q_grasp
 
     except KeyboardInterrupt:
         pass
