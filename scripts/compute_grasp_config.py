@@ -154,6 +154,9 @@ def generate_single_antipodal_grasp(
     Returns:
         RigidTransform of the gripper pose in world frame
     """
+    # Reset all generalized positions (q) for the entire plant.
+    plant.SetPositions(plant.GetMyContextFromRoot(context), plant.GetDefaultPositions())
+
     # 1. Sample a random point
     idx = np.random.randint(points_world.shape[0])
     point = points_world[idx]
