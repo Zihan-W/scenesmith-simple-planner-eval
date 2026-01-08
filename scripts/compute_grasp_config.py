@@ -225,78 +225,38 @@ def generate_single_antipodal_grasp(
     query_object = scene_graph.get_query_output_port().Eval(sg_context)
     inspector = query_object.inspector()
 
-    # Proximity geometries of the gripper (these are always proximity)
-    gripper_geometry_ids = set(plant.GetCollisionGeometriesForBody(gripper_body))
+    gripper_geometry_ids = set()
+    for body_index in plant.GetBodyIndices(gripper_instance):
+        body = plant.get_body(body_index)
+        gripper_geometry_ids.update(plant.GetCollisionGeometriesForBody(body))
 
-    # Collect all proximity geometries in the scene (including world + objects + robot)
-    all_proximity_ids = set(inspector.GetAllGeometryIds())
-    all_proximity_ids = {gid for gid in all_proximity_ids if inspector.GetProximityProperties(gid) is not None}
+    penetrations = query_object.ComputePointPairPenetration()
 
-    # Only check gripper vs "everything else"
-    other_proximity_ids = all_proximity_ids - gripper_geometry_ids
-
-    def describe_geometry(gid):
-        name = inspector.GetName(gid)
+    def body_from_geom(gid):
         frame_id = inspector.GetFrameId(gid)
+        return plant.GetBodyFromFrameId(frame_id)
 
-        roles = []
-        if inspector.GetProximityProperties(gid) is not None:
-            roles.append("proximity")
-        if inspector.GetIllustrationProperties(gid) is not None:
-            roles.append("illustration")
-        if inspector.GetPerceptionProperties(gid) is not None:
-            roles.append("perception")
+    for pen in penetrations:
+        a = pen.id_A
+        b = pen.id_B
 
-        # Try to map frame -> body (works for geometries registered by MultibodyPlant)
-        body_info = "body=<unknown>"
-        try:
-            body = plant.GetBodyFromFrameId(frame_id)
-            body_info = (
-                f"body={body.name()} "
-                f"model={plant.GetModelInstanceName(body.model_instance())}"
-            )
-        except Exception:
-            pass
+        # Only care about penetrations where exactly one geom is the gripper
+        if (a in gripper_geometry_ids) ^ (b in gripper_geometry_ids):
+            # Identify which side is gripper
+            g = a if a in gripper_geometry_ids else b
+            o = b if g == a else a
 
-        return f"gid={gid} name='{name}' frame_id={frame_id} {body_info} roles={roles}"
-
-    bad = []
-    for g_geom in gripper_geometry_ids:
-        for t_geom in other_proximity_ids:
-            pair = query_object.ComputeSignedDistancePairClosestPoints(g_geom, t_geom)
-
-            if pair.distance <= 0.0:
-                bad.append((pair.distance, g_geom, t_geom, pair.p_ACa, pair.p_BCb))
-
-    if bad:
-        bad.sort(key=lambda x: x[0])  # most negative first
-        print(f"\n[DEBUG] {len(bad)} signed-distance collisions:")
-        for dist, a, b, pA, pB in bad[:20]:
-            print(f"  dist={dist:.6f}")
-            print(f"    A: {describe_geometry(a)}")
-            print(f"    B: {describe_geometry(b)}")
-            print(f"    p_ACa={pA}  p_BCb={pB}")
-
-    for g_geom in gripper_geometry_ids:
-        frame_A = inspector.GetFrameId(g_geom)
-        body_A = plant.GetBodyFromFrameId(frame_A)
-
-        for other in other_proximity_ids:
-            frame_B = inspector.GetFrameId(other)
-
-            try:
-                body_B = plant.GetBodyFromFrameId(frame_B)
-            except Exception:
-                continue  # non-MBP geometry (rare)
-
-            # Ignore self-collisions (gripper vs gripper)
-            if body_A.model_instance() == body_B.model_instance():
+            # Ignore self-collisions inside the gripper model instance
+            body_g = body_from_geom(g)
+            body_o = body_from_geom(o)
+            if body_g.model_instance() == body_o.model_instance():
                 continue
 
-            pair = query_object.ComputeSignedDistancePairClosestPoints(g_geom, other)
-            if pair.distance <= 0.0:
-                print("Gripper in collision with scene!")
-                return None
+            print("Gripper in collision with scene!")
+            print(f"  depth={pen.depth:.6f}")
+            print(f"  gripper geom: {inspector.GetName(g)}")
+            print(f"  other geom:   {inspector.GetName(o)}")
+            return None
 
     print("Grasp candidate is collision-free!")
 
