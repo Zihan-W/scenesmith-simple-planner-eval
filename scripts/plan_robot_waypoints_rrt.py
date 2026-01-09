@@ -31,8 +31,9 @@ from pydrake.multibody.tree import BodyIndex
 import sys
 sys.path.append("..")
 
-# Import your RRT implementation (adjust the import path to your repo layout)
+# Import your RRT and shortcut implementations
 from src.rrt import BiRRT, RRTOptions
+from src.shortcut import shortcut
 
 def embed_q_prefix(
     *,
@@ -414,6 +415,9 @@ def plan_rrt_segment(
     world_xy_bounds,
     max_iters=2000,
     step_size=0.1,
+    do_shortcut: bool = False,
+    shortcut_tries: int = 200,
+    shortcut_check_size: float = 1e-2,
 ) -> TrajectorySegment:
     """
     Plans in the first 11 positions only. Remaining positions held constant.
@@ -448,14 +452,31 @@ def plan_rrt_segment(
 
     rrt_planner = BiRRT(RandomConfig, ValidityChecker)
     path11 = rrt_planner.plan(start11, goal11, rrt_options)
-
     if path11 is None or len(path11) == 0:
         raise RuntimeError("RRT failed to find a path.")
 
-    # Convert 11-DOF path back to full-q knots for playback/concatenation.
+    # --- Optional shortcutting (in 11-DOF space) ---
+    if do_shortcut:
+        path11 = shortcut_refine_prefix(
+            checker,
+            path11,
+            num_tries=shortcut_tries,
+            check_size=shortcut_check_size,
+        )
+
+    # Embed refined path back to full-q
     q_knots_full = np.vstack([checker.embed_prefix(q11) for q11 in path11])
     return TrajectorySegment(q_knots=q_knots_full)
 
+def shortcut_refine_prefix(
+    checker,
+    path11,
+    *,
+    num_tries: int = 200,
+    check_size: float = 1e-2,
+):
+    ValidityChecker = lambda q11: checker.CheckConfigCollisionFreePrefix(q11)
+    return shortcut(path11, ValidityChecker, num_tries=num_tries, check_size=check_size)
 
 
 # -----------------------------------------------------------------------------
@@ -583,6 +604,13 @@ def main():
     parser.add_argument("--rrt-step", type=float, default=0.1)
     parser.add_argument("--render-rate", type=float, default=60.0)
     parser.add_argument("--q-speed", type=float, default=1.0)
+    parser.add_argument(
+        "--no-shortcut",
+        action="store_true",
+        help="Disable shortcutting (default: shortcutting is enabled).",
+    )
+    parser.add_argument("--shortcut-tries", type=int, default=25)
+    parser.add_argument("--shortcut-check", type=float, default=1e-2)
     args = parser.parse_args()
 
     dmd_file = Path(args.dmd_file)
@@ -661,7 +689,11 @@ def main():
             world_xy_bounds=world_xy_bounds,
             max_iters=args.rrt_iters,
             step_size=args.rrt_step,
+            do_shortcut=not args.no_shortcut,
+            shortcut_tries=args.shortcut_tries,
+            shortcut_check_size=args.shortcut_check,
         )
+
 
         print(f"  Segment knots: {seg.q_knots.shape[0]}")
         segments.append(seg)
