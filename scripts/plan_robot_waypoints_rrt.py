@@ -480,48 +480,46 @@ def concatenate_segments(segments: List[TrajectorySegment]) -> np.ndarray:
 # Step (5): Visualize plan interactively  (TODO skeleton)
 # -----------------------------------------------------------------------------
 
-def playback_plan_interactive(
+def playback_segments_interactive(
     *,
     diagram,
     diagram_context,
     plant,
     plant_context,
-    q_traj: np.ndarray,
+    segments: List[TrajectorySegment],
     render_rate_hz: float = 60.0,
     q_speed: float = 0.6,
 ):
     """
-    Visualize the plan with roughly constant speed in configuration space.
-
-    - Builds a piecewise-linear trajectory through q_traj
-    - Assigns knot times proportional to ||dq|| so motion is ~constant speed
-    - Renders at a fixed rate and interpolates between knots
+    Interactive playback over multiple segments (kept separate).
 
     Controls:
-      - <enter> : replay trajectory
+      - <enter> : play the next segment (in order)
       - q<enter>: quit
+
+    After the last segment, wraps back to segment 0.
     """
-    if q_traj.shape[0] < 1:
-        raise ValueError("q_traj is empty")
+    if not segments:
+        raise ValueError("No segments to playback.")
 
     dt_render = 1.0 / render_rate_hz
-    t_knots = _compute_knot_times_constant_speed(q_traj, speed=q_speed)
-    T = float(t_knots[-1])
 
     print("\nControls:")
-    print("  <enter> : replay trajectory")
+    print("  <enter> : play next segment")
     print("  q + <enter> : quit")
     print()
-    print(f"Playback: {q_traj.shape[0]} knots, duration ~ {T:.2f}s, "
-          f"render_rate={render_rate_hz:.1f} Hz, q_speed={q_speed:.3f}")
 
-    def play_once():
-        # Always start exactly at first knot
+    def play_traj(q_traj: np.ndarray):
+        if q_traj.shape[0] == 0:
+            return
+        t_knots = _compute_knot_times_constant_speed(q_traj, speed=q_speed)
+        T = float(t_knots[-1])
+
+        # Start exactly at first knot
         plant.SetPositions(plant_context, q_traj[0])
         diagram.ForcedPublish(diagram_context)
 
         t = 0.0
-        # Use wall-clock sleep to regulate rendering.
         while t < T:
             q = _sample_piecewise_linear(q_traj, t_knots, t)
             plant.SetPositions(plant_context, q)
@@ -533,14 +531,28 @@ def playback_plan_interactive(
         plant.SetPositions(plant_context, q_traj[-1])
         diagram.ForcedPublish(diagram_context)
 
-    play_once()
+    # Start at first segment
+    seg_idx = 0
+    print(f"Ready. {len(segments)} segment(s) planned.")
+    print(f"Next up: segment {seg_idx+1}/{len(segments)}. Press <enter> to play.")
 
     while True:
         s = input().strip("\n").lower()
         if s == "q":
             break
-        if s == "":
-            play_once()
+        if s != "":
+            continue
+
+        seg = segments[seg_idx]
+        print(f"\nPlaying segment {seg_idx+1}/{len(segments)} "
+              f"({seg.q_knots.shape[0]} knots)")
+        play_traj(seg.q_knots)
+
+        # Advance + wrap
+        seg_idx = (seg_idx + 1) % len(segments)
+        if seg_idx == 0:
+            print("\n(Reached end — wrapping back to segment 1)")
+        print(f"Next up: segment {seg_idx+1}/{len(segments)}. Press <enter> to play.")
 
     print("Exiting playback.")
 
@@ -655,20 +667,14 @@ def main():
         segments.append(seg)
 
     # ---------------------------------------------------------------------
-    # (4) Concatenate
+    # (4) Visualize interactively
     # ---------------------------------------------------------------------
-    q_traj = concatenate_segments(segments)
-    print(f"\nFull plan knots: {q_traj.shape[0]} (nq={q_traj.shape[1]})")
-
-    # ---------------------------------------------------------------------
-    # (5) Visualize interactively
-    # ---------------------------------------------------------------------
-    playback_plan_interactive(
+    playback_segments_interactive(
         diagram=diagram,
         diagram_context=diagram_context,
         plant=plant,
         plant_context=plant_context,
-        q_traj=q_traj,
+        segments=segments,
         render_rate_hz=args.render_rate,
         q_speed=args.q_speed,
     )
