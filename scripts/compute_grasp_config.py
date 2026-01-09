@@ -654,9 +654,13 @@ def main():
     last_grasp_pose = None   # stores last successful grasp pose (X_WG)
     last_grasp_q = None      # stores last successful grasp configuration
 
+    # Save at the base level of the repository (parent directory of the folder containing this .py file)
+    waypoints_path = Path(__file__).resolve().parent.parent / "robot_waypoints.json"
+
     print("Controls:")
     print("  <enter> or <space> + <enter> : sample grasp + solve IK")
-    print("  p + <enter>                  : compute place pose + solve IK there (requires successful grasp)")
+    print("  p + <enter>                  : sample place target + solve IK")
+    print("  s + <enter>                  : save grasp+place waypoints to robot_waypoints.json")
     print("  q + <enter>                  : quit")
 
     # Make sure the world is drawn once.
@@ -665,13 +669,32 @@ def main():
     grasp_count = 0
     try:
         while True:
-            s = input().strip("\n")
+            s = input().strip("\n").lower()
 
-            if s.lower() == "q":
+            if s == "q":
                 break
 
-            # ---- placement request ----
-            if s.lower() == "p":
+            # Save waypoints
+            if s == "s":
+                if q_grasp_last is None or q_place_last is None:
+                    print("Need both a successful grasp and place IK before saving.")
+                    continue
+
+                data = {
+                    "waypoints": [
+                        {"name": "grasp", "q": q_grasp_last[:11].tolist()},
+                        {"name": "place", "q": q_place_last[:11].tolist()},
+                    ]
+                }
+
+                with open(waypoints_path, "w") as f:
+                    json.dump(data, f, indent=2)
+
+                print(f"Saved waypoints to: {waypoints_path}")
+                continue
+
+            # Place IK
+            if s == "p":
                 if last_grasp_pose is None:
                     print("No successful grasp yet — sample a grasp first.")
                     continue
@@ -682,25 +705,25 @@ def main():
                     diagram_context=diagram_context,
                     target_obj_name=target_obj_name,
                     X_grasp=last_grasp_pose,
-                    z_offset=0.002,  # optional; default is 2mm anyway
+                    z_offset=0.002,
+                    # rng=rng,   # if you added deterministic sampling
                 )
 
-                print("\nTarget/place hand pose (world frame):")
-                print(X_target)
-
-                q_place = solve_ik_for_grasp(X_target, diagram, plant, scene_graph, ghost_gripper_instance)
+                q_place = solve_ik_for_grasp(
+                    X_target, diagram, plant, scene_graph, ghost_gripper_instance
+                )
                 if q_place is None:
                     print("Place IK failed.")
                     continue
 
-                plant.SetPositions(plant_context, q_place)
+                q_place_last = np.asarray(q_place).copy()
+                plant.SetPositions(plant_context, q_place_last)
                 diagram.ForcedPublish(diagram_context)
                 print("Place IK succeeded.")
                 continue
 
-            # ---- grasp sampling request ----
+            # Grasp sampling: accept "" or " " only
             if s != "" and s != " ":
-                # Ignore other inputs
                 continue
 
             X_grasp = generate_single_antipodal_grasp(
@@ -708,7 +731,7 @@ def main():
                 plant,
                 scene_graph,
                 diagram_context,
-                gripper_model_name=ghost_gripper_instance,  # ModelInstanceIndex
+                gripper_model_name=ghost_gripper_instance,
                 points_world=points_world,
                 meshcat=meshcat,
                 target_model_name=target_obj_name,
@@ -732,13 +755,12 @@ def main():
                 diagram.ForcedPublish(diagram_context)
                 continue
 
-            print("Grasp IK succeeded (robot moved to grasp configuration).")
-            plant.SetPositions(plant_context, q_grasp)
-            diagram.ForcedPublish(diagram_context)
-
-            # Store for later placement attempts
+            q_grasp_last = np.asarray(q_grasp).copy()
             last_grasp_pose = X_grasp
-            last_grasp_q = q_grasp
+
+            plant.SetPositions(plant_context, q_grasp_last)
+            diagram.ForcedPublish(diagram_context)
+            print("Grasp IK succeeded.")
 
     except KeyboardInterrupt:
         pass
