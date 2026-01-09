@@ -18,7 +18,12 @@ export ROS_PACKAGE_PATH=/home/tommy/Documents/programming/work/rlg/snippets/poli
 python3 -m pydrake.visualization.model_visualizer pick_candle_task.dmd.yaml
 ```
 
-Compute a grasp configuration for the manipuland:
+Compute a grasp and place configuration for the manipuland:
 ```
-python3 scripts/compute_grasp_config.py models/scene_008/pick_candle_task.json pick_candle_task.dmd.yaml     --package-xml models/iiwa/package.xml --package-xml models/scene_008/package.xml
+python3 scripts/compute_grasp_config.py models/scene_008/pick_candle_task.json pick_candle_task.dmd.yaml --package-xml models/iiwa/package.xml --package-xml models/scene_008/package.xml
+```
+
+Compute a plan given robot waypoints from the grasp computation script:
+```
+python3 scripts/plan_robot_waypoints_rrt.py pick_candle_task.dmd.yaml robot_waypoints.json --package-xml models/iiwa/package.xml --package-xml models/scene_008/package.xml
 ```
