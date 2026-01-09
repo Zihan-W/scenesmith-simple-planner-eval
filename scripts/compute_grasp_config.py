@@ -517,37 +517,42 @@ def compute_target_pose(
     target_obj_name: str,
     X_grasp: RigidTransform,
     z_offset: float = 0.002,
+    rng: np.random.Generator | None = None,
 ):
     """
-    Given:
-      - X_grasp = X_WG at pick time (world->gripper)
-      - current object pose X_WO (world->object) from the diagram_context
-      - task["commands"][0]["target_position"] (world position for object)
+    Samples an object placement target pose within [placement_bounds_min, placement_bounds_max],
+    then returns the corresponding gripper target pose that preserves the grasp transform.
 
     Returns:
-      - X_WG_goal: world->gripper pose that realizes the same relative grasp
-        when the object is at its target pose.
-
-    Notes:
-      - We keep the object's *orientation* the same as its current orientation.
-      - We set the object's position to target_position + [0,0,z_offset].
+      X_WG_goal (RigidTransform): world->gripper pose
     """
-    # Current object pose in world at pick time
+    if rng is None:
+        rng = np.random.default_rng()
+
+    cmd = task["commands"][0]
+    lo = np.array(cmd["placement_bounds_min"], dtype=float)
+    hi = np.array(cmd["placement_bounds_max"], dtype=float)
+
+    # Sample object target position uniformly in the AABB
+    p_WO_goal = rng.uniform(lo, hi)
+    p_WO_goal[2] += z_offset
+
+    # Current object pose in world (for X_OG computation)
     obj_instance = plant.GetModelInstanceByName(target_obj_name)
-    obj_body = plant.GetBodyByName("base_link", obj_instance)  # may differ; see note below
+    body_indices = plant.GetBodyIndices(obj_instance)
+    obj_body = plant.get_body(body_indices[0])  # ok for single-body objects; refine if needed
+
     X_WO = plant.EvalBodyPoseInWorld(
         plant.GetMyContextFromRoot(diagram_context), obj_body
     )
 
-    # Relative grasp transform: object -> gripper
+    # Preserve relative grasp: X_OG
     X_OG = X_WO.inverse() @ X_grasp
 
-    # Desired object target pose (world->object): keep current rotation, change translation
-    cmd = task["commands"][0]
-    p_WO_goal = np.array(cmd["target_position"], dtype=float) + np.array([0.0, 0.0, z_offset])
+    # Build goal object pose: keep current orientation, new sampled translation
     X_WO_goal = RigidTransform(X_WO.rotation(), p_WO_goal)
 
-    # Desired gripper pose at place time
+    # Convert to desired gripper pose
     X_WG_goal = X_WO_goal @ X_OG
     return X_WG_goal
 
