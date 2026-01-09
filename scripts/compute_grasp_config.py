@@ -620,6 +620,7 @@ def main():
     diagram = builder.Build()
     diagram_context = diagram.CreateDefaultContext()
     plant_context = diagram.GetSubsystemContext(plant, diagram_context)
+    q_start = plant.GetPositions(plant_context).copy()[:11]
 
     # ---------------------------------------------------------------------
     # Sample points and visualize point cloud
@@ -652,7 +653,8 @@ def main():
     # Interactive grasp sampling loop
     # ---------------------------------------------------------------------
     last_grasp_pose = None   # stores last successful grasp pose (X_WG)
-    last_grasp_q = None      # stores last successful grasp configuration
+    q_grasp_last = None      # stores last successful grasp configuration
+    q_place_last = None      # stores last successful place configuration
 
     # Save at the base level of the repository (parent directory of the folder containing this .py file)
     waypoints_path = Path(__file__).resolve().parent.parent / "robot_waypoints.json"
@@ -682,8 +684,10 @@ def main():
 
                 data = {
                     "waypoints": [
+                        {"name": "start", "q": q_start.tolist()},
                         {"name": "grasp", "q": q_grasp_last[:11].tolist()},
                         {"name": "place", "q": q_place_last[:11].tolist()},
+                        {"name": "start", "q": q_start.tolist()},
                     ]
                 }
 

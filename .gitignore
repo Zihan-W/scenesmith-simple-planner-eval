@@ -2,3 +2,4 @@
 models/scene_008/*
 /*.dmd.yaml
 snopt.log
+robot_waypoints.json
