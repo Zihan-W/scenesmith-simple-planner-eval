@@ -24,6 +24,15 @@ from pydrake.geometry import StartMeshcat
 from pydrake.multibody.parsing import Parser, LoadModelDirectives, ProcessModelDirectives
 from pydrake.planning import RobotDiagramBuilder
 from pydrake.visualization import ApplyVisualizationConfig, VisualizationConfig
+from pydrake.geometry import CollisionFilterDeclaration, GeometrySet
+from pydrake.multibody.tree import BodyIndex
+
+# Fix relative paths so contents of the src directory can be imported.
+import sys
+sys.path.append("..")
+
+# Import your RRT implementation (adjust the import path to your repo layout)
+from src.rrt import BiRRT, RRTOptions
 
 def embed_q_prefix(
     *,
@@ -92,6 +101,166 @@ def _sample_piecewise_linear(
     alpha = (t - t0) / (t1 - t0)
     return (1.0 - alpha) * q0 + alpha * q1
 
+def _collision_geometry_ids_for_instance(plant, instance):
+    ids = set()
+    for body_index in plant.GetBodyIndices(instance):
+        body = plant.get_body(body_index)
+        ids.update(plant.GetCollisionGeometriesForBody(body))
+    return ids
+
+
+def _all_collision_geometry_ids(plant):
+    ids = set()
+    for body_index in range(plant.num_bodies()):
+        body = plant.get_body(BodyIndex(body_index))
+        ids.update(plant.GetCollisionGeometriesForBody(body))
+    return ids
+
+
+def apply_robot_environment_only_filters(
+    *,
+    plant,
+    scene_graph,
+    sg_context,
+    robot_instances,      # list[ModelInstanceIndex] e.g. [mobile_iiwa_instance, wsg_instance]
+    ignore_arm_gripper_internal: bool = True,
+):
+    """
+    Leaves only (robot) <-> (environment) candidate pairs.
+    Excludes: env-env, robot-robot (incl self within arm/gripper), and optionally arm<->gripper.
+    """
+    # Robot geometry ids
+    R = set()
+    for inst in robot_instances:
+        R |= _collision_geometry_ids_for_instance(plant, inst)
+
+    ALL = _all_collision_geometry_ids(plant)
+    E = set(ALL) - set(R)
+
+    setR = GeometrySet(list(R))
+    setE = GeometrySet(list(E))
+
+    cfm = scene_graph.collision_filter_manager(sg_context)
+    decl = CollisionFilterDeclaration()
+
+    # Never care about env-env or robot-robot
+    decl.ExcludeWithin(setE)
+    decl.ExcludeWithin(setR)
+
+    # If you *do* care about arm-vs-gripper internal collisions, set this False
+    if ignore_arm_gripper_internal and len(robot_instances) >= 2:
+        # Exclude between each pair of robot sub-instances
+        # (Arm vs gripper, etc.)
+        ids_by_inst = [_collision_geometry_ids_for_instance(plant, inst) for inst in robot_instances]
+        for i in range(len(ids_by_inst)):
+            for j in range(i + 1, len(ids_by_inst)):
+                decl.ExcludeBetween(
+                    GeometrySet(list(ids_by_inst[i])),
+                    GeometrySet(list(ids_by_inst[j])),
+                )
+
+    # Important: Do NOT exclude between setR and setE.
+    # That’s the only family we want to keep.
+    cfm.Apply(decl)
+
+class RobotEnvValidityChecker:
+    def __init__(
+        self,
+        *,
+        diagram,
+        plant,
+        scene_graph,
+        diagram_context,
+        plant_context,
+        robot_instances,      # [mobile_iiwa_instance, wsg_instance]
+        q_full_fixed: np.ndarray,  # full plant positions used as baseline; only first 11 overwritten
+        prefix_size: int = 11,
+    ):
+        self._diagram = diagram
+        self._plant = plant
+        self._scene_graph = scene_graph
+        self._diagram_context = diagram_context
+        self._plant_context = plant_context
+        self._prefix_size = prefix_size
+
+        self._q_full_fixed = np.asarray(q_full_fixed, dtype=float).copy()
+        if self._q_full_fixed.shape != (plant.num_positions(),):
+            raise ValueError("q_full_fixed must have shape (plant.num_positions(),)")
+
+        # Apply collision filters once (they live in SceneGraph context).
+        sg_context = scene_graph.GetMyContextFromRoot(diagram_context)
+        apply_robot_environment_only_filters(
+            plant=plant,
+            scene_graph=scene_graph,
+            sg_context=sg_context,
+            robot_instances=robot_instances,
+            ignore_arm_gripper_internal=True,
+        )
+
+    def plant(self):
+        return self._plant
+
+    def embed_prefix(self, q_prefix: np.ndarray) -> np.ndarray:
+        q_prefix = np.asarray(q_prefix, dtype=float)
+        if q_prefix.shape != (self._prefix_size,):
+            raise ValueError(f"Expected q_prefix shape ({self._prefix_size},), got {q_prefix.shape}")
+        q_full = self._q_full_fixed.copy()
+        q_full[: self._prefix_size] = q_prefix
+        return q_full
+
+    def CheckConfigCollisionFreePrefix(self, q_prefix: np.ndarray) -> bool:
+        q_full = self.embed_prefix(q_prefix)
+
+        # Set positions in plant context
+        self._plant.SetPositions(self._plant_context, q_full)
+
+        # Query collisions
+        sg_context = self._scene_graph.GetMyContextFromRoot(self._diagram_context)
+        query_object = self._scene_graph.get_query_output_port().Eval(sg_context)
+
+        penetrations = query_object.ComputePointPairPenetration()
+        # With filters applied, any penetration means robot-env collision.
+        return len(penetrations) == 0
+
+def make_prefix_sampler(
+    checker,
+    *,
+    rng: np.random.Generator,
+    world_xy_bounds: tuple[float, float, float, float],
+    prefix_size: int = 11,
+):
+    """
+    Samples q_prefix (size=prefix_size) with special handling for:
+      q[0] = base x in [world_x_min, world_x_max]
+      q[1] = base y in [world_y_min, world_y_max]
+      q[2] = base theta in [-pi, pi]
+
+    Remaining prefix DOFs use plant position limits. Raises if any remaining
+    bounds are non-finite (so you notice immediately).
+    """
+    q_lb = np.asarray(checker.plant().GetPositionLowerLimits()[:prefix_size], dtype=float)
+    q_ub = np.asarray(checker.plant().GetPositionUpperLimits()[:prefix_size], dtype=float)
+
+    x_min, x_max, y_min, y_max = world_xy_bounds
+
+    # Override unbounded base x/y/theta with task-derived / chosen bounds.
+    q_lb[0], q_ub[0] = x_min, x_max
+    q_lb[1], q_ub[1] = y_min, y_max
+
+    # Safety: make sure the rest are finite.
+    bad = ~np.isfinite(q_lb) | ~np.isfinite(q_ub)
+    if np.any(bad):
+        bad_idx = np.where(bad)[0].tolist()
+        raise ValueError(
+            f"Non-finite joint bounds in prefix after overrides at indices {bad_idx}. "
+            "You need to provide finite bounds for these DOFs too."
+        )
+
+    def sample():
+        return rng.uniform(q_lb, q_ub)
+
+    return sample
+
 # -----------------------------------------------------------------------------
 # Utilities copied / aligned with your previous script
 # -----------------------------------------------------------------------------
@@ -116,6 +285,11 @@ def register_package_xml(parser: Parser, package_xml_path: Path):
     parser.package_map().Add(package_name, package_dir)
     print(f"Registered package '{package_name}' at {package_dir}")
 
+def load_task_json(task_file: Path) -> dict:
+    if not task_file.exists():
+        raise ValueError(f"Task file does not exist: {task_file}")
+    with open(task_file, "r") as f:
+        return json.load(f)
 
 # -----------------------------------------------------------------------------
 # Waypoints / plan data structures
@@ -233,34 +407,55 @@ def load_waypoints_json(path: Path) -> List[Waypoint]:
 
 def plan_rrt_segment(
     *,
-    plant,
-    plant_context,
-    q_start: np.ndarray,
-    q_goal: np.ndarray,
-    rng: np.random.Generator,
-    max_iters: int = 2000,
-    step_size: float = 0.1,
+    checker,
+    q_start,
+    q_goal,
+    rng,
+    world_xy_bounds,
+    max_iters=2000,
+    step_size=0.1,
 ) -> TrajectorySegment:
     """
-    Placeholder for an RRT planner in configuration space.
-
-    Contract:
-      - Returns a sequence of configurations from q_start to q_goal.
-      - Should do collision checking using the plant/scene_graph context you already built.
-
-    TODO: Implement:
-      - sampling in joint limits
-      - nearest neighbor
-      - steer step_size
-      - collision check along edge
-      - goal connection
-      - path extraction
+    Plans in the first 11 positions only. Remaining positions held constant.
+    Returns full-q knots for visualization.
     """
-    # --- TEMP: straight-line fallback so the script structure works ---
-    # Replace this with real RRT output once implemented.
-    K = 20
-    qs = np.linspace(q_start, q_goal, K)
-    return TrajectorySegment(q_knots=qs)
+    start11 = np.asarray(q_start[:11], dtype=float).copy()
+    goal11  = np.asarray(q_goal[:11], dtype=float).copy()
+
+    # (Optional but helpful) ensure endpoints are valid
+    if not checker.CheckConfigCollisionFreePrefix(start11):
+        raise RuntimeError("Start waypoint is in collision (robot-environment).")
+    if not checker.CheckConfigCollisionFreePrefix(goal11):
+        raise RuntimeError("Goal waypoint is in collision (robot-environment).")
+
+    rrt_options = RRTOptions(
+        step_size=step_size,
+        check_size=min(1e-2, step_size / 10.0),
+        max_vertices=int(1e4),
+        max_iters=int(max_iters),
+        goal_sample_frequency=0.01,
+        always_swap=False,
+    )
+
+    RandomConfig = make_prefix_sampler(
+        checker,
+        rng=rng,
+        world_xy_bounds=world_xy_bounds,
+        prefix_size=11,
+    )
+
+    ValidityChecker = lambda q11: checker.CheckConfigCollisionFreePrefix(q11)
+
+    rrt_planner = BiRRT(RandomConfig, ValidityChecker)
+    path11 = rrt_planner.plan(start11, goal11, rrt_options)
+
+    if path11 is None or len(path11) == 0:
+        raise RuntimeError("RRT failed to find a path.")
+
+    # Convert 11-DOF path back to full-q knots for playback/concatenation.
+    q_knots_full = np.vstack([checker.embed_prefix(q11) for q11 in path11])
+    return TrajectorySegment(q_knots=q_knots_full)
+
 
 
 # -----------------------------------------------------------------------------
@@ -358,6 +553,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Plan a path through saved robot waypoints using RRT and visualize it."
     )
+    parser.add_argument("task_file", type=str, help="Path to task JSON (contains world_bounds)")
     parser.add_argument("dmd_file", type=str, help="Path to .dmd.yaml directives file")
     parser.add_argument(
         "waypoints_file",
@@ -373,19 +569,44 @@ def main():
     )
     parser.add_argument("--rrt-iters", type=int, default=2000)
     parser.add_argument("--rrt-step", type=float, default=0.1)
-    parser.add_argument("--playback-dt", type=float, default=0.05)
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--render-rate", type=float, default=60.0)
+    parser.add_argument("--q-speed", type=float, default=1.0)
     args = parser.parse_args()
 
     dmd_file = Path(args.dmd_file)
     waypoints_file = Path(args.waypoints_file)
     package_xmls = [Path(p) for p in args.package_xml]
 
+    task = load_task_json(Path(args.task_file))
+    wb_min = task["world_bounds"]["min"]
+    wb_max = task["world_bounds"]["max"]
+    world_xy_bounds = (float(wb_min[0]), float(wb_max[0]), float(wb_min[1]), float(wb_max[1]))
+
     # ---------------------------------------------------------------------
     # (1) Load world + set up simulation/diagram
     # ---------------------------------------------------------------------
     meshcat, builder, diagram, diagram_context, plant, plant_context, scene_graph = (
         build_world_diagram(dmd_file=dmd_file, package_xmls=package_xmls)
+    )
+
+    # ---------------------------------------------------------------------
+    # Build a robot-vs-environment validity checker for RRT
+    # ---------------------------------------------------------------------
+    # TODO: replace these names with the ones in your directives if different.
+    mobile_iiwa_instance = plant.GetModelInstanceByName("mobile_iiwa")
+    wsg_instance = plant.GetModelInstanceByName("wsg_50")
+
+    q_full_fixed = plant.GetPositions(plant_context).copy()
+
+    checker = RobotEnvValidityChecker(
+        diagram=diagram,
+        plant=plant,
+        scene_graph=scene_graph,
+        diagram_context=diagram_context,
+        plant_context=plant_context,
+        robot_instances=[mobile_iiwa_instance, wsg_instance],
+        q_full_fixed=q_full_fixed,
+        prefix_size=11,
     )
 
     # ---------------------------------------------------------------------
@@ -416,19 +637,20 @@ def main():
     # ---------------------------------------------------------------------
     # (3) For each consecutive waypoint pair, plan with RRT
     # ---------------------------------------------------------------------
-    rng = np.random.default_rng(args.seed)
+    rng = np.random.default_rng(0)
     segments: List[TrajectorySegment] = []
     for a, b in zip(waypoints[:-1], waypoints[1:]):
         print(f"\nPlanning segment: {a.name} -> {b.name}")
         seg = plan_rrt_segment(
-            plant=plant,
-            plant_context=plant_context,
+            checker=checker,
             q_start=a.q,
             q_goal=b.q,
             rng=rng,
+            world_xy_bounds=world_xy_bounds,
             max_iters=args.rrt_iters,
             step_size=args.rrt_step,
         )
+
         print(f"  Segment knots: {seg.q_knots.shape[0]}")
         segments.append(seg)
 
@@ -447,8 +669,8 @@ def main():
         plant=plant,
         plant_context=plant_context,
         q_traj=q_traj,
-        render_rate_hz=60,
-        q_speed=1.0,
+        render_rate_hz=args.render_rate,
+        q_speed=args.q_speed,
     )
 
 

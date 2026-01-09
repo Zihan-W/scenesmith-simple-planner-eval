@@ -25,5 +25,5 @@ python3 scripts/compute_grasp_config.py models/scene_008/pick_candle_task.json p
 
 Compute a plan given robot waypoints from the grasp computation script:
 ```
-python3 scripts/plan_robot_waypoints_rrt.py pick_candle_task.dmd.yaml robot_waypoints.json --package-xml models/iiwa/package.xml --package-xml models/scene_008/package.xml
+python3 scripts/plan_robot_waypoints_rrt.py models/scene_008/pick_candle_task.json pick_candle_task.dmd.yaml robot_waypoints.json --package-xml models/iiwa/package.xml --package-xml models/scene_008/package.xml
 ```
