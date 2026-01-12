@@ -621,6 +621,43 @@ def playback_segments_interactive(
 
     print("Exiting playback.")
 
+def dump_piecewise_linear_trajectory_json(
+    *,
+    path: Path,
+    segments: List[TrajectorySegment],
+):
+    """
+    Writes a single piecewise-linear joint trajectory as JSON.
+    Concatenates all segment knots into one (N,13) array, avoiding duplicate
+    boundary knots between segments.
+    """
+    if not segments:
+        raise ValueError("No segments to dump.")
+
+    # Concatenate knots; avoid duplicating first knot of each subsequent segment.
+    pieces = [segments[0].q_knots]
+    for seg in segments[1:]:
+        if seg.q_knots.shape[0] == 0:
+            continue
+        pieces.append(seg.q_knots[1:, :])
+
+    q_traj = np.vstack(pieces)
+
+    if q_traj.ndim != 2 or q_traj.shape[1] != 13:
+        raise ValueError(f"Expected trajectory shape (N,13); got {q_traj.shape}")
+
+    out = {
+        "q": q_traj.tolist(),      # (N,13)
+        "nq": 13,
+        "num_knots": int(q_traj.shape[0]),
+        "segments": [seg.name for seg in segments],  # helpful provenance
+    }
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(out, f, indent=2)
+
+    print(f"Wrote piecewise-linear trajectory: {q_traj.shape} to {path}")
 
 # -----------------------------------------------------------------------------
 # Main
@@ -655,6 +692,13 @@ def main():
     )
     parser.add_argument("--shortcut-tries", type=int, default=25)
     parser.add_argument("--shortcut-check", type=float, default=1e-2)
+    parser.add_argument(
+        "--out-traj",
+        type=str,
+        default="robot_plan.json",
+        help="Output JSON path for the concatenated Nx13 piecewise-linear trajectory.",
+    )
+
     args = parser.parse_args()
 
     dmd_file = Path(args.dmd_file)
@@ -788,6 +832,11 @@ def main():
                 )
             )
             current_gripper = GRIPPER_OPEN
+
+    dump_piecewise_linear_trajectory_json(
+        path=Path(args.out_traj),
+        segments=segments,
+    )
 
     # ---------------------------------------------------------------------
     # (4) Visualize interactively
