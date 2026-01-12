@@ -43,3 +43,11 @@ python3 scripts/plan_robot_waypoints_rrt.py \
     --package-xml models/scene_008/package.xml \
     --out-traj robot_plan.json
 ```
+
+Simulate a plan from the planning script:
+```
+python3 scripts/simulate.py \
+    pick_candle_task.dmd.yaml \
+    --package-xml models/iiwa/package.xml \
+    --package-xml models/scene_008/package.xml
+```
