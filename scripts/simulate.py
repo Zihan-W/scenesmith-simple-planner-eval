@@ -113,9 +113,10 @@ def main():
         help="Path to a package.xml file (may be repeated).",
     )
     parser.add_argument(
-        "--loop",
-        action="store_true",
-        help="Loop the trajectory playback.",
+        "--record-html",
+        type=str,
+        default="simulation.html",
+        help="Write a static Meshcat recording to this HTML file (default: simulation.html).",
     )
     args = parser.parse_args()
 
@@ -131,7 +132,6 @@ def main():
 
     # Meshcat
     meshcat = StartMeshcat()
-    meshcat.Delete()
 
     # Parse scenario
     scenario = LoadScenario(data=yaml_text)
@@ -254,15 +254,15 @@ def main():
     print("Meshcat server running. Ctrl+C to exit.")
 
     try:
-        if args.loop:
-            while True:
-                sim.get_mutable_context().SetTime(0.0)
-                sim.Initialize()
-                sim.AdvanceTo(t1)
-        else:
-            sim.AdvanceTo(t1)
-            while True:
-                pass
+        meshcat.StartRecording()
+        sim.AdvanceTo(t1)
+        meshcat.StopRecording()
+        meshcat.PublishRecording()
+        html = meshcat.StaticHtml()
+        Path(args.record_html).write_text(html)
+        print(f"Wrote Meshcat recording to: {args.record_html}")
+        while True:
+            pass
     except KeyboardInterrupt:
         print("\nExiting.")
 

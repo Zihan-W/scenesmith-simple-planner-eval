@@ -1,6 +1,8 @@
 **/__pycache__/*
 models/scene_008/*
 /*.dmd.yaml
+
 snopt.log
 robot_waypoints.json
 robot_plan.json
+simulation.html
