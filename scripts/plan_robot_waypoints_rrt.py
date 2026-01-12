@@ -303,6 +303,7 @@ class Waypoint:
 
 @dataclass
 class TrajectorySegment:
+    name: str
     q_knots: np.ndarray  # shape (K, nq)
     # You can later add timestamps, costs, etc.
 
@@ -423,8 +424,8 @@ def plan_rrt_segment(
     Plans in the first 11 positions only. Remaining positions held constant.
     Returns full-q knots for visualization.
     """
-    start11 = np.asarray(q_start[:11], dtype=float).copy()
-    goal11  = np.asarray(q_goal[:11], dtype=float).copy()
+    start11 = np.asarray(q_start.q[:11], dtype=float).copy()
+    goal11  = np.asarray(q_goal.q[:11], dtype=float).copy()
 
     # (Optional but helpful) ensure endpoints are valid
     if not checker.CheckConfigCollisionFreePrefix(start11):
@@ -464,9 +465,7 @@ def plan_rrt_segment(
             check_size=shortcut_check_size,
         )
 
-    # Embed refined path back to full-q
-    q_knots_full = np.vstack([checker.embed_prefix(q11) for q11 in path11])
-    return TrajectorySegment(q_knots=q_knots_full)
+    return TrajectorySegment(name=(q_start.name + " -> " + q_goal.name), q_knots=np.array(path11))
 
 def shortcut_refine_prefix(
     checker,
@@ -477,6 +476,48 @@ def shortcut_refine_prefix(
 ):
     ValidityChecker = lambda q11: checker.CheckConfigCollisionFreePrefix(q11)
     return shortcut(path11, ValidityChecker, num_tries=num_tries, check_size=check_size)
+
+def promote_segment_to_13dof(
+    seg: TrajectorySegment,
+    *,
+    gripper_left: float,
+    gripper_right: float,
+) -> TrajectorySegment:
+    """Appends constant gripper joints to every knot in seg.q_knots."""
+    q = seg.q_knots
+    print(q.shape)
+    if q.shape[1] != 11:
+        raise ValueError(f"Expected 11DoF segment, got {q.shape[1]}DoF")
+
+    gr = np.tile(np.array([[gripper_left, gripper_right]], dtype=float), (q.shape[0], 1))
+    q13 = np.hstack([q, gr])
+    return TrajectorySegment(name=seg.name, q_knots=q13)
+
+def make_gripper_segment(
+    *,
+    name: str,
+    q_robot_11: np.ndarray,
+    gripper_start: tuple[float, float],
+    gripper_goal: tuple[float, float],
+    num_knots: int = 2,
+) -> TrajectorySegment:
+    """
+    Robot holds still at q_robot_11 while gripper linearly moves start->goal.
+    Returns 13DoF knots.
+    """
+    q_robot_11 = np.asarray(q_robot_11, dtype=float).reshape(-1)
+    if q_robot_11.shape[0] != 11:
+        raise ValueError(f"Expected robot prefix size 11, got {q_robot_11.shape[0]}")
+
+    l0, r0 = gripper_start
+    l1, r1 = gripper_goal
+
+    alphas = np.linspace(0.0, 1.0, num_knots)
+    q13 = np.zeros((num_knots, 13), dtype=float)
+    q13[:, :11] = q_robot_11[None, :]
+    q13[:, 11] = (1.0 - alphas) * l0 + alphas * l1
+    q13[:, 12] = (1.0 - alphas) * r0 + alphas * r1
+    return TrajectorySegment(name=name, q_knots=q13)
 
 
 # -----------------------------------------------------------------------------
@@ -512,7 +553,7 @@ def playback_segments_interactive(
     q_speed: float = 0.6,
 ):
     """
-    Interactive playback over multiple segments (kept separate).
+    Interactive playback over multiple segments.
 
     Controls:
       - <enter> : play the next segment (in order)
@@ -537,25 +578,28 @@ def playback_segments_interactive(
         T = float(t_knots[-1])
 
         # Start exactly at first knot
-        plant.SetPositions(plant_context, q_traj[0])
+        q = plant.GetDefaultPositions()
+        q[:13] = q_traj[0]
+        plant.SetPositions(plant_context, q)
         diagram.ForcedPublish(diagram_context)
 
         t = 0.0
         while t < T:
-            q = _sample_piecewise_linear(q_traj, t_knots, t)
+            q[:13] = _sample_piecewise_linear(q_traj, t_knots, t)
             plant.SetPositions(plant_context, q)
             diagram.ForcedPublish(diagram_context)
             time.sleep(dt_render)
             t += dt_render
 
         # End exactly at last knot
-        plant.SetPositions(plant_context, q_traj[-1])
+        q[:13] = q_traj[-1]
+        plant.SetPositions(plant_context, q)
         diagram.ForcedPublish(diagram_context)
 
-    # Start at first segment
     seg_idx = 0
     print(f"Ready. {len(segments)} segment(s) planned.")
-    print(f"Next up: segment {seg_idx+1}/{len(segments)}. Press <enter> to play.")
+    print(f"Next up: segment {seg_idx+1}/{len(segments)}: {segments[seg_idx].name}")
+    print("Press <enter> to play.")
 
     while True:
         s = input().strip("\n").lower()
@@ -565,15 +609,15 @@ def playback_segments_interactive(
             continue
 
         seg = segments[seg_idx]
-        print(f"\nPlaying segment {seg_idx+1}/{len(segments)} "
+        print(f"\nPlaying segment {seg_idx+1}/{len(segments)}: {seg.name} "
               f"({seg.q_knots.shape[0]} knots)")
         play_traj(seg.q_knots)
 
-        # Advance + wrap
         seg_idx = (seg_idx + 1) % len(segments)
         if seg_idx == 0:
             print("\n(Reached end — wrapping back to segment 1)")
-        print(f"Next up: segment {seg_idx+1}/{len(segments)}. Press <enter> to play.")
+        print(f"Next up: segment {seg_idx+1}/{len(segments)}: {segments[seg_idx].name}")
+        print("Press <enter> to play.")
 
     print("Exiting playback.")
 
@@ -677,14 +721,24 @@ def main():
     # ---------------------------------------------------------------------
     # (3) For each consecutive waypoint pair, plan with RRT
     # ---------------------------------------------------------------------
+    # Gripper joint targets
+    GRIPPER_OPEN = (-0.05, 0.05)    # (left, right)
+    GRIPPER_CLOSED = (-0.005, 0.005)    # (left, right)
+
     rng = np.random.default_rng(0)
+
     segments: List[TrajectorySegment] = []
+
+    # We will keep track of the gripper state as we build segments.
+    current_gripper = GRIPPER_OPEN
+
     for a, b in zip(waypoints[:-1], waypoints[1:]):
         print(f"\nPlanning segment: {a.name} -> {b.name}")
-        seg = plan_rrt_segment(
+
+        seg11 = plan_rrt_segment(
             checker=checker,
-            q_start=a.q,
-            q_goal=b.q,
+            q_start=a,
+            q_goal=b,
             rng=rng,
             world_xy_bounds=world_xy_bounds,
             max_iters=args.rrt_iters,
@@ -694,9 +748,46 @@ def main():
             shortcut_check_size=args.shortcut_check,
         )
 
+        # Name the motion segment and promote it to 13DoF with the CURRENT gripper setting.
+        seg11.name = f"{a.name} -> {b.name}"
+        seg13 = promote_segment_to_13dof(
+            seg11,
+            gripper_left=current_gripper[0],
+            gripper_right=current_gripper[1],
+        )
 
-        print(f"  Segment knots: {seg.q_knots.shape[0]}")
-        segments.append(seg)
+        print(f"  Segment knots: {seg13.q_knots.shape[0]}")
+        segments.append(seg13)
+
+        # Insert gripper-only segments at grasp and place (after arriving there).
+        # We key off the destination waypoint name b.name.
+        if b.name.lower() == "grasp":
+            # Close while holding robot still at grasp pose.
+            q_robot_11_at_grasp = np.asarray(b.q[:11], dtype=float)
+            segments.append(
+                make_gripper_segment(
+                    name="gripper close",
+                    q_robot_11=q_robot_11_at_grasp,
+                    gripper_start=current_gripper,
+                    gripper_goal=GRIPPER_CLOSED,
+                    num_knots=2,
+                )
+            )
+            current_gripper = GRIPPER_CLOSED
+
+        if b.name.lower() == "place":
+            # Open while holding robot still at place pose.
+            q_robot_11_at_place = np.asarray(b.q[:11], dtype=float)
+            segments.append(
+                make_gripper_segment(
+                    name="gripper open",
+                    q_robot_11=q_robot_11_at_place,
+                    gripper_start=current_gripper,
+                    gripper_goal=GRIPPER_OPEN,
+                    num_knots=2,
+                )
+            )
+            current_gripper = GRIPPER_OPEN
 
     # ---------------------------------------------------------------------
     # (4) Visualize interactively
