@@ -48,6 +48,7 @@ Simulate a plan from the planning script:
 ```
 python3 scripts/simulate.py \
     pick_candle_task.dmd.yaml \
+    robot_plan.json \
     --package-xml models/iiwa/package.xml \
     --package-xml models/scene_008/package.xml
 ```
