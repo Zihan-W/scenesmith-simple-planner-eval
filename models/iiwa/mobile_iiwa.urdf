@@ -48,25 +48,33 @@
   <link name="iiwa_base_x"/>
 
   <!-- X prismatic joint -->
-  <joint name="world_x_joint" type="prismatic">
+  <joint name="base_x_joint" type="prismatic">
     <parent link="base"/>
     <child link="iiwa_base_x"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <axis xyz="1 0 0"/>
     <limit lower="-1.0" upper="5.0" effort="1000" velocity="0.5"/>
   </joint>
+  <transmission type="SimpleTransmission" name="base_x_trans">
+    <actuator name="iiwa_base_x"/>
+    <joint name="base_x_joint"/>
+  </transmission>
 
   <!-- Intermediate link for y translation -->
   <link name="iiwa_base_y"/>
 
   <!-- Y prismatic joint -->
-  <joint name="world_y_joint" type="prismatic">
+  <joint name="base_y_joint" type="prismatic">
     <parent link="iiwa_base_x"/>
     <child link="iiwa_base_y"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="-1.0" upper="5.0" effort="1000" velocity="0.5"/>
   </joint>
+  <transmission type="SimpleTransmission" name="base_y_trans">
+    <actuator name="iiwa_base_y"/>
+    <joint name="base_y_joint"/>
+  </transmission>
 
   <!-- Intermediate link for yaw rotation -->
   <link name="iiwa_base_theta"/>
@@ -86,6 +94,10 @@
     <axis xyz="0 0 1"/>
     <limit effort="1000" velocity="3.1416"/>
   </joint> -->
+  <transmission type="SimpleTransmission" name="world_theta_trans">
+    <actuator name="iiwa_base_theta"/>
+    <joint name="iiwa_base_theta_joint"/>
+  </transmission>
 
   <!-- Prismatic joint for vertical (z) motion -->
   <joint name="iiwa_base_z_joint" type="prismatic">
@@ -95,6 +107,10 @@
     <axis xyz="0 0 1"/>
     <limit lower="0.0" upper="1.0" effort="1000" velocity="0.5"/>
   </joint>
+  <transmission type="SimpleTransmission" name="base_z_trans">
+    <actuator name="iiwa_base_z"/>
+    <joint name="iiwa_base_z_joint"/>
+  </transmission>
 
   <!-- iiwa base link -->
   <link name="iiwa_link_0">

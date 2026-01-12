@@ -15,8 +15,8 @@ def make_robot_and_gripper_yaml(start_xy):
     name: mobile_iiwa
     file: package://mobile_iiwa/mobile_iiwa.urdf
     default_joint_positions:
-      world_x_joint: [{x}]
-      world_y_joint: [{y}]
+      base_x_joint: [{x}]
+      base_y_joint: [{y}]
 - add_weld:
     parent: world
     child: mobile_iiwa::base
