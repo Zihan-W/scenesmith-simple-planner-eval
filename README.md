@@ -50,5 +50,8 @@ python3 scripts/simulate.py \
     pick_candle_task.dmd.yaml \
     robot_plan.json \
     --package-xml models/iiwa/package.xml \
-    --package-xml models/scene_008/package.xml
+    --package-xml models/scene_008/package.xml \
+    --ee-vel 0.25 \
+    --ee-accel 0.25
 ```
+(Don't include the last two lines to run TOPPRA with only joint-space limits)

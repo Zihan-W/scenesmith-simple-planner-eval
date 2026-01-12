@@ -15,7 +15,7 @@ from pydrake.trajectories import (
     PathParameterizedTrajectory,
     PiecewisePolynomial,
 )
-from pydrake.multibody.optimization import Toppra
+from pydrake.multibody.optimization import Toppra, CalcGridPointsOptions
 
 # Robotic Manipulation course "manipulation" python package.
 from manipulation.station import LoadScenario, MakeHardwareStation, MakeMultibodyPlant
@@ -62,17 +62,23 @@ def _pl_path_to_traj(path: np.ndarray) -> CompositeTrajectory:
     return CompositeTrajectory(segments)
 
 
-def _retime_toppra(plant, rough_traj, n_gridpoints=200):
+def _retime_toppra(
+    plant,
+    rough_traj,
+    n_gridpoints=200,
+    ee_vel_limit=None,
+    ee_accel_limit=None,
+):
     t0 = rough_traj.start_time()
     t1 = rough_traj.end_time()
-    gridpoints = np.linspace(t0, t1, n_gridpoints)
+    gridpoints = Toppra.CalcGridPoints(rough_traj, CalcGridPointsOptions(min_points=n_gridpoints))
 
-    # Tune as you like.
-    vel_multiplier = 0.5
-    accel_multiplier = 3.0
-    effort_multiplier = 3.0
+    vel_multiplier = 1.0
+    accel_multiplier = 1.0
+    effort_multiplier = 1.0
 
     toppra = Toppra(rough_traj, plant, gridpoints)
+
     toppra.AddJointVelocityLimit(
         vel_multiplier * plant.GetVelocityLowerLimits(),
         vel_multiplier * plant.GetVelocityUpperLimits(),
@@ -85,6 +91,27 @@ def _retime_toppra(plant, rough_traj, n_gridpoints=200):
         effort_multiplier * plant.GetEffortLowerLimits(),
         effort_multiplier * plant.GetEffortUpperLimits(),
     )
+
+    # ----------------------------
+    # End-effector (frame) limits (optional)
+    # Spatial velocity / acceleration measured AND expressed in world frame.
+    # ----------------------------
+    if ee_vel_limit is not None or ee_accel_limit is not None:
+        wsg_instance = plant.GetModelInstanceByName("wsg_50")
+        ee_frame = plant.GetFrameByName("body", wsg_instance)  # wsg_50::body
+
+        if ee_vel_limit is not None:
+            s = float(ee_vel_limit)
+            lower_v = -s * np.ones(6)
+            upper_v =  s * np.ones(6)
+            toppra.AddFrameVelocityLimit(ee_frame, lower_v, upper_v)
+
+        if ee_accel_limit is not None:
+            a = float(ee_accel_limit)
+            lower_a = -a * np.ones(6)
+            upper_a =  a * np.ones(6)
+            toppra.AddFrameAccelerationLimit(ee_frame, lower_a, upper_a)
+
     time_traj = toppra.SolvePathParameterization()
     if time_traj is None:
         raise RuntimeError("TOPPRA failed to find a time parameterization.")
@@ -118,6 +145,21 @@ def main():
         default="simulation.html",
         help="Write a static Meshcat recording to this HTML file (default: simulation.html).",
     )
+    parser.add_argument(
+        "--ee-vel",
+        type=float,
+        default=None,
+        help="End-effector spatial velocity component limit (applied to all 6 components) in world frame. "
+             "Units: rad/s for rotational, m/s for translational. Default: None (no limit).",
+    )
+    parser.add_argument(
+        "--ee-accel",
+        type=float,
+        default=None,
+        help="End-effector spatial acceleration component limit (applied to all 6 components) in world frame. "
+             "Units: rad/s^2 for rotational, m/s^2 for translational. Default: None (no limit).",
+    )
+
     args = parser.parse_args()
 
     scenario_path = Path(args.scenario_yaml)
@@ -173,7 +215,12 @@ def main():
     rough_traj = _pl_path_to_traj(q_all)
 
     # TOPPRA retime robot traj
-    timed_robot_traj = _retime_toppra(toppra_plant, rough_traj)
+    timed_robot_traj = _retime_toppra(
+        toppra_plant,
+        rough_traj,
+        ee_vel_limit=args.ee_vel,
+        ee_accel_limit=args.ee_accel,
+    )
 
     # ----------------------------
     # Build station and wire trajectory sources
