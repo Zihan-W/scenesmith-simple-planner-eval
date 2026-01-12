@@ -371,27 +371,32 @@ def apply_robot_environment_collision_filters(
 
     cfm.Apply(decl)
 
-def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance):
+def solve_ik_for_pose(
+    X_WE,
+    diagram,
+    plant,
+    scene_graph,
+    ghost_gripper_instance,
+    q_ref=None,                 # <-- center cost around this
+    q_initial_guess=None,       # <-- initial guess
+    arm_position_count=11,
+):
     # -------------------------
-    # Main IK context (decision variables live here)
+    # Main IK context
     # -------------------------
     diagram_context = diagram.CreateDefaultContext()
     plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
-    arm_position_count = 11
     lock_joints_outside_first_n_positions(plant, plant_context, arm_position_count)
-
     ik = InverseKinematics(plant, plant_context, with_joint_limits=True)
 
     # -------------------------
-    # End-effector pose constraint: "wsg_50" body frame matches X_grasp
+    # End-effector pose constraint
     # -------------------------
     wsg_instance = plant.GetModelInstanceByName("wsg_50")
     ee_body = plant.GetBodyByName("body", wsg_instance)
     frame_E = ee_body.body_frame()
     frame_W = plant.world_frame()
-
-    X_WE = X_grasp
 
     # Position constraint (origin of E)
     p_tol = 0.002
@@ -399,7 +404,6 @@ def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_insta
     p_BQ = np.zeros((3, 1))
     p_AQ_lower = (p_WE - p_tol).reshape(3, 1)
     p_AQ_upper = (p_WE + p_tol).reshape(3, 1)
-
     ik.AddPositionConstraint(
         frameB=frame_E,
         p_BQ=p_BQ,
@@ -423,21 +427,28 @@ def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_insta
     q = ik.q()
 
     # -------------------------
-    # Quadratic posture cost on q[3:12]
+    # Quadratic cost: stay near q_ref (on arm dofs)
     # -------------------------
-    q_nom = plant.GetPositions(plant_context).copy()
-    idx = np.arange(3, 12)  # 3..11 inclusive
-    w = 1.0
-    Q = w * np.eye(len(idx))
-    Q[0] *= 10.0
-    prog.AddQuadraticErrorCost(Q, q_nom[idx], q[idx])
-    prog.SetInitialGuess(q, q_nom)
+    if q_ref is None:
+        q_ref = plant.GetPositions(plant_context).copy()
+    else:
+        q_ref = np.asarray(q_ref).copy()
+        prog.AddQuadraticErrorCost(np.eye(3), q_ref[:3], q[:3])
+
+    if q_initial_guess is None:
+        q_initial_guess = q_ref
+
+    idx = np.arange(3, 12)  # arm dofs in your convention
+    Q = np.eye(len(idx))
+    Q[0] *= 10.0  # keep your previous weighting choice
+    prog.AddQuadraticErrorCost(Q, q_ref[idx], q[idx])
+    prog.SetInitialGuess(q, q_initial_guess)
 
     # -------------------------
-    # Collision constraints: two contexts + two explicit constraints
+    # Collision constraints (same as your existing code)
     # -------------------------
     mobile_iiwa_instance = plant.GetModelInstanceByName("mobile_iiwa")
-    influence_distance = 0.02  # tune
+    influence_distance = 0.02
 
     # Context A: arm<->environment, lower bound 1 cm
     diagram_context_arm = diagram.CreateDefaultContext()
@@ -457,9 +468,9 @@ def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_insta
 
     c_arm = MinimumDistanceLowerBoundConstraint(
         plant,
-        0.01,              # bound (1 cm)
+        0.01,
         plant_context_arm,
-        influence_distance_offset=0.02,
+        influence_distance_offset=influence_distance,
     )
     prog.AddConstraint(c_arm, q)
 
@@ -481,24 +492,22 @@ def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_insta
 
     c_grip = MinimumDistanceLowerBoundConstraint(
         plant,
-        0.0,               # bound (0 cm)
+        0.0,
         plant_context_grip,
-        influence_distance_offset=0.02,
+        influence_distance_offset=influence_distance,
     )
     prog.AddConstraint(c_grip, q)
 
     # -------------------------
     # Solve
     # -------------------------
-
     solver = SnoptSolver()
     options = SolverOptions()
-
     options.SetOption(CommonSolverOption.kPrintFileName, "snopt.log")
-    options.SetOption(SnoptSolver().solver_id(), "Major print level", 1)  # 1 = summary, 0 = none, >1 = verbose
-    options.SetOption(SnoptSolver().solver_id(), "Timing level", 3)  # Need to enable timing for time limits to work
-    options.SetOption(SnoptSolver().solver_id(), "Time Limit", 60)
-    options.SetOption(SnoptSolver().solver_id(), "Major optimality tolerance", 1e-1)
+    options.SetOption(solver.solver_id(), "Major print level", 1)
+    options.SetOption(solver.solver_id(), "Timing level", 3)
+    options.SetOption(solver.solver_id(), "Time Limit", 60)
+    options.SetOption(solver.solver_id(), "Major optimality tolerance", 1e-1)
 
     result = solver.Solve(prog, None, options)
     if not result.is_success():
@@ -506,8 +515,10 @@ def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_insta
         return None
 
     print("IK succeeded")
-
     return result.GetSolution(q)
+
+def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance):
+    return solve_ik_for_pose(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance)
 
 def compute_target_pose(
     *,
@@ -556,6 +567,9 @@ def compute_target_pose(
     X_WG_goal = X_WO_goal @ X_OG
     return X_WG_goal
 
+def retreat_along_gripper_y(X_WG: RigidTransform, distance: float) -> RigidTransform:
+    return X_WG @ RigidTransform([0.0, -distance, 0.0])
+
 def main():
     parser = argparse.ArgumentParser(
         description="Compute and visualize a sparse point cloud for the task's target object and a grasp"
@@ -568,11 +582,18 @@ def main():
         action="append",
         default=[],
     )
+    parser.add_argument(
+        "--approach-distance",
+        type=float,
+        default=0.10,  # 5 cm
+        help="Distance (m) to retreat along gripper +x axis for pregrasp/postplace IK targets.",
+    )
     args = parser.parse_args()
 
     task_file = Path(args.task_file)
     dmd_file = Path(args.dmd_file)
     package_xmls = [Path(p) for p in args.package_xml]
+    approach_distance = float(args.approach_distance)
 
     task = load_task(task_file)
     target_obj_name = task["commands"][0]["drake_model_name"]
@@ -655,6 +676,8 @@ def main():
     last_grasp_pose = None   # stores last successful grasp pose (X_WG)
     q_grasp_last = None      # stores last successful grasp configuration
     q_place_last = None      # stores last successful place configuration
+    q_pregrasp_last = None
+    q_postplace_last = None
 
     # Save at the base level of the repository (parent directory of the folder containing this .py file)
     waypoints_path = Path(__file__).resolve().parent.parent / "robot_waypoints.json"
@@ -681,13 +704,18 @@ def main():
                 if q_grasp_last is None or q_place_last is None:
                     print("Need both a successful grasp and place IK before saving.")
                     continue
+                if q_pregrasp_last is None or q_postplace_last is None:
+                    print("Need successful pregrasp and postplace IK before saving.")
+                    continue
 
                 data = {
                     "waypoints": [
-                        {"name": "start", "q": q_start.tolist()},
-                        {"name": "grasp", "q": q_grasp_last[:11].tolist()},
-                        {"name": "place", "q": q_place_last[:11].tolist()},
-                        {"name": "start", "q": q_start.tolist()},
+                        {"name": "start",     "q": q_start.tolist()},
+                        {"name": "pregrasp",  "q": q_pregrasp_last[:11].tolist()},
+                        {"name": "grasp",     "q": q_grasp_last[:11].tolist()},
+                        {"name": "place",     "q": q_place_last[:11].tolist()},
+                        {"name": "postplace", "q": q_postplace_last[:11].tolist()},
+                        {"name": "start",     "q": q_start.tolist()},
                     ]
                 }
 
@@ -721,6 +749,23 @@ def main():
                     continue
 
                 q_place_last = np.asarray(q_place).copy()
+
+                # Solve postplace: retreat along gripper y-axis, cost centered at place q
+                X_postplace = retreat_along_gripper_y(X_target, approach_distance)
+                q_postplace = solve_ik_for_pose(
+                    X_postplace,
+                    diagram, plant, scene_graph, ghost_gripper_instance,
+                    q_ref=q_place_last,
+                    q_initial_guess=q_place_last,
+                )
+                if q_postplace is None:
+                    print("Postplace IK failed (keeping place anyway).")
+                    q_postplace_last = None
+                    continue
+                else:
+                    q_postplace_last = np.asarray(q_postplace).copy()
+                    print("Postplace IK succeeded.")
+
                 plant.SetPositions(plant_context, q_place_last)
                 diagram.ForcedPublish(diagram_context)
                 print("Place IK succeeded.")
@@ -761,6 +806,21 @@ def main():
 
             q_grasp_last = np.asarray(q_grasp).copy()
             last_grasp_pose = X_grasp
+
+            # Solve pregrasp: retreat along gripper y-axis, cost centered at grasp q
+            X_pregrasp = retreat_along_gripper_y(last_grasp_pose, approach_distance)
+            q_pregrasp = solve_ik_for_pose(
+                X_pregrasp,
+                diagram, plant, scene_graph, ghost_gripper_instance,
+                q_ref=q_grasp_last,
+                q_initial_guess=q_grasp_last,
+            )
+            if q_pregrasp is None:
+                print("Pregrasp IK failed (keeping grasp anyway).")
+                q_pregrasp_last = None
+            else:
+                q_pregrasp_last = np.asarray(q_pregrasp).copy()
+                print("Pregrasp IK succeeded.")
 
             plant.SetPositions(plant_context, q_grasp_last)
             diagram.ForcedPublish(diagram_context)
