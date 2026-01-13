@@ -6,6 +6,9 @@ from typing import List, Tuple
 
 import numpy as np
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 from pydrake.geometry import StartMeshcat
 from pydrake.systems.analysis import Simulator
 from pydrake.systems.framework import DiagramBuilder
@@ -16,10 +19,16 @@ from pydrake.trajectories import (
     PiecewisePolynomial,
 )
 from pydrake.multibody.optimization import Toppra, CalcGridPointsOptions
+from pydrake.multibody.plant import MultibodyPlant
 
 # Robotic Manipulation course "manipulation" python package.
 from manipulation.station import LoadScenario, MakeHardwareStation, MakeMultibodyPlant
 
+# Fix relative paths so contents of the src directory can be imported.
+import sys
+sys.path.append("..")
+
+from src.item_locking_monitor import ItemLockingMonitorConfig, ApplyItemLockingMonitorConfig
 
 def _ensure_model_drivers(yaml_text: str) -> str:
     if "model_drivers:" in yaml_text:
@@ -125,6 +134,12 @@ def _make_piecewise_hold(times: np.ndarray, samples: np.ndarray) -> PiecewisePol
     """
     return PiecewisePolynomial.FirstOrderHold(times, samples.T)
 
+
+def body_names_for_instance(plant: MultibodyPlant, model_instance_name):
+    return [
+        plant.get_body(body_index).name()
+        for body_index in plant.GetBodyIndices(plant.GetModelInstanceByName(model_instance_name))
+    ]
 
 def main():
     parser = argparse.ArgumentParser(
@@ -281,11 +296,25 @@ def main():
     builder.Connect(wsg_diff.get_output_port(),
                     station_sys.GetInputPort("wsg_50.position"))
 
+    iiwa_body_names = ["mobile_iiwa::" + name for name in body_names_for_instance(station.plant(), "mobile_iiwa")]
+    wsg_body_names = ["wsg_50::" + name for name in body_names_for_instance(station.plant(), "wsg_50")]
+    body_names = iiwa_body_names + wsg_body_names
+    locking_cfg = ItemLockingMonitorConfig(
+        unlock_near_geometry = body_names,
+    )
+    locking_monitor = ApplyItemLockingMonitorConfig(
+        locking_cfg,
+        station.plant(),
+        builder,
+        station.scene_graph()
+    )
+
     diagram = builder.Build()
     context = diagram.CreateDefaultContext()
     diagram.ForcedPublish(context)
 
     sim = Simulator(diagram)
+    sim.set_monitor(locking_monitor.Monitor)
     sim.Initialize()
 
     print(f"Loaded scenario from: {scenario_path}")
@@ -302,7 +331,15 @@ def main():
 
     try:
         meshcat.StartRecording()
-        sim.AdvanceTo(t1)
+
+        while sim.get_mutable_context().get_time() < t1:
+            # Update the simulation using the monitor.
+            locking_monitor.SetItemLockStates(sim.get_mutable_context())
+
+            sim.AdvanceTo(
+                sim.get_mutable_context().get_time() + station.plant().time_step()
+            )
+
         meshcat.StopRecording()
         meshcat.PublishRecording()
         html = meshcat.StaticHtml()
