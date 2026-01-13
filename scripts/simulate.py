@@ -37,6 +37,11 @@ def _ensure_model_drivers(yaml_text: str) -> str:
 model_drivers:
   mobile_iiwa: !InverseDynamicsDriver {}
   wsg_50: !SchunkWsgDriver {}
+
+plant_config:
+  time_step: 5e-3
+  contact_model: hydroelastic_with_fallback
+  discrete_contact_approximation: lagged
 """
     return yaml_text.rstrip() + "\n" + drivers_block.lstrip()
 
