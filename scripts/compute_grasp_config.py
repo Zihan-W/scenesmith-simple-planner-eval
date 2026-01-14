@@ -31,6 +31,7 @@ from pydrake.all import (
     SnoptSolver,
     SolverOptions,
     CommonSolverOption,
+    Role,
 )
 
 
@@ -311,6 +312,24 @@ def _all_collision_geometry_ids(plant):
         ids.update(plant.GetCollisionGeometriesForBody(body))
     return ids
 
+
+def _collision_geometry_ids_by_name_substr(scene_graph, name_substr: str):
+    ids = set()
+    inspector = scene_graph.model_inspector()
+    for gid in inspector.GetAllGeometryIds():
+        if name_substr in inspector.GetName(gid):
+            ids.add(gid)
+    return ids
+
+
+def _collision_geometry_ids_for_body_name(plant, scene_graph, model_instance, body_name: str):
+    """Returns collision GeometryIds for the named body in the given model instance."""
+    body = plant.GetBodyByName(body_name, model_instance)
+    frame_id = plant.GetBodyFrameIdOrThrow(body.index())
+    inspector = scene_graph.model_inspector()
+    return set(inspector.GetGeometries(frame_id, role=Role.kProximity))
+
+
 def apply_robot_environment_collision_filters(
     *,
     plant,
@@ -336,6 +355,8 @@ def apply_robot_environment_collision_filters(
     A = _collision_geometry_ids_for_instance(plant, mobile_iiwa_instance)   # arm
     G = _collision_geometry_ids_for_instance(plant, wsg_instance)          # real gripper
     H = _collision_geometry_ids_for_instance(plant, ghost_gripper_instance)  # ghost
+    F = _collision_geometry_ids_by_name_substr(scene_graph, "floor_collision")
+    Z = _collision_geometry_ids_for_body_name(plant, scene_graph, mobile_iiwa_instance, "iiwa_base_z_column")
     ALL = _all_collision_geometry_ids(plant)
     E = set(ALL) - set(A) - set(G) - set(H)  # environment
 
@@ -343,6 +364,8 @@ def apply_robot_environment_collision_filters(
     setG = GeometrySet(list(G))
     setH = GeometrySet(list(H))
     setE = GeometrySet(list(E))
+    setF = GeometrySet(list(F))
+    setZ = GeometrySet(list(Z))
 
     cfm = scene_graph.collision_filter_manager(sg_context)
     decl = CollisionFilterDeclaration()
@@ -368,6 +391,10 @@ def apply_robot_environment_collision_filters(
     else:
         # Leave only G <-> E; so exclude A <-> E.
         decl.ExcludeBetween(setA, setE)
+
+    # 5) Eliminate mobile iiwa lift joint <-> floor collisions
+    if Z and F:
+        decl.ExcludeBetween(setZ, setF)
 
     cfm.Apply(decl)
 
