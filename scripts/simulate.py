@@ -363,6 +363,47 @@ def update_default_free_body_pose_text_in_place(
     return "".join(out)
 
 
+def strip_trailing_model_drivers_and_plant_config(yaml_text: str) -> str:
+    """
+    Removes top-level `model_drivers:` and `plant_config:` blocks from the YAML text.
+    Pure text-based, indentation-aware, no YAML parsing.
+    """
+    lines = yaml_text.splitlines(keepends=True)
+
+    def is_top_level_key(line, key):
+        return re.match(rf"^{key}:\s*$", line) is not None
+
+    out = []
+    i = 0
+    n = len(lines)
+
+    while i < n:
+        line = lines[i]
+
+        # Detect start of a removable top-level block
+        if is_top_level_key(line, "model_drivers") or is_top_level_key(line, "plant_config"):
+            block_indent = len(line) - len(line.lstrip(" "))
+            i += 1
+
+            # Skip all indented lines belonging to this block
+            while i < n:
+                next_line = lines[i]
+                # Blank lines are considered part of the block
+                if next_line.strip() == "":
+                    i += 1
+                    continue
+                indent = len(next_line) - len(next_line.lstrip(" "))
+                if indent <= block_indent:
+                    break
+                i += 1
+            continue  # do not emit anything for this block
+
+        out.append(line)
+        i += 1
+
+    return "".join(out)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Build a manipulation.station HardwareStation and play a retimed plan"
@@ -587,6 +628,8 @@ def main():
                 plant=plant,
                 plant_context=plant_context,
             )
+            updated_yaml_text = strip_trailing_model_drivers_and_plant_config(updated_yaml_text)
+
             Path(args.write_updated_scenario).write_text(updated_yaml_text)
             print(f"Wrote updated scenario YAML to: {args.write_updated_scenario}")
 
