@@ -99,6 +99,32 @@
     <joint name="iiwa_base_theta_joint"/>
   </transmission>
 
+  <!-- Collision geometry for the z-lift (centered 0.2m x 0.2m x 1.0m). -->
+  <link name="iiwa_base_z_column">
+    <!-- Optional but recommended: a visual to match the collision (delete if you only want collision). -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.3 0.3 1.0"/>
+      </geometry>
+      <material name="Silver"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.3 0.3 1.0"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Rigidly attach the column to the moving lift frame (so it follows x/y/theta and lifts with z). -->
+  <joint name="iiwa_base_z_column_joint" type="fixed">
+    <parent link="iiwa_base_theta"/>
+    <child link="iiwa_base_z_column"/>
+    <origin xyz="0 0 -0.5" rpy="0 0 0"/>
+  </joint>
+
   <!-- Prismatic joint for vertical (z) motion -->
   <joint name="iiwa_base_z_joint" type="prismatic">
     <parent link="iiwa_base_theta"/>
