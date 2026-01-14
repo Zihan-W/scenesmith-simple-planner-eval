@@ -2,9 +2,9 @@
 import argparse
 import json
 from pathlib import Path
-from typing import List, Tuple
-
+from typing import List, Tuple, Any, Dict
 import numpy as np
+import re
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +20,7 @@ from pydrake.trajectories import (
 )
 from pydrake.multibody.optimization import Toppra, CalcGridPointsOptions
 from pydrake.multibody.plant import MultibodyPlant
+from pydrake.common.yaml import yaml_load, yaml_dump_typed
 
 # Robotic Manipulation course "manipulation" python package.
 from manipulation.station import LoadScenario, MakeHardwareStation, MakeMultibodyPlant
@@ -146,6 +147,222 @@ def body_names_for_instance(plant: MultibodyPlant, model_instance_name):
         for body_index in plant.GetBodyIndices(plant.GetModelInstanceByName(model_instance_name))
     ]
 
+
+def _make_angleaxis_block(indent: str, angle_deg: float, axis):
+    """
+    indent: indentation for the 'rotation:' line
+    axis: iterable of 3 floats
+    """
+    ax = [_format_float(float(axis[0])), _format_float(float(axis[1])), _format_float(float(axis[2]))]
+    return [
+        f"{indent}rotation: !AngleAxis\n",
+        f"{indent}  angle_deg: {_format_float(float(angle_deg))}\n",
+        f"{indent}  axis: [{ax[0]}, {ax[1]}, {ax[2]}]\n",
+    ]
+
+
+def _make_translation_line(indent: str, p):
+    vals = [_format_float(float(p[0])), _format_float(float(p[1])), _format_float(float(p[2]))]
+    return f"{indent}translation: [{vals[0]}, {vals[1]}, {vals[2]}]\n"
+
+
+def _indent_of(line: str) -> str:
+    return line[: len(line) - len(line.lstrip(" "))]
+
+
+def _format_float(x: float) -> str:
+    # Keep it readable and stable-ish; adjust if you prefer more/less precision.
+    return f"{x:.16g}"
+
+def update_default_free_body_pose_text_in_place(
+    yaml_text: str,
+    plant,
+    plant_context,
+) -> str:
+    """
+    Pure text rewrite:
+    - Only edits add_model.default_free_body_pose.<body>.(translation, rotation)
+    - Leaves welds and everything else unchanged
+    - Does not use Drake/PyYAML YAML parsing
+    """
+
+    lines = yaml_text.splitlines(keepends=True)
+
+    # State for scanning
+    in_add_model = False
+    add_model_indent = None  # indent string for "- add_model:"
+    current_model_name = None
+
+    in_dfbp = False
+    dfbp_indent = None  # indent string for "default_free_body_pose:"
+    current_body_name = None
+    body_indent = None  # indent string for "base_link:" line (body key)
+
+    i = 0
+    out = []
+
+    # Helpers to detect block boundaries by indentation
+    def indent_len(s): return len(_indent_of(s))
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.lstrip(" ")
+
+        # Detect start of an add_model item: "- add_model:"
+        if re.match(r"^\s*-\s+add_model:\s*$", line):
+            in_add_model = True
+            in_dfbp = False
+            current_body_name = None
+            body_indent = None
+            current_model_name = None
+            add_model_indent = _indent_of(line)
+            out.append(line)
+            i += 1
+            continue
+
+        # If we hit a new directive item, end previous add_model context
+        if re.match(r"^\s*-\s+\w+:\s*$", line) and not re.match(r"^\s*-\s+add_model:\s*$", line):
+            in_add_model = False
+            in_dfbp = False
+            current_body_name = None
+            body_indent = None
+            current_model_name = None
+            add_model_indent = None
+            dfbp_indent = None
+            out.append(line)
+            i += 1
+            continue
+
+        # Within add_model, grab name: <model>
+        if in_add_model and current_model_name is None:
+            m = re.match(r"^\s*name:\s*([^\s#]+)\s*$", stripped)
+            # Careful: name line is "    name: foo" but stripped removes indentation,
+            # so match on stripped but keep "name:".
+            if m:
+                current_model_name = m.group(1)
+                out.append(line)
+                i += 1
+                continue
+
+        # Enter default_free_body_pose:
+        if in_add_model and re.match(r"^\s*default_free_body_pose:\s*$", stripped):
+            in_dfbp = True
+            dfbp_indent = _indent_of(line)
+            current_body_name = None
+            body_indent = None
+            out.append(line)
+            i += 1
+            continue
+
+        # Exit dfbp when indentation decreases to add_model level or we hit another key at same/lower indent
+        if in_dfbp:
+            # If blank/comment line, just pass through
+            if stripped.strip() == "" or stripped.lstrip().startswith("#"):
+                out.append(line)
+                i += 1
+                continue
+
+            # If indentation is <= dfbp indent, we left the dfbp block
+            if indent_len(line) <= indent_len(dfbp_indent):
+                in_dfbp = False
+                current_body_name = None
+                body_indent = None
+                dfbp_indent = None
+                # Don’t consume; reprocess this line in outer logic
+                continue
+
+            # Detect body key line: e.g. "      base_link:"
+            # It should be one indent level under default_free_body_pose
+            m_body = re.match(r"^\s*([A-Za-z0-9_:\-\.]+):\s*$", stripped)
+            if m_body:
+                current_body_name = m_body.group(1)
+                body_indent = _indent_of(line)
+                out.append(line)
+                i += 1
+                continue
+
+            # If we have a body name, we want to overwrite translation/rotation under it
+            if current_body_name is not None and current_model_name is not None:
+                # translation line
+                if re.match(r"^\s*translation:\s*\[.*\]\s*$", stripped):
+                    # Compute pose
+                    try:
+                        model_instance = plant.GetModelInstanceByName(current_model_name)
+                        body = plant.GetBodyByName(current_body_name, model_instance)
+                        X_WB = plant.EvalBodyPoseInWorld(plant_context, body)
+                    except Exception:
+                        # If lookup fails, keep original line unchanged
+                        out.append(line)
+                        i += 1
+                        continue
+
+                    p = X_WB.translation()
+                    out.append(_make_translation_line(_indent_of(line), p))
+                    i += 1
+                    continue
+
+                # rotation line could be:
+                # 1) "rotation: !AngleAxis" followed by angle_deg/axis on next lines
+                # 2) "rotation: !Rpy { deg: [..] }" one-line
+                # 3) "rotation: ..." other — we’ll replace the rotation *block* we recognize
+                if re.match(r"^\s*rotation:\s*!AngleAxis\s*$", stripped):
+                    # Compute pose
+                    try:
+                        model_instance = plant.GetModelInstanceByName(current_model_name)
+                        body = plant.GetBodyByName(current_body_name, model_instance)
+                        X_WB = plant.EvalBodyPoseInWorld(plant_context, body)
+                    except Exception:
+                        out.append(line)
+                        i += 1
+                        continue
+
+                    aa = X_WB.rotation().ToAngleAxis()
+                    angle_deg = float(aa.angle()) * 180.0 / np.pi
+                    axis = aa.axis()
+
+                    rot_indent = _indent_of(line)
+                    # Emit new rotation block
+                    out.extend(_make_angleaxis_block(rot_indent, angle_deg, axis))
+
+                    # Skip old AngleAxis sublines (angle_deg / axis) if present
+                    i += 1
+                    while i < len(lines):
+                        nxt = lines[i]
+                        nxt_stripped = nxt.lstrip(" ")
+                        # If next line indentation <= rotation indent, stop skipping
+                        if indent_len(nxt) <= indent_len(rot_indent):
+                            break
+                        # Skip typical angleaxis contents; be permissive and skip all deeper-indented lines
+                        i += 1
+                    continue
+
+                if re.match(r"^\s*rotation:\s*!Rpy\s*\{.*\}\s*$", stripped):
+                    # Replace one-line Rpy with AngleAxis block
+                    try:
+                        model_instance = plant.GetModelInstanceByName(current_model_name)
+                        body = plant.GetBodyByName(current_body_name, model_instance)
+                        X_WB = plant.EvalBodyPoseInWorld(plant_context, body)
+                    except Exception:
+                        out.append(line)
+                        i += 1
+                        continue
+
+                    aa = X_WB.rotation().ToAngleAxis()
+                    angle_deg = float(aa.angle()) * 180.0 / math.pi
+                    axis = aa.axis()
+
+                    rot_indent = _indent_of(line)
+                    out.extend(_make_angleaxis_block(rot_indent, angle_deg, axis))
+                    i += 1
+                    continue
+
+        # Default: pass through
+        out.append(line)
+        i += 1
+
+    return "".join(out)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Build a manipulation.station HardwareStation and play a retimed plan"
@@ -178,6 +395,13 @@ def main():
         default=None,
         help="End-effector spatial acceleration component limit (applied to all 6 components) in world frame. "
              "Units: rad/s^2 for rotational, m/s^2 for translational. Default: None (no limit).",
+    )
+    parser.add_argument(
+        "--write-updated-scenario",
+        type=str,
+        default=None,
+        help="If set, write a new scenario YAML where default_free_body_pose entries are updated "
+             "to the final simulated poses.",
     )
 
     args = parser.parse_args()
@@ -350,6 +574,22 @@ def main():
         html = meshcat.StaticHtml()
         Path(args.record_html).write_text(html)
         print(f"Wrote Meshcat recording to: {args.record_html}")
+
+        # --- After sim: optionally write updated scenario YAML ---
+        if args.write_updated_scenario is not None:
+            root_context = sim.get_mutable_context()
+
+            plant = station.plant()
+            plant_context = plant.GetMyContextFromRoot(root_context)
+
+            updated_yaml_text = update_default_free_body_pose_text_in_place(
+                yaml_text=yaml_text,
+                plant=plant,
+                plant_context=plant_context,
+            )
+            Path(args.write_updated_scenario).write_text(updated_yaml_text)
+            print(f"Wrote updated scenario YAML to: {args.write_updated_scenario}")
+
         while True:
             pass
     except KeyboardInterrupt:
