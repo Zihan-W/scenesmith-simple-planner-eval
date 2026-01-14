@@ -1,6 +1,8 @@
 **/__pycache__/*
-models/scene_008/*
 /*.dmd.yaml
+
+models/scene_008/*
+models/21-20-10_cleaned/*
 
 snopt.log
 robot_waypoints.json
