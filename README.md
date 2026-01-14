@@ -51,7 +51,8 @@ python3 scripts/simulate.py \
     robot_plan.json \
     --package-xml models/iiwa/package.xml \
     --package-xml models/scene_008/package.xml \
-    --ee-vel 0.25 \
-    --ee-accel 0.25
+    --ee-vel 1 \
+    --ee-accel 1 \
+    --write-updated-scenario out.dmd.yaml
 ```
 (Don't include the last two lines to run TOPPRA with only joint-space limits)

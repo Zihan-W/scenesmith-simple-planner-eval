@@ -9,7 +9,7 @@ import re
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from pydrake.geometry import StartMeshcat
+from pydrake.geometry import StartMeshcat, Role, GeometrySet, CollisionFilterDeclaration
 from pydrake.systems.analysis import Simulator
 from pydrake.systems.framework import DiagramBuilder
 from pydrake.systems.primitives import TrajectorySource, Demultiplexer, Multiplexer, Adder, Gain
@@ -20,6 +20,7 @@ from pydrake.trajectories import (
 )
 from pydrake.multibody.optimization import Toppra, CalcGridPointsOptions
 from pydrake.multibody.plant import MultibodyPlant
+from pydrake.multibody.tree import BodyIndex
 from pydrake.common.yaml import yaml_load, yaml_dump_typed
 
 # Robotic Manipulation course "manipulation" python package.
@@ -404,6 +405,49 @@ def strip_trailing_model_drivers_and_plant_config(yaml_text: str) -> str:
     return "".join(out)
 
 
+def _collision_geometry_ids_by_name_substr(scene_graph, name_substr: str):
+    ids = set()
+    inspector = scene_graph.model_inspector()
+    for gid in inspector.GetAllGeometryIds():
+        if name_substr in inspector.GetName(gid):
+            ids.add(gid)
+    return ids
+
+
+def _collision_geometry_ids_for_body_name(plant, scene_graph, body_name: str):
+    """Returns collision GeometryIds for the named body."""
+    body = plant.GetBodyByName(body_name)
+    frame_id = plant.GetBodyFrameIdOrThrow(body.index())
+    inspector = scene_graph.model_inspector()
+    return set(inspector.GetGeometries(frame_id, role=Role.kProximity))
+
+
+def apply_collision_filters(
+    *,
+    plant,
+    scene_graph,
+    sim_context,
+):
+    """
+    Leaves only (robot) <-> (environment) candidate pairs.
+    Excludes: env-env, robot-robot (incl self within arm/gripper), robot lift <-> floor, and optionally arm<->gripper.
+    """
+    # Robot geometry ids
+    F = _collision_geometry_ids_by_name_substr(scene_graph, "floor_collision")
+    Z = _collision_geometry_ids_for_body_name(plant, scene_graph, "iiwa_base_z_column")
+
+    setF = GeometrySet(list(F))
+    setZ = GeometrySet(list(Z))
+
+    sg_context = scene_graph.GetMyContextFromRoot(sim_context)
+    cfm = scene_graph.collision_filter_manager(sg_context)
+    decl = CollisionFilterDeclaration()
+
+    # Eliminate mobile iiwa lift joint <-> floor collisions
+    decl.ExcludeBetween(setZ, setF)
+
+    cfm.Apply(decl)
+
 def main():
     parser = argparse.ArgumentParser(
         description="Build a manipulation.station HardwareStation and play a retimed plan"
@@ -586,6 +630,12 @@ def main():
     sim = Simulator(diagram)
     sim.set_monitor(locking_monitor.Monitor)
     sim.Initialize()
+
+    apply_collision_filters(
+        plant=station.plant(),
+        scene_graph=station.scene_graph(),
+        sim_context=sim.get_mutable_context()
+    )
 
     print(f"Loaded scenario from: {scenario_path}")
     print(f"Loaded plan from: {plan_path}")
