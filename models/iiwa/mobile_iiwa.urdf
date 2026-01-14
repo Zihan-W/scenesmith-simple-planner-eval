@@ -99,6 +99,19 @@
     <joint name="iiwa_base_theta_joint"/>
   </transmission>
 
+  <!-- Prismatic joint for vertical (z) motion -->
+  <joint name="iiwa_base_z_joint" type="prismatic">
+    <parent link="iiwa_base_theta"/>
+    <child link="iiwa_link_0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="0.0" upper="1.0" effort="1000" velocity="0.5"/>
+  </joint>
+  <transmission type="SimpleTransmission" name="base_z_trans">
+    <actuator name="iiwa_base_z"/>
+    <joint name="iiwa_base_z_joint"/>
+  </transmission>
+
   <!-- Collision geometry for the z-lift (centered 0.2m x 0.2m x 1.0m). -->
   <link name="iiwa_base_z_column">
     <!-- Optional but recommended: a visual to match the collision (delete if you only want collision). -->
@@ -120,23 +133,10 @@
 
   <!-- Rigidly attach the column to the moving lift frame (so it follows x/y/theta and lifts with z). -->
   <joint name="iiwa_base_z_column_joint" type="fixed">
-    <parent link="iiwa_base_theta"/>
+    <parent link="iiwa_link_0"/>
     <child link="iiwa_base_z_column"/>
     <origin xyz="0 0 -0.5" rpy="0 0 0"/>
   </joint>
-
-  <!-- Prismatic joint for vertical (z) motion -->
-  <joint name="iiwa_base_z_joint" type="prismatic">
-    <parent link="iiwa_base_theta"/>
-    <child link="iiwa_link_0"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="0.0" upper="1.0" effort="1000" velocity="0.5"/>
-  </joint>
-  <transmission type="SimpleTransmission" name="base_z_trans">
-    <actuator name="iiwa_base_z"/>
-    <joint name="iiwa_base_z_joint"/>
-  </transmission>
 
   <!-- iiwa base link -->
   <link name="iiwa_link_0">
