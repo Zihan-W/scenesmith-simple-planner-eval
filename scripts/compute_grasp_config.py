@@ -463,7 +463,7 @@ def solve_ik_for_pose(
         prog.AddQuadraticErrorCost(np.eye(3), q_ref[:3], q[:3])
 
     if q_initial_guess is None:
-        q_initial_guess = q_ref
+        q_initial_guess = np.random.random(q_ref.shape)
 
     idx = np.arange(3, 12)  # arm dofs in your convention
     Q = np.eye(len(idx))
