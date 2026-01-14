@@ -24,7 +24,7 @@ from pydrake.geometry import StartMeshcat
 from pydrake.multibody.parsing import Parser, LoadModelDirectives, ProcessModelDirectives
 from pydrake.planning import RobotDiagramBuilder
 from pydrake.visualization import ApplyVisualizationConfig, VisualizationConfig
-from pydrake.geometry import CollisionFilterDeclaration, GeometrySet
+from pydrake.geometry import CollisionFilterDeclaration, GeometrySet, Role
 from pydrake.multibody.tree import BodyIndex
 
 # Fix relative paths so contents of the src directory can be imported.
@@ -118,6 +118,23 @@ def _all_collision_geometry_ids(plant):
     return ids
 
 
+def _collision_geometry_ids_by_name_substr(scene_graph, name_substr: str):
+    ids = set()
+    inspector = scene_graph.model_inspector()
+    for gid in inspector.GetAllGeometryIds():
+        if name_substr in inspector.GetName(gid):
+            ids.add(gid)
+    return ids
+
+
+def _collision_geometry_ids_for_body_name(plant, scene_graph, body_name: str):
+    """Returns collision GeometryIds for the named body."""
+    body = plant.GetBodyByName(body_name)
+    frame_id = plant.GetBodyFrameIdOrThrow(body.index())
+    inspector = scene_graph.model_inspector()
+    return set(inspector.GetGeometries(frame_id, role=Role.kProximity))
+
+
 def apply_robot_environment_only_filters(
     *,
     plant,
@@ -128,7 +145,7 @@ def apply_robot_environment_only_filters(
 ):
     """
     Leaves only (robot) <-> (environment) candidate pairs.
-    Excludes: env-env, robot-robot (incl self within arm/gripper), and optionally arm<->gripper.
+    Excludes: env-env, robot-robot (incl self within arm/gripper), robot lift <-> floor, and optionally arm<->gripper.
     """
     # Robot geometry ids
     R = set()
@@ -137,9 +154,13 @@ def apply_robot_environment_only_filters(
 
     ALL = _all_collision_geometry_ids(plant)
     E = set(ALL) - set(R)
+    F = _collision_geometry_ids_by_name_substr(scene_graph, "floor_collision")
+    Z = _collision_geometry_ids_for_body_name(plant, scene_graph, "iiwa_base_z_column")
 
     setR = GeometrySet(list(R))
     setE = GeometrySet(list(E))
+    setF = GeometrySet(list(F))
+    setZ = GeometrySet(list(Z))
 
     cfm = scene_graph.collision_filter_manager(sg_context)
     decl = CollisionFilterDeclaration()
@@ -159,6 +180,10 @@ def apply_robot_environment_only_filters(
                     GeometrySet(list(ids_by_inst[i])),
                     GeometrySet(list(ids_by_inst[j])),
                 )
+
+    # 5) Eliminate mobile iiwa lift joint <-> floor collisions
+    if Z and F:
+        decl.ExcludeBetween(setZ, setF)
 
     # Important: Do NOT exclude between setR and setE.
     # That’s the only family we want to keep.
