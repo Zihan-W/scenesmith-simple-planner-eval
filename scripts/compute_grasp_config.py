@@ -766,11 +766,12 @@ def main():
     # Add a free "ghost" WSG50 gripper for visualization
     # ---------------------------------------------------------------------
     ghost_parser = Parser(plant)
+    for pkg_xml in package_xmls:
+        register_package_xml(ghost_parser, pkg_xml)
     ghost_gripper_instances = ghost_parser.AddModelsFromUrl(
-        "package://drake_models/wsg_50_description/sdf/schunk_wsg_50_welded_fingers.sdf"
+        "package://mobile_iiwa/schunk_wsg_50_welded_fingers_and_wrist_geometry.sdf"
     )
     ghost_gripper_instance = ghost_gripper_instances[0]
-    ghost_body = plant.GetBodyByName("body", ghost_gripper_instance)
 
     plant.Finalize()
 
@@ -895,6 +896,10 @@ def main():
                         print("Rejected place (collision).")
                     else:
                         break
+
+
+                print(f"\nPlace candidate pose (world frame):")
+                print(X_target)
 
                 q_place = solve_ik_for_grasp(
                     X_target, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds
