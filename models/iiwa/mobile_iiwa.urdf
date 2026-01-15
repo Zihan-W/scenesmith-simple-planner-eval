@@ -105,7 +105,7 @@
     <child link="iiwa_link_0"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="0.0" upper="1.0" effort="1000" velocity="0.5"/>
+    <limit lower="0.0" upper="2.0" effort="1000" velocity="0.5"/>
   </joint>
   <transmission type="SimpleTransmission" name="base_z_trans">
     <actuator name="iiwa_base_z"/>
@@ -118,7 +118,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.3 0.3 1.0"/>
+        <box size="0.3 0.3 2.0"/>
       </geometry>
       <material name="Silver"/>
     </visual>
@@ -126,7 +126,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.3 0.3 1.0"/>
+        <box size="0.3 0.3 2.0"/>
       </geometry>
     </collision>
   </link>
@@ -135,7 +135,7 @@
   <joint name="iiwa_base_z_column_joint" type="fixed">
     <parent link="iiwa_link_0"/>
     <child link="iiwa_base_z_column"/>
-    <origin xyz="0 0 -0.5" rpy="0 0 0"/>
+    <origin xyz="0 0 -1.0" rpy="0 0 0"/>
   </joint>
 
   <!-- iiwa base link -->
