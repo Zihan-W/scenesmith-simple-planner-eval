@@ -136,6 +136,79 @@ def transform_points_to_world(
 
     return points_W
 
+
+def _collision_geometry_ids_for_instance(plant, model_instance: ModelInstanceIndex) -> set:
+    geom_ids = set()
+    for body_index in plant.GetBodyIndices(model_instance):
+        body = plant.get_body(body_index)
+        geom_ids.update(plant.GetCollisionGeometriesForBody(body))
+    return geom_ids
+
+
+def gripper_pose_in_collision(
+    *,
+    plant,
+    scene_graph,
+    diagram_context,
+    gripper_instance: ModelInstanceIndex,
+    X_WG: RigidTransform,
+    ignore_instances: set[ModelInstanceIndex] | None = None,
+    _cached_gripper_geom_ids: set | None = None,
+) -> bool:
+    """
+    Returns True if gripper penetrates anything (except itself, and optionally
+    anything belonging to ignore_instances).
+    """
+    if ignore_instances is None:
+        ignore_instances = set()
+
+    plant_context = plant.GetMyContextFromRoot(diagram_context)
+
+    # Move the free-floating gripper body to X_WG (ghost gripper should be floating)
+    gripper_body = plant.GetBodyByName("body", gripper_instance)
+    plant.SetFreeBodyPose(plant_context, gripper_body, X_WG)
+
+    sg_context = scene_graph.GetMyContextFromRoot(diagram_context)
+    query_object = scene_graph.get_query_output_port().Eval(sg_context)
+    inspector = query_object.inspector()
+
+    gripper_geom_ids = (
+        _cached_gripper_geom_ids
+        if _cached_gripper_geom_ids is not None
+        else _collision_geometry_ids_for_instance(plant, gripper_instance)
+    )
+
+    penetrations = query_object.ComputePointPairPenetration()
+
+    def body_from_geom(gid):
+        frame_id = inspector.GetFrameId(gid)
+        return plant.GetBodyFromFrameId(frame_id)
+
+    for pen in penetrations:
+        a = pen.id_A
+        b = pen.id_B
+
+        # exactly one side is gripper
+        if (a in gripper_geom_ids) ^ (b in gripper_geom_ids):
+            g = a if a in gripper_geom_ids else b
+            o = b if g == a else a
+
+            body_g = body_from_geom(g)
+            body_o = body_from_geom(o)
+
+            # ignore gripper self-collisions
+            if body_g.model_instance() == body_o.model_instance():
+                continue
+
+            # ignore collisions with specified model instances (e.g., the target object)
+            if body_o.model_instance() in ignore_instances:
+                continue
+
+            return True
+
+    return False
+
+
 def generate_single_antipodal_grasp(
     diagram,
     plant,
@@ -551,52 +624,89 @@ def solve_ik_for_pose(
 def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds):
     return solve_ik_for_pose(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds)
 
-def compute_target_pose(
+
+def compute_target_pose_collision_free(
     *,
     task,
     plant,
+    scene_graph,
     diagram_context,
     target_obj_name: str,
-    X_grasp: RigidTransform,
+    X_grasp: RigidTransform,          # world->gripper at grasp time
+    ghost_gripper_instance,           # ModelInstanceIndex or name
     z_offset: float = 0.002,
-    rng: np.random.Generator | None = None,
+    ignore_target_object: bool = True,
+    visualize: bool = False,
+    diagram=None,                     # only needed if visualize=True
 ):
     """
-    Samples an object placement target pose within [placement_bounds_min, placement_bounds_max],
-    then returns the corresponding gripper target pose that preserves the grasp transform.
-
-    Returns:
-      X_WG_goal (RigidTransform): world->gripper pose
+    Samples an object placement target pose within the bounds, rejects samples where
+    the *ghost gripper at the implied goal pose* is in penetration with the scene.
+    Returns X_WG_goal or None if no collision-free sample is found.
     """
-    if rng is None:
-        rng = np.random.default_rng()
+    rng = np.random.default_rng()
 
     cmd = task["commands"][0]
     lo = np.array(cmd["placement_bounds_min"], dtype=float)
     hi = np.array(cmd["placement_bounds_max"], dtype=float)
 
-    # Sample object target position uniformly in the AABB
+    plant_context = plant.GetMyContextFromRoot(diagram_context)
+
+    # Resolve instances
+    obj_instance = plant.GetModelInstanceByName(target_obj_name)
+    gripper_instance = (
+        ghost_gripper_instance
+        if isinstance(ghost_gripper_instance, ModelInstanceIndex)
+        else plant.GetModelInstanceByName(ghost_gripper_instance)
+    )
+
+    # Get single-body handles (same assumption you made)
+    obj_body = plant.get_body(plant.GetBodyIndices(obj_instance)[0])
+    gripper_body = plant.GetBodyByName("body", gripper_instance)
+
+    # Cache gripper geometry ids (speed)
+    gripper_geom_ids = _collision_geometry_ids_for_instance(plant, gripper_instance)
+
+    # Save original poses to restore after each try (and on exit)
+    X_WO_orig = plant.EvalBodyPoseInWorld(plant_context, obj_body)
+    X_WG_orig = plant.EvalBodyPoseInWorld(plant_context, gripper_body)
+
+    # Compute grasp transform relative to object at the *current* context
+    # (This assumes X_grasp corresponds to this same scene state, which it likely does right after grasping.)
+    X_WO = X_WO_orig
+    X_OG = X_WO.inverse() @ X_grasp
+
+    ignore_instances = {obj_instance} if ignore_target_object else set()
+
+    # Sample object target position uniformly in AABB
     p_WO_goal = rng.uniform(lo, hi)
     p_WO_goal[2] += z_offset
 
-    # Current object pose in world (for X_OG computation)
-    obj_instance = plant.GetModelInstanceByName(target_obj_name)
-    body_indices = plant.GetBodyIndices(obj_instance)
-    obj_body = plant.get_body(body_indices[0])  # ok for single-body objects; refine if needed
-
-    X_WO = plant.EvalBodyPoseInWorld(
-        plant.GetMyContextFromRoot(diagram_context), obj_body
-    )
-
-    # Preserve relative grasp: X_OG
-    X_OG = X_WO.inverse() @ X_grasp
-
-    # Build goal object pose: keep current orientation, new sampled translation
+    # Keep current object orientation, only change translation
     X_WO_goal = RigidTransform(X_WO.rotation(), p_WO_goal)
 
-    # Convert to desired gripper pose
+    # Implied gripper target pose preserving grasp
     X_WG_goal = X_WO_goal @ X_OG
-    return X_WG_goal
+
+    # Temporarily set object to goal pose for collision checking
+    plant.SetFreeBodyPose(plant_context, obj_body, X_WO_goal)
+
+    # Check gripper penetrations at the implied goal pose
+    in_collision = gripper_pose_in_collision(
+        plant=plant,
+        scene_graph=scene_graph,
+        diagram_context=diagram_context,
+        gripper_instance=gripper_instance,
+        X_WG=X_WG_goal,
+        ignore_instances=ignore_instances,
+        _cached_gripper_geom_ids=gripper_geom_ids,
+    )
+
+    if not in_collision:
+        return X_WG_goal
+
+    return None
+
 
 def retreat_along_gripper_y(X_WG: RigidTransform, distance: float) -> RigidTransform:
     return X_WG @ RigidTransform([0.0, -distance, 0.0])
@@ -765,15 +875,26 @@ def main():
                     print("No successful grasp yet — sample a grasp first.")
                     continue
 
-                X_target = compute_target_pose(
-                    task=task,
-                    plant=plant,
-                    diagram_context=diagram_context,
-                    target_obj_name=target_obj_name,
-                    X_grasp=last_grasp_pose,
-                    z_offset=0.002,
-                    # rng=rng,   # if you added deterministic sampling
-                )
+                while True:
+                    X_target = compute_target_pose_collision_free(
+                        task=task,
+                        plant=plant,
+                        scene_graph=scene_graph,
+                        diagram_context=diagram_context,
+                        target_obj_name=target_obj_name,
+                        X_grasp=last_grasp_pose,
+                        ghost_gripper_instance=ghost_gripper_instance,
+                        z_offset=0.002,
+                        ignore_target_object=True,   # usually yes: you expect the gripper to be “touching” the object
+                        visualize=True,             # set True if you pass diagram=diagram
+                        diagram=diagram,
+                    )
+                    diagram.ForcedPublish(diagram_context)
+
+                    if X_target is None:
+                        print("Rejected place (collision).")
+                    else:
+                        break
 
                 q_place = solve_ik_for_grasp(
                     X_target, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds
