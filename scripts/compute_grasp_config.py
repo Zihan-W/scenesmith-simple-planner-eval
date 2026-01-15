@@ -721,6 +721,11 @@ def compute_target_pose_collision_free(
     # Implied gripper target pose preserving grasp
     X_WG_goal = X_WO_goal @ X_OG
 
+    print()
+    print(p_WO_goal)
+    print(X_WG_goal.translation())
+    print()
+
     # Temporarily set object to goal pose for collision checking
     plant.SetFreeBodyPose(plant_context, obj_body, X_WO_goal)
 
@@ -772,7 +777,7 @@ def main():
     approach_distance = float(args.approach_distance)
 
     task = load_task(task_file)
-    target_obj_name = task["commands"][0]["drake_model_name"]
+    target_obj_names = [command["drake_model_name"] for command in task["commands"]]
     wb_min = task["world_bounds"]["min"]
     wb_max = task["world_bounds"]["max"]
     world_xy_bounds = (float(wb_min[0]), float(wb_max[0]), float(wb_min[1]), float(wb_max[1]))
@@ -826,34 +831,41 @@ def main():
     # ---------------------------------------------------------------------
     # Sample points and visualize point cloud
     # ---------------------------------------------------------------------
-    points_body = sample_points_from_body(
-        plant,
-        scene_graph,
-        target_obj_name,
-        n_points=1000,
-    )
+    points_bodies = [
+        sample_points_from_body(
+            plant,
+            scene_graph,
+            target_obj_name,
+            n_points=1000,
+        )
+        for target_obj_name in target_obj_names
+    ]
 
-    points_world = transform_points_to_world(
-        plant, diagram_context, target_obj_name, points_body
-    )
+    points_world = [
+        transform_points_to_world(
+            plant, diagram_context, target_obj_name, points_body
+        )
+        for target_obj_name, points_body in zip(target_obj_names, points_bodies)
+    ]
 
-    pc = PointCloud(points_world.shape[0])
-    pc.mutable_xyzs()[:] = points_world.T
+    # pc = PointCloud(points_world[0].shape[0])
+    # pc.mutable_xyzs()[:] = points_world[0].T
 
-    meshcat.SetObject(
-        "point_cloud",
-        pc,
-        point_size=0.01,
-        rgba=Rgba(1.0, 1.0, 1.0, 1.0),
-    )
+    # meshcat.SetObject(
+    #     "point_cloud",
+    #     pc,
+    #     point_size=0.01,
+    #     rgba=Rgba(1.0, 1.0, 1.0, 1.0),
+    # )
 
-    print(f"Visualizing: {dmd_file}")
-    print(f"Point cloud for '{target_obj_name}' with {points_world.shape[0]} points")
+    # print(f"Visualizing: {dmd_file}")
+    # print(f"Point cloud for '{target_obj_name}' with {points_world.shape[0]} points")
 
     # ---------------------------------------------------------------------
     # Interactive grasp sampling loop
     # ---------------------------------------------------------------------
     last_grasp_pose = None   # stores last successful grasp pose (X_WG)
+    last_object_idx = None   # stores the index of the object grasped
     q_grasp_last = None      # stores last successful grasp configuration
     q_place_last = None      # stores last successful place configuration
     q_pregrasp_last = None
@@ -917,7 +929,7 @@ def main():
                         plant=plant,
                         scene_graph=scene_graph,
                         diagram_context=diagram_context,
-                        target_obj_name=target_obj_name,
+                        target_obj_name=target_obj_names[last_object_idx],
                         X_grasp=last_grasp_pose,
                         ghost_gripper_instance=ghost_gripper_instance,
                         z_offset=0.002,
@@ -971,15 +983,16 @@ def main():
                 continue
 
             while True:
+                object_idx = np.random.choice(len(target_obj_names))
                 X_grasp = generate_single_antipodal_grasp(
                     diagram,
                     plant,
                     scene_graph,
                     diagram_context,
                     gripper_model_name=ghost_gripper_instance,
-                    points_world=points_world,
+                    points_world=points_world[object_idx],
                     meshcat=meshcat,
-                    target_model_name=target_obj_name,
+                    target_model_name=target_obj_names[object_idx],
                     visualize=True,
                 )
 
@@ -1002,6 +1015,7 @@ def main():
                 continue
 
             q_grasp_last = np.asarray(q_grasp).copy()
+            last_object_idx = object_idx
             last_grasp_pose = X_grasp
 
             # Solve pregrasp: retreat along gripper y-axis, cost centered at grasp q
