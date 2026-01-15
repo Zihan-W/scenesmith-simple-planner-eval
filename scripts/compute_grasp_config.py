@@ -667,9 +667,7 @@ def compute_target_pose_collision_free(
     # Cache gripper geometry ids (speed)
     gripper_geom_ids = _collision_geometry_ids_for_instance(plant, gripper_instance)
 
-    # Save original poses to restore after each try (and on exit)
     X_WO_orig = plant.EvalBodyPoseInWorld(plant_context, obj_body)
-    X_WG_orig = plant.EvalBodyPoseInWorld(plant_context, gripper_body)
 
     # Compute grasp transform relative to object at the *current* context
     # (This assumes X_grasp corresponds to this same scene state, which it likely does right after grasping.)
@@ -701,6 +699,8 @@ def compute_target_pose_collision_free(
         ignore_instances=ignore_instances,
         _cached_gripper_geom_ids=gripper_geom_ids,
     )
+
+    plant.SetFreeBodyPose(plant_context, obj_body, X_WO_orig)
 
     if not in_collision:
         return X_WG_goal
