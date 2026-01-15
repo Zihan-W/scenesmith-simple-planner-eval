@@ -168,9 +168,9 @@ def generate_single_antipodal_grasp(
     # 1. Sample a random point
     idx = np.random.randint(points_world.shape[0])
     point = points_world[idx]
-    print("Point cloud min:", points_world.min(axis=0))
-    print("Point cloud max:", points_world.max(axis=0))
-    print("Sampled point:", point)
+    # print("Point cloud min:", points_world.min(axis=0))
+    # print("Point cloud max:", points_world.max(axis=0))
+    # print("Sampled point:", point)
 
     # 2. Estimate a normal at that point (simple approximation: use vector to mean)
     normal = point - points_world.mean(axis=0)
@@ -266,10 +266,10 @@ def generate_single_antipodal_grasp(
             if body_g.model_instance() == body_o.model_instance():
                 continue
 
-            print("Gripper in collision with scene!")
-            print(f"  depth={pen.depth:.6f}")
-            print(f"  gripper geom: {inspector.GetName(g)}")
-            print(f"  other geom:   {inspector.GetName(o)}")
+            # print("Gripper in collision with scene!")
+            # print(f"  depth={pen.depth:.6f}")
+            # print(f"  gripper geom: {inspector.GetName(g)}")
+            # print(f"  other geom:   {inspector.GetName(o)}")
             return None
 
     print("Grasp candidate is collision-free!")
@@ -809,22 +809,24 @@ def main():
             if s != "" and s != " ":
                 continue
 
-            X_grasp = generate_single_antipodal_grasp(
-                diagram,
-                plant,
-                scene_graph,
-                diagram_context,
-                gripper_model_name=ghost_gripper_instance,
-                points_world=points_world,
-                meshcat=meshcat,
-                target_model_name=target_obj_name,
-                visualize=True,
-            )
+            while True:
+                X_grasp = generate_single_antipodal_grasp(
+                    diagram,
+                    plant,
+                    scene_graph,
+                    diagram_context,
+                    gripper_model_name=ghost_gripper_instance,
+                    points_world=points_world,
+                    meshcat=meshcat,
+                    target_model_name=target_obj_name,
+                    visualize=True,
+                )
 
-            if X_grasp is None:
-                print("\nRejected grasp (collision).")
-                diagram.ForcedPublish(diagram_context)
-                continue
+                if X_grasp is None:
+                    print("Rejected grasp (collision).")
+                    diagram.ForcedPublish(diagram_context)
+                else:
+                    break
 
             grasp_count += 1
             print(f"\nGrasp #{grasp_count} candidate pose (world frame):")
