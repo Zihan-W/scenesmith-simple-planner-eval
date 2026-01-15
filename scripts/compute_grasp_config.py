@@ -404,6 +404,7 @@ def solve_ik_for_pose(
     plant,
     scene_graph,
     ghost_gripper_instance,
+    world_xy_bounds=[-10, 10, -10, 10], # should specify if q_initial_guess or q_ref is not given
     q_ref=None,                 # <-- center cost around this
     q_initial_guess=None,       # <-- initial guess
     arm_position_count=11,
@@ -464,6 +465,9 @@ def solve_ik_for_pose(
 
     if q_initial_guess is None:
         q_initial_guess = np.random.random(q_ref.shape)
+        low = (world_xy_bounds[0], world_xy_bounds[2])
+        high = (world_xy_bounds[1], world_xy_bounds[3])
+        q_initial_guess[:2] = np.random.uniform(low, high)
 
     idx = np.arange(3, 12)  # arm dofs in your convention
     Q = np.eye(len(idx))
@@ -544,8 +548,8 @@ def solve_ik_for_pose(
     print("IK succeeded")
     return result.GetSolution(q)
 
-def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance):
-    return solve_ik_for_pose(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance)
+def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds):
+    return solve_ik_for_pose(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds)
 
 def compute_target_pose(
     *,
@@ -612,7 +616,7 @@ def main():
     parser.add_argument(
         "--approach-distance",
         type=float,
-        default=0.10,  # 5 cm
+        default=0.10,  # 10 cm
         help="Distance (m) to retreat along gripper +x axis for pregrasp/postplace IK targets.",
     )
     args = parser.parse_args()
@@ -624,6 +628,9 @@ def main():
 
     task = load_task(task_file)
     target_obj_name = task["commands"][0]["drake_model_name"]
+    wb_min = task["world_bounds"]["min"]
+    wb_max = task["world_bounds"]["max"]
+    world_xy_bounds = (float(wb_min[0]), float(wb_max[0]), float(wb_min[1]), float(wb_max[1]))
 
     # ---------------------------------------------------------------------
     # Build full Drake diagram (world + robot + objects)
@@ -769,7 +776,7 @@ def main():
                 )
 
                 q_place = solve_ik_for_grasp(
-                    X_target, diagram, plant, scene_graph, ghost_gripper_instance
+                    X_target, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds
                 )
                 if q_place is None:
                     print("Place IK failed.")
@@ -824,7 +831,7 @@ def main():
             print(X_grasp)
 
             q_grasp = solve_ik_for_grasp(
-                X_grasp, diagram, plant, scene_graph, ghost_gripper_instance
+                X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds
             )
             if q_grasp is None:
                 print("Grasp IK failed.")
