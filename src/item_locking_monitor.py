@@ -288,8 +288,8 @@ def _FindAllTargets(plant) -> list[_TargetDetail]:
     matches = []
     for body_index in candidates.keys():
         # Skip bodies that are inboard of something else.
-        # if len(outboards.get(body_index, [])) > 0:
-        #     continue
+        if len(outboards.get(body_index, [])) > 0:
+            continue
         # TODO: uncomment the above once directives files don't have spurious welds
         # Skip bodies without a single 6dof inboard joint.
         if len(inboards.get(body_index, [])) != 1:
@@ -299,8 +299,8 @@ def _FindAllTargets(plant) -> list[_TargetDetail]:
         if joint.num_positions() < 6:
             continue
         # Skip bodies with a non-world-affixed parent.
-        # if joint.parent_body().index() not in world_body_indices:
-        #     continue
+        if joint.parent_body().index() not in world_body_indices:
+            continue
         # TODO: uncomment the above once directives files don't have spurious welds
         candidates[body_index].joint_index = joint_index
         matches.append(body_index)
