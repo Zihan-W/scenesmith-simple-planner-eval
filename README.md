@@ -1,5 +1,9 @@
 ### Useful commands:
 
+To do all-in-one, just run `bash run_experiment.sh scene_000`.
+
+### Old:
+
 *All commands should be run from the root of the repository.*
 
 Add the robot to the directives (based on the task):
