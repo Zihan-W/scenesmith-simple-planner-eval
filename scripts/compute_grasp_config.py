@@ -721,11 +721,6 @@ def compute_target_pose_collision_free(
     # Implied gripper target pose preserving grasp
     X_WG_goal = X_WO_goal @ X_OG
 
-    print()
-    print(p_WO_goal)
-    print(X_WG_goal.translation())
-    print()
-
     # Temporarily set object to goal pose for collision checking
     plant.SetFreeBodyPose(plant_context, obj_body, X_WO_goal)
 
@@ -982,8 +977,10 @@ def main():
             if s != "" and s != " ":
                 continue
 
+            weights = 1 + np.arange(len(target_obj_names), 0, -1, dtype=float)
+            weights /= np.sum(weights)
             while True:
-                object_idx = np.random.choice(len(target_obj_names))
+                object_idx = np.random.choice(len(target_obj_names), p=weights)
                 X_grasp = generate_single_antipodal_grasp(
                     diagram,
                     plant,
