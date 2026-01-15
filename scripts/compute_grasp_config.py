@@ -610,7 +610,7 @@ def solve_ik_for_pose(
     options.SetOption(CommonSolverOption.kPrintFileName, "snopt.log")
     options.SetOption(solver.solver_id(), "Major print level", 1)
     options.SetOption(solver.solver_id(), "Timing level", 3)
-    options.SetOption(solver.solver_id(), "Time Limit", 60)
+    options.SetOption(solver.solver_id(), "Time Limit", 10)
     options.SetOption(solver.solver_id(), "Major optimality tolerance", 1e-1)
 
     result = solver.Solve(prog, None, options)
@@ -623,6 +623,36 @@ def solve_ik_for_pose(
 
 def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds):
     return solve_ik_for_pose(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds)
+
+
+def hat(w):
+    wx, wy, wz = w
+    return np.array([[0, -wz, wy],
+                     [wz, 0, -wx],
+                     [-wy, wx, 0]], dtype=float)
+
+def so3_exp(w):
+    """Exponential map from axis-angle vector w to rotation matrix."""
+    theta = np.linalg.norm(w)
+    if theta < 1e-12:
+        # First-order approximation
+        return np.eye(3) + hat(w)
+    K = hat(w / theta)
+    return np.eye(3) + np.sin(theta) * K + (1 - np.cos(theta)) * (K @ K)
+
+def sample_rotation_gaussian(R0, Sigma, n=1, side="right", rng=None):
+    """
+    R = R0 * Exp([eps]_x)  (side='right')  or  R = Exp([eps]_x) * R0 (side='left')
+    eps ~ N(0, Sigma) in R^3.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    eps = rng.multivariate_normal(mean=np.zeros(3), cov=Sigma, size=n)
+    Rs = []
+    for e in eps:
+        dR = so3_exp(e)
+        Rs.append(R0 @ dR if side == "right" else dR @ R0)
+    return Rs[0] if n == 1 else np.stack(Rs, axis=0)
 
 
 def compute_target_pose_collision_free(
@@ -680,8 +710,13 @@ def compute_target_pose_collision_free(
     p_WO_goal = rng.uniform(lo, hi)
     p_WO_goal[2] += z_offset
 
+    random_orientation = sample_rotation_gaussian(
+        X_WO.rotation().matrix(),
+        Sigma = 0.5 * np.eye(3)
+    )
+
     # Keep current object orientation, only change translation
-    X_WO_goal = RigidTransform(X_WO.rotation(), p_WO_goal)
+    X_WO_goal = RigidTransform(RotationMatrix(random_orientation), p_WO_goal)
 
     # Implied gripper target pose preserving grasp
     X_WG_goal = X_WO_goal @ X_OG
