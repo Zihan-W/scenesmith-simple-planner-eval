@@ -1,6 +1,6 @@
 ### Useful commands:
 
-To do all-in-one, just run `bash run_experiment.sh scene_000`.
+To do all-in-one, just run `bash run_experiment.sh models/21-20-10_cleaned/scene_000` or `bash run_experiment.sh models/15-15-01_cleaned/scene_000`.
 
 ### Old:
 
