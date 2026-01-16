@@ -1,6 +1,6 @@
 export SCENE=$1
 
-export TIMELIMIT=10m
+export TIMELIMIT=5m
 export GRACEPERIOD=5s
 
 rm robot_task.dmd.yaml
@@ -40,7 +40,7 @@ timeout -k $GRACEPERIOD $TIMELIMIT \
 
 if [ ! -f robot_plan.json ]; then
     echo "Failed to compute robot plan in the allotted time."
-    exit 1
+    exit 2
 fi
 
 python3 scripts/simulate_noninteractive.py \
