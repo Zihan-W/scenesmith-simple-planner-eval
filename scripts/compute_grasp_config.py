@@ -29,6 +29,7 @@ from pydrake.all import (
     MinimumDistanceLowerBoundConstraint,
     BodyIndex,
     SnoptSolver,
+    IpoptSolver,
     SolverOptions,
     CommonSolverOption,
     Role,
@@ -534,12 +535,12 @@ def solve_ik_for_pose(
         q_ref = plant.GetPositions(plant_context).copy()
     else:
         q_ref = np.asarray(q_ref).copy()
-        prog.AddQuadraticErrorCost(np.eye(3), q_ref[:3], q[:3])
 
     if q_initial_guess is None:
         q_initial_guess = np.random.random(q_ref.shape)
-        low = (world_xy_bounds[0], world_xy_bounds[2])
-        high = (world_xy_bounds[1], world_xy_bounds[3])
+        ee_pos = X_WE.translation()
+        low = ee_pos[:2] - 2
+        high = ee_pos[:2] + 2
         q_initial_guess[:2] = np.random.uniform(low, high)
 
     idx = np.arange(3, 12)  # arm dofs in your convention
@@ -606,12 +607,24 @@ def solve_ik_for_pose(
     # Solve
     # -------------------------
     solver = SnoptSolver()
+    # solver = IpoptSolver()
+
     options = SolverOptions()
+
+    # SNOPT Options
     options.SetOption(CommonSolverOption.kPrintFileName, "snopt.log")
     options.SetOption(solver.solver_id(), "Major print level", 1)
-    options.SetOption(solver.solver_id(), "Timing level", 3)
-    options.SetOption(solver.solver_id(), "Time Limit", 10)
-    options.SetOption(solver.solver_id(), "Major optimality tolerance", 1e-1)
+    options.SetOption(SnoptSolver().solver_id(), "Timing level", 3)
+    options.SetOption(SnoptSolver().solver_id(), "Time Limit", 10)
+    options.SetOption(SnoptSolver().solver_id(), "Major optimality tolerance", 1e-1)
+
+    # IPOPT Options
+    # options.SetOption(CommonSolverOption.kPrintToConsole, True)
+    # options.SetOption(IpoptSolver().solver_id(), "print_level", 5)
+    options.SetOption(IpoptSolver().solver_id(), "max_wall_time", 10)
+    options.SetOption(IpoptSolver().solver_id(), "acceptable_tol", 1e-2)
+    options.SetOption(IpoptSolver().solver_id(), "acceptable_iter", 5)
+    options.SetOption(IpoptSolver().solver_id(), "acceptable_constr_viol_tol", 1e-6)
 
     result = solver.Solve(prog, None, options)
     if not result.is_success():
@@ -679,6 +692,7 @@ def compute_target_pose_collision_free(
     cmd = task["commands"][0]
     lo = np.array(cmd["placement_bounds_min"], dtype=float)
     hi = np.array(cmd["placement_bounds_max"], dtype=float)
+    hi[2] += z_offset
 
     plant_context = plant.GetMyContextFromRoot(diagram_context)
 
@@ -708,7 +722,6 @@ def compute_target_pose_collision_free(
 
     # Sample object target position uniformly in AABB
     p_WO_goal = rng.uniform(lo, hi)
-    p_WO_goal[2] += z_offset
 
     random_orientation = sample_rotation_gaussian(
         X_WO.rotation().matrix(),
@@ -927,7 +940,7 @@ def main():
                         target_obj_name=target_obj_names[last_object_idx],
                         X_grasp=last_grasp_pose,
                         ghost_gripper_instance=ghost_gripper_instance,
-                        z_offset=0.002,
+                        z_offset=0.1,
                         ignore_target_object=True,   # usually yes: you expect the gripper to be “touching” the object
                         visualize=True,             # set True if you pass diagram=diagram
                         diagram=diagram,
