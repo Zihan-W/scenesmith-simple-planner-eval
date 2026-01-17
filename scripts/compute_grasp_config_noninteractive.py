@@ -612,8 +612,8 @@ def solve_ik_for_pose(
     options = SolverOptions()
 
     # SNOPT Options
-    options.SetOption(CommonSolverOption.kPrintFileName, "snopt.log")
-    options.SetOption(solver.solver_id(), "Major print level", 1)
+    # options.SetOption(CommonSolverOption.kPrintFileName, "snopt.log")
+    # options.SetOption(solver.solver_id(), "Major print level", 1)
     options.SetOption(SnoptSolver().solver_id(), "Timing level", 3)
     options.SetOption(SnoptSolver().solver_id(), "Time Limit", 10)
     options.SetOption(SnoptSolver().solver_id(), "Major optimality tolerance", 1e-1)
