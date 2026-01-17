@@ -11,9 +11,15 @@ rm simulation_bad.html
 rm out_good.dmd.yaml
 rm out_bad.dmd.yaml
 
+# timeout -k $GRACEPERIOD $TIMELIMIT \
+#     python3 scripts/add_robot_to_directives.py \
+#         $SCENE/combined_house/house.dmd.yaml \
+#         $SCENE/combined_house/robot_commands.json \
+#         robot_task.dmd.yaml
+
 timeout -k $GRACEPERIOD $TIMELIMIT \
     python3 scripts/add_robot_to_directives.py \
-        $SCENE/combined_house/house.dmd.yaml \
+        $SCENE/combined_house/house_furniture_welded.dmd.yaml \
         $SCENE/combined_house/robot_commands.json \
         robot_task.dmd.yaml
 
