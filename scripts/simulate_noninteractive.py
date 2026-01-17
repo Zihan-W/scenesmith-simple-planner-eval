@@ -28,7 +28,7 @@ from manipulation.station import LoadScenario, MakeHardwareStation, MakeMultibod
 
 # Fix relative paths so contents of the src directory can be imported.
 import sys
-sys.path.append("..")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.item_locking_monitor import ItemLockingMonitorConfig, ApplyItemLockingMonitorConfig
 

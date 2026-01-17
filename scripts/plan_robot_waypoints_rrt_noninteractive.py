@@ -29,7 +29,8 @@ from pydrake.multibody.tree import BodyIndex
 
 # Fix relative paths so contents of the src directory can be imported.
 import sys
-sys.path.append("..")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Import your RRT and shortcut implementations
 from src.rrt import BiRRT, RRTOptions
