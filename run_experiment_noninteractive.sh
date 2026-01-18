@@ -1,6 +1,6 @@
 export SCENE=$1
 
-export TIMELIMIT=5m
+export TIMELIMIT=60m
 export GRACEPERIOD=5s
 
 rm robot_task.dmd.yaml

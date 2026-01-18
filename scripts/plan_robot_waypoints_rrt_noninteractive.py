@@ -440,7 +440,7 @@ def plan_rrt_segment(
     q_goal,
     rng,
     world_xy_bounds,
-    max_iters=2000,
+    max_iters=10000,
     step_size=0.1,
     do_shortcut: bool = False,
     shortcut_tries: int = 200,
@@ -462,7 +462,7 @@ def plan_rrt_segment(
     rrt_options = RRTOptions(
         step_size=step_size,
         check_size=min(1e-2, step_size / 10.0),
-        max_vertices=int(1e4),
+        max_vertices=int(1e5),
         max_iters=int(max_iters),
         goal_sample_frequency=0.01,
         always_swap=False,
