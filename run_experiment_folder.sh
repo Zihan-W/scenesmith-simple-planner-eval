@@ -17,6 +17,14 @@ export GRASPFAILURE=0
 export PLANFAILURE=0
 export SKIPPED=0
 
+# Handle Ctrl+C - kill all child processes
+cleanup() {
+    echo ""
+    echo "Interrupted. Killing child processes..."
+    kill 0
+}
+trap cleanup SIGINT SIGTERM
+
 for DIR in $FOLDER*/; do
     # Skip if both output files already exist
     if $SKIP_EXISTING && \
