@@ -1,10 +1,32 @@
-export FOLDER=$1
+SKIP_EXISTING=false
+FOLDER=""
+
+for arg in "$@"; do
+    case $arg in
+        --skip-existing)
+            SKIP_EXISTING=true
+            ;;
+        *)
+            FOLDER=$arg
+            ;;
+    esac
+done
 
 export SUCCESS=0
 export GRASPFAILURE=0
 export PLANFAILURE=0
+export SKIPPED=0
 
 for DIR in $FOLDER*/; do
+    # Skip if both output files already exist
+    if $SKIP_EXISTING && \
+       [ -f "output/$DIR/out_good.dmd.yaml" ] && \
+       [ -f "output/$DIR/out_bad.dmd.yaml" ]; then
+        echo "Skipping $DIR (already completed)"
+        ((SKIPPED++))
+        continue
+    fi
+
     mkdir -p output/$DIR
     bash run_experiment_noninteractive.sh $DIR
     mv \
@@ -38,3 +60,4 @@ echo "================ Summary ================"
 echo "SUCCESS:       $SUCCESS"
 echo "GRASPFAILURE:  $GRASPFAILURE"
 echo "PLANFAILURE:   $PLANFAILURE"
+echo "SKIPPED:       $SKIPPED"
