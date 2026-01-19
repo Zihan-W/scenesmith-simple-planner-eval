@@ -6,6 +6,8 @@ WORKDIR="${WORKDIR:-.}"
 export TIMELIMIT=120m
 export GRACEPERIOD=5s
 
+echo "Running scene $SCENE"
+
 rm -f "$WORKDIR/robot_task.dmd.yaml"
 rm -f "$WORKDIR/robot_waypoints.json"
 rm -f "$WORKDIR/robot_plan.json"
@@ -34,8 +36,8 @@ timeout -k $GRACEPERIOD $TIMELIMIT \
         --package-xml models/iiwa/package.xml \
         --out-waypoints "$WORKDIR/robot_waypoints.json"
 
-if [ ! -f "$WORKDIR/robot_waypoints.json" ]; then
-    echo "Failed to compute grasp or place configurations in the allotted time."
+if [ ! -f robot_waypoints.json ]; then
+    echo "Failed to compute grasp or place configurations in the allotted time for scene $SCENE."
     exit 1
 fi
 
@@ -48,8 +50,8 @@ timeout -k $GRACEPERIOD $TIMELIMIT \
         --package-xml models/iiwa/package.xml \
         --out-traj "$WORKDIR/robot_plan.json"
 
-if [ ! -f "$WORKDIR/robot_plan.json" ]; then
-    echo "Failed to compute robot plan in the allotted time."
+if [ ! -f robot_plan.json ]; then
+    echo "Failed to compute robot plan in the allotted time for scene $SCENE."
     exit 2
 fi
 
@@ -72,3 +74,5 @@ python3 scripts/simulate_noninteractive.py \
     --ee-accel 1 \
     --write-updated-scenario "$WORKDIR/out_bad.dmd.yaml" \
     --record-html "$WORKDIR/simulation_bad.html"
+
+echo "Successfully finished running scene $SCENE"
