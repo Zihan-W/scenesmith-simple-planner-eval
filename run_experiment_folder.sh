@@ -39,6 +39,8 @@ for DIR in $FOLDER*/; do
 
     mkdir -p output/$DIR
     bash run_experiment_noninteractive.sh $DIR
+    status=$?
+
     mv \
         robot_task.dmd.yaml \
         robot_waypoints.json \
@@ -49,7 +51,6 @@ for DIR in $FOLDER*/; do
         out_bad.dmd.yaml \
         output/$DIR
 
-    status=$?
     case $status in
         0)
             ((SUCCESS++))
