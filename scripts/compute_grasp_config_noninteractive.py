@@ -783,6 +783,12 @@ def main():
         default=10,
         help="Time (minutes) before killing the script"
     )
+    parser.add_argument(
+        "--out-waypoints",
+        type=str,
+        default="robot_waypoints.json",
+        help="Output path for the robot waypoints JSON file (default: robot_waypoints.json)",
+    )
     args = parser.parse_args()
 
     task_file = Path(args.task_file)
@@ -871,8 +877,8 @@ def main():
     q_pregrasp_last = None
     q_postplace_last = None
 
-    # Save at the base level of the repository (parent directory of the folder containing this .py file)
-    waypoints_path = Path(__file__).resolve().parent.parent / "robot_waypoints.json"
+    # Output path from CLI argument (default: robot_waypoints.json in cwd)
+    waypoints_path = Path(args.out_waypoints)
 
     # Make sure the world is drawn once.
     diagram.ForcedPublish(diagram_context)

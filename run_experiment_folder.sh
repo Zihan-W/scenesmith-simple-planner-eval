@@ -21,7 +21,9 @@ export SKIPPED=0
 cleanup() {
     echo ""
     echo "Interrupted. Killing child processes..."
-    kill 0
+    pkill -P $$ 2>/dev/null
+    wait 2>/dev/null
+    exit 130
 }
 trap cleanup SIGINT SIGTERM
 
