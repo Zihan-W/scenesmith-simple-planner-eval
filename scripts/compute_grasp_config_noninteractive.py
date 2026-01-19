@@ -215,108 +215,61 @@ def generate_single_antipodal_grasp(
     plant,
     scene_graph,
     context,
-    gripper_model_name: str,
+    gripper_model_name,
     points_world: np.ndarray,
     meshcat,
     target_model_name: str,
     visualize=True,
 ):
-    """
-    Sample a single antipodal grasp on a point cloud and visualize it.
-
-    Args:
-        diagram: Parent Diagram object
-        plant: MultibodyPlant
-        scene_graph: SceneGraph
-        context: diagram's Context
-        gripper_model_name: str, name of the gripper model instance (e.g., "wsg_50")
-        points_world: (N,3) ndarray of object points in world frame
-        meshcat: Meshcat instance for visualization
-        visualize: whether to publish the gripper pose
-    Returns:
-        RigidTransform of the gripper pose in world frame
-    """
     # Reset all generalized positions (q) for the entire plant.
-    plant.SetPositions(plant.GetMyContextFromRoot(context), plant.GetDefaultPositions())
+    plant_context = plant.GetMyContextFromRoot(context)
+    plant.SetPositions(plant_context, plant.GetDefaultPositions())
 
     # 1. Sample a random point
     idx = np.random.randint(points_world.shape[0])
     point = points_world[idx]
-    # print("Point cloud min:", points_world.min(axis=0))
-    # print("Point cloud max:", points_world.max(axis=0))
-    # print("Sampled point:", point)
 
-    # 2. Estimate a normal at that point (simple approximation: use vector to mean)
+    # 2. Estimate a normal at that point
     normal = point - points_world.mean(axis=0)
     normal /= np.linalg.norm(normal)
 
-    # 3. Choose a gripper frame aligned to the estimated surface normal.
-    # We set the gripper x-axis to align with the (outward) normal at the sampled point.
-    # To fix the remaining rotation about x, we construct the gripper y-axis as the
-    # cross product of a world-up reference direction and the approach direction,
-    # then compute z to complete a right-handed frame.
-
+    # 3–4. Construct grasp pose X_WG (your existing code)
     approach = normal
     approach /= np.linalg.norm(approach)
 
-    # Choose world z as gripper up
-    world_z = np.array([0.0, 0.0, 1.0])
-    if np.abs(np.dot(approach, world_z)) > 0.95:  # avoid degenerate
-        world_z = np.array([0.0, 1.0, 0.0])
+    p_GS_G = np.array([0.054 - 0.01, 0.10625, 0.0])
 
-    gripper_y = np.cross(world_z, approach)
-    gripper_y /= np.linalg.norm(gripper_y)
-    gripper_z = np.cross(approach, gripper_y)
-
-    # Column order: [x-axis, y-axis, z-axis]
-    gripper_rot = RotationMatrix(np.column_stack([approach, gripper_y, gripper_z]))
-
-    # 4. Place the gripper so the sampled point lands between the fingers.
-    # p_GS_G is the position of the sampled point S expressed in the gripper frame G when
-    # the object is correctly centered between the fingers (taken from Drake's bin-picking example).
-    # Therefore, the gripper origin position is: p_WG = p_WS - R_WG * p_GS_G.
-
-    p_GS_G = np.array([0.054 - 0.01, 0.10625, 0.0])  # [x, y, z] in gripper frame
-
-    # Construct R_WG: x = approach, y = orthogonal, z = cross
     Gx = approach
     Gy = np.array([0.0, 0.0, -1.0])
-    Gy -= np.dot(Gy, Gx) * Gx  # make orthogonal
+    Gy -= np.dot(Gy, Gx) * Gx
     Gy /= np.linalg.norm(Gy)
     Gz = np.cross(Gx, Gy)
     R_WG = RotationMatrix(np.column_stack([Gx, Gy, Gz]))
 
-    # Sample a single roll about the gripper x-axis (approach axis).
-    min_roll = -np.pi / 3.0
-    max_roll =  np.pi / 3.0
-    theta = np.random.uniform(min_roll, max_roll)
-
-    # Apply roll in the gripper frame: R_WG2 = R_WG * Rx(theta)
+    theta = np.random.uniform(-np.pi / 3.0, np.pi / 3.0)
     R_WG2 = R_WG.multiply(RotationMatrix.MakeXRotation(theta))
 
-    # Transform finger-box offset into world using the rolled rotation
     p_WG = point - R_WG2.multiply(p_GS_G)
     X_WG = RigidTransform(R_WG2, p_WG)
 
-    # 5. Temporarily move the gripper in the plant to this pose
+    # 5. Set ghost gripper pose
     gripper_instance = (
         gripper_model_name
         if isinstance(gripper_model_name, ModelInstanceIndex)
         else plant.GetModelInstanceByName(gripper_model_name)
     )
     gripper_body = plant.GetBodyByName("body", gripper_instance)
-    plant.SetFreeBodyPose(plant.GetMyContextFromRoot(context), gripper_body, X_WG)
+    plant.SetFreeBodyPose(plant_context, gripper_body, X_WG)
+
+    # 6. Refresh SceneGraph
     diagram.ForcedPublish(context)
 
-    # 6. Check collisions: gripper vs everything else (proximity role only)
+    # 7. Collision check (now relies on your pre-applied filters)
     sg_context = scene_graph.GetMyContextFromRoot(context)
     query_object = scene_graph.get_query_output_port().Eval(sg_context)
     inspector = query_object.inspector()
 
-    gripper_geometry_ids = set()
-    for body_index in plant.GetBodyIndices(gripper_instance):
-        body = plant.get_body(body_index)
-        gripper_geometry_ids.update(plant.GetCollisionGeometriesForBody(body))
+    gripper_geometry_ids = _collision_geometry_ids_for_instance(plant, gripper_instance)
 
     penetrations = query_object.ComputePointPairPenetration()
 
@@ -328,27 +281,17 @@ def generate_single_antipodal_grasp(
         a = pen.id_A
         b = pen.id_B
 
-        # Only care about penetrations where exactly one geom is the gripper
         if (a in gripper_geometry_ids) ^ (b in gripper_geometry_ids):
-            # Identify which side is gripper
-            g = a if a in gripper_geometry_ids else b
-            o = b if g == a else a
-
-            # Ignore self-collisions inside the gripper model instance
-            body_g = body_from_geom(g)
-            body_o = body_from_geom(o)
-            if body_g.model_instance() == body_o.model_instance():
+            # Ignore self collisions inside gripper instance (rare, but safe)
+            body_a = body_from_geom(a)
+            body_b = body_from_geom(b)
+            if body_a.model_instance() == body_b.model_instance():
                 continue
-
-            # print("Gripper in collision with scene!")
-            # print(f"  depth={pen.depth:.6f}")
-            # print(f"  gripper geom: {inspector.GetName(g)}")
-            # print(f"  other geom:   {inspector.GetName(o)}")
+            # print(body_a.scoped_name().to_string(), "collides with", body_b.scoped_name().to_string())
             return None
 
-    print("Grasp candidate is collision-free!")
-
     return X_WG
+
 
 def lock_joints_outside_first_n_positions(plant, plant_context, n_active_positions: int):
     """
@@ -413,26 +356,51 @@ def apply_robot_environment_collision_filters(
     wsg_instance,
     ghost_gripper_instance,
     mode: str,  # "arm_only" or "gripper_only"
+    target_model_name: str,
+    active_gripper_instance=None,  # ModelInstanceIndex; defaults to wsg_instance
 ):
     """
-    Configures SceneGraph collision filters so that the only remaining candidate
-    pairs are:
+    Configures SceneGraph collision filters so that the only remaining candidate pairs are:
       - mode="arm_only":     mobile_iiwa <-> environment
-      - mode="gripper_only": wsg_50      <-> environment
+      - mode="gripper_only": (active gripper) <-> environment
 
-    Always excludes anything involving the ghost gripper, and excludes env<->env,
-    robot<->robot, etc.
+    Always excludes env<->env, robot-internal collisions (arm<->gripper),
+    and (optionally) ghost collisions when ghost is not the active gripper.
+
+    Additionally prunes (active robot family) <-> environment-body pairs whose
+    environment body is farther than a broadphase threshold from the *target object*
+    at the current poses in sg_context.
+
+    Args:
+      active_gripper_instance:
+        - If None: uses wsg_instance (real gripper).
+        - If ghost_gripper_instance: keeps ghost<->env candidates and does NOT exclude
+          ghost vs env.
     """
+
+    # --- Tunables ---
+    floating_hand_broadphase_distance = 0.75  # meters (used for gripper_only)
+    robot_broadphase_distance = 2.0           # meters (used for arm_only)
+
     if mode not in ("arm_only", "gripper_only"):
         raise ValueError(f"Unknown mode: {mode}")
 
-    A = _collision_geometry_ids_for_instance(plant, mobile_iiwa_instance)   # arm
-    G = _collision_geometry_ids_for_instance(plant, wsg_instance)          # real gripper
-    H = _collision_geometry_ids_for_instance(plant, ghost_gripper_instance)  # ghost
+    if active_gripper_instance is None:
+        active_gripper_instance = wsg_instance
+
+    # Robot / grippers / ghost geometry id sets
+    A = _collision_geometry_ids_for_instance(plant, mobile_iiwa_instance)       # arm
+    G = _collision_geometry_ids_for_instance(plant, wsg_instance)              # real gripper
+    H = _collision_geometry_ids_for_instance(plant, ghost_gripper_instance)    # ghost gripper
+
+    # Floor + lift-column special-case
     F = _collision_geometry_ids_by_name_substr(scene_graph, "floor_collision")
-    Z = _collision_geometry_ids_for_body_name(plant, scene_graph, mobile_iiwa_instance, "iiwa_base_z_column")
+    Z = _collision_geometry_ids_for_body_name(
+        plant, scene_graph, mobile_iiwa_instance, "iiwa_base_z_column"
+    )
+
     ALL = _all_collision_geometry_ids(plant)
-    E = set(ALL) - set(A) - set(G) - set(H)  # environment
+    E = set(ALL) - set(A) - set(G) - set(H)  # environment geometries
 
     setA = GeometrySet(list(A))
     setG = GeometrySet(list(G))
@@ -441,36 +409,103 @@ def apply_robot_environment_collision_filters(
     setF = GeometrySet(list(F))
     setZ = GeometrySet(list(Z))
 
+    # Which "gripper set" is active?
+    if active_gripper_instance == ghost_gripper_instance:
+        active_set = setH
+    elif active_gripper_instance == wsg_instance:
+        active_set = setG
+    else:
+        raise ValueError(
+            "active_gripper_instance must be either wsg_instance or ghost_gripper_instance "
+            f"(got {active_gripper_instance})."
+        )
+
     cfm = scene_graph.collision_filter_manager(sg_context)
     decl = CollisionFilterDeclaration()
 
-    # 1) Ghost should never collide with anything (robot or env).
-    decl.ExcludeWithin(setH)
-    decl.ExcludeBetween(setH, setA)
-    decl.ExcludeBetween(setH, setG)
-    decl.ExcludeBetween(setH, setE)
+    # 1) Ghost should never collide with anything *unless* it is the active gripper.
+    if active_set is not setH:
+        decl.ExcludeWithin(setH)
+        decl.ExcludeBetween(setH, setA)
+        decl.ExcludeBetween(setH, setG)
+        decl.ExcludeBetween(setH, setE)
 
     # 2) Never care about env-env or self collisions within components.
     decl.ExcludeWithin(setE)
     decl.ExcludeWithin(setA)
     decl.ExcludeWithin(setG)
+    decl.ExcludeWithin(setH)  # okay even when ghost is active; avoids ghost self-collisions
 
-    # 3) Never care about robot internal collisions between arm and gripper here.
+    # 3) Never care about robot internal collisions between arm and grippers.
     decl.ExcludeBetween(setA, setG)
+    decl.ExcludeBetween(setA, setH)
 
-    # 4) Remove whichever robot-vs-env pairs we *don't* want, leaving only one family.
+    # 4) Remove whichever robot-vs-env pairs we *don't* want.
     if mode == "arm_only":
-        # Leave only A <-> E; so exclude G <-> E.
+        # Keep only A <-> E. Exclude both grippers <-> E.
         decl.ExcludeBetween(setG, setE)
+        decl.ExcludeBetween(setH, setE)
+        robot_set_for_env = setA
+        broadphase_threshold = robot_broadphase_distance
     else:
-        # Leave only G <-> E; so exclude A <-> E.
+        # Keep only (active gripper) <-> E. Exclude arm <-> E and the inactive gripper <-> E.
         decl.ExcludeBetween(setA, setE)
+        if active_set is setG:
+            decl.ExcludeBetween(setH, setE)
+        else:
+            decl.ExcludeBetween(setG, setE)
+        robot_set_for_env = active_set
+        broadphase_threshold = floating_hand_broadphase_distance
 
     # 5) Eliminate mobile iiwa lift joint <-> floor collisions
     if Z and F:
         decl.ExcludeBetween(setZ, setF)
 
+    # 6) Prune far environment bodies relative to the target object (stable per target pose)
+    target_instance = plant.GetModelInstanceByName(target_model_name)
+    T = _collision_geometry_ids_for_instance(plant, target_instance)
+    if not T:
+        raise ValueError(f"No collision geometries found for target model '{target_model_name}'.")
+
+    query_object = scene_graph.get_query_output_port().Eval(sg_context)
+    T_list = list(T)
+
+    def min_signed_distance_between_sets(geoms1, geoms2) -> float:
+        """Min over pairs of ComputeSignedDistancePairClosestPoints().distance."""
+        d_min = float("inf")
+        for g1 in geoms1:
+            for g2 in geoms2:
+                # If you ever see an exception here for unsupported geometry pairs,
+                # wrap this line in try/except and just 'continue' on failures.
+                d = query_object.ComputeSignedDistancePairClosestPoints(g1, g2).distance
+                if d < d_min:
+                    d_min = d
+                    # Early exit: once it's within threshold, we keep it.
+                    if d_min <= broadphase_threshold:
+                        return d_min
+        return d_min
+
+    for inst_i in range(plant.num_model_instances()):
+        inst = ModelInstanceIndex(inst_i)
+
+        # Skip robot/grippers/ghost/target
+        if inst in (mobile_iiwa_instance, wsg_instance, ghost_gripper_instance, target_instance):
+            continue
+
+        for body_index in plant.GetBodyIndices(inst):
+            body = plant.get_body(body_index)
+            body_geoms = set(plant.GetCollisionGeometriesForBody(body))
+            if not body_geoms:
+                continue
+            if body_geoms.isdisjoint(E):
+                continue
+
+            d_min = min_signed_distance_between_sets(T_list, list(body_geoms))
+            if d_min > broadphase_threshold:
+                decl.ExcludeBetween(robot_set_for_env, GeometrySet(list(body_geoms)))
+
     cfm.Apply(decl)
+
 
 def solve_ik_for_pose(
     X_WE,
@@ -478,6 +513,7 @@ def solve_ik_for_pose(
     plant,
     scene_graph,
     ghost_gripper_instance,
+    target_model_name,
     world_xy_bounds=[-10, 10, -10, 10], # should specify if q_initial_guess or q_ref is not given
     q_ref=None,                 # <-- center cost around this
     q_initial_guess=None,       # <-- initial guess
@@ -569,6 +605,7 @@ def solve_ik_for_pose(
         wsg_instance=wsg_instance,
         ghost_gripper_instance=ghost_gripper_instance,
         mode="arm_only",
+        target_model_name=target_model_name
     )
 
     c_arm = MinimumDistanceLowerBoundConstraint(
@@ -593,6 +630,7 @@ def solve_ik_for_pose(
         wsg_instance=wsg_instance,
         ghost_gripper_instance=ghost_gripper_instance,
         mode="gripper_only",
+        target_model_name=target_model_name
     )
 
     c_grip = MinimumDistanceLowerBoundConstraint(
@@ -634,8 +672,8 @@ def solve_ik_for_pose(
     print("IK succeeded")
     return result.GetSolution(q)
 
-def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds):
-    return solve_ik_for_pose(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds)
+def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, target_model_name, world_xy_bounds):
+    return solve_ik_for_pose(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, target_model_name, world_xy_bounds)
 
 
 def hat(w):
@@ -877,6 +915,8 @@ def main():
     q_pregrasp_last = None
     q_postplace_last = None
 
+    chosen_target_model_name = None
+
     # Output path from CLI argument (default: robot_waypoints.json in cwd)
     waypoints_path = Path(args.out_waypoints)
 
@@ -888,35 +928,62 @@ def main():
         # ---------------------------------------------------------------------
         # Compute grasp config
         # ---------------------------------------------------------------------
+        mobile_iiwa_instance=plant.GetModelInstanceByName("mobile_iiwa")
+        wsg_instance=plant.GetModelInstanceByName("wsg_50")
 
         while True:
             weights = 1 + np.arange(len(target_obj_names), 0, -1, dtype=float)
             weights /= np.sum(weights)
+            X_grasp = None
             while True:
                 object_idx = np.random.choice(len(target_obj_names), p=weights)
-                X_grasp = generate_single_antipodal_grasp(
-                    diagram,
-                    plant,
-                    scene_graph,
-                    diagram_context,
-                    gripper_model_name=ghost_gripper_instance,
-                    points_world=points_world[object_idx],
-                    meshcat=meshcat,
-                    target_model_name=target_obj_names[object_idx],
-                    visualize=True,
+                chosen_target_model_name = target_obj_names[object_idx]
+
+                # Apply filters ONCE for this target + this sg_context
+                plant.SetPositions(plant.GetMyContextFromRoot(diagram_context),
+                                                              plant.GetDefaultPositions())
+                sg_context = scene_graph.GetMyContextFromRoot(diagram_context)
+                apply_robot_environment_collision_filters(
+                    plant=plant,
+                    scene_graph=scene_graph,
+                    sg_context=sg_context,
+                    mobile_iiwa_instance=mobile_iiwa_instance,
+                    wsg_instance=wsg_instance,
+                    ghost_gripper_instance=ghost_gripper_instance,
+                    mode="gripper_only",
+                    target_model_name=chosen_target_model_name,
+                    active_gripper_instance=ghost_gripper_instance,   # <-- THIS is the key
                 )
 
-                if X_grasp is None:
-                    print("Rejected grasp (collision).")
-                    diagram.ForcedPublish(diagram_context)
-                else:
+
+                n_grasp_attempts_per_try = 100
+                for _ in range(n_grasp_attempts_per_try):
+                    X_grasp = generate_single_antipodal_grasp(
+                        diagram,
+                        plant,
+                        scene_graph,
+                        diagram_context,
+                        gripper_model_name=ghost_gripper_instance,
+                        points_world=points_world[object_idx],
+                        meshcat=meshcat,
+                        target_model_name=chosen_target_model_name,
+                        visualize=True,
+                    )
+
+                    if X_grasp is None:
+                        print("Rejected grasp (collision).")
+                    else:
+                        break
+
+                if X_grasp is not None:
                     break
 
             print(f"\nGrasp candidate pose (world frame):")
             print(X_grasp)
 
             q_grasp = solve_ik_for_grasp(
-                X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds
+                X_grasp, diagram, plant, scene_graph, ghost_gripper_instance,
+                chosen_target_model_name, world_xy_bounds
             )
             if q_grasp is None:
                 print("Grasp IK failed.")
@@ -932,6 +999,7 @@ def main():
             q_pregrasp = solve_ik_for_pose(
                 X_pregrasp,
                 diagram, plant, scene_graph, ghost_gripper_instance,
+                chosen_target_model_name,
                 q_ref=q_grasp_last,
                 q_initial_guess=q_grasp_last,
             )
@@ -980,7 +1048,8 @@ def main():
             print(X_target)
 
             q_place = solve_ik_for_grasp(
-                X_target, diagram, plant, scene_graph, ghost_gripper_instance, world_xy_bounds
+                X_target, diagram, plant, scene_graph, ghost_gripper_instance,
+                chosen_target_model_name, world_xy_bounds
             )
             if q_place is None:
                 print("Place IK failed.")
@@ -993,6 +1062,7 @@ def main():
             q_postplace = solve_ik_for_pose(
                 X_postplace,
                 diagram, plant, scene_graph, ghost_gripper_instance,
+                chosen_target_model_name,
                 q_ref=q_place_last,
                 q_initial_guess=q_place_last,
             )
