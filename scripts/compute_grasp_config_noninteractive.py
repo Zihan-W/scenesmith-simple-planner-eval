@@ -262,7 +262,7 @@ def generate_single_antipodal_grasp(
     plant.SetFreeBodyPose(plant_context, gripper_body, X_WG)
 
     # 6. Refresh SceneGraph
-    diagram.ForcedPublish(context)
+    # diagram.ForcedPublish(context)
 
     # 7. Collision check (now relies on your pre-applied filters)
     sg_context = scene_graph.GetMyContextFromRoot(context)
@@ -287,7 +287,7 @@ def generate_single_antipodal_grasp(
             body_b = body_from_geom(b)
             if body_a.model_instance() == body_b.model_instance():
                 continue
-            print(body_a.scoped_name().to_string(), "collides with", body_b.scoped_name().to_string())
+            # print(body_a.scoped_name().to_string(), "collides with", body_b.scoped_name().to_string())
             return None
 
     return X_WG
@@ -1007,7 +1007,7 @@ def main():
             )
             if q_grasp is None:
                 print("Grasp IK failed.")
-                diagram.ForcedPublish(diagram_context)
+                # diagram.ForcedPublish(diagram_context)
                 continue
 
             q_grasp_last = np.asarray(q_grasp).copy()
@@ -1056,7 +1056,7 @@ def main():
                     visualize=True,             # set True if you pass diagram=diagram
                     diagram=diagram,
                 )
-                diagram.ForcedPublish(diagram_context)
+                # diagram.ForcedPublish(diagram_context)
 
                 if X_target is None:
                     print("Rejected place (collision).")
