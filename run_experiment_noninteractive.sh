@@ -36,7 +36,7 @@ timeout -k $GRACEPERIOD $TIMELIMIT \
         --package-xml models/iiwa/package.xml \
         --out-waypoints "$WORKDIR/robot_waypoints.json"
 
-if [ ! -f robot_waypoints.json ]; then
+if [ ! -f "$WORKDIR/robot_waypoints.json" ]; then
     echo "Failed to compute grasp or place configurations in the allotted time for scene $SCENE."
     exit 1
 fi
@@ -50,7 +50,7 @@ timeout -k $GRACEPERIOD $TIMELIMIT \
         --package-xml models/iiwa/package.xml \
         --out-traj "$WORKDIR/robot_plan.json"
 
-if [ ! -f robot_plan.json ]; then
+if [ ! -f "$WORKDIR/robot_plan.json" ]; then
     echo "Failed to compute robot plan in the allotted time for scene $SCENE."
     exit 2
 fi
