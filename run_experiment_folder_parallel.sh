@@ -4,8 +4,6 @@
 # Usage: ./run_experiment_folder_parallel.sh <folder> <num_workers> [--skip-existing]
 #
 
-set -e
-
 # Parse arguments
 SKIP_EXISTING=false
 FOLDER=""

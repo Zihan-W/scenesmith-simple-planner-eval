@@ -3,7 +3,7 @@ export SCENE=$1
 # WORKDIR allows parallel workers to write outputs to isolated directories
 WORKDIR="${WORKDIR:-.}"
 
-export TIMELIMIT=120m
+export TIMELIMIT=180m
 export GRACEPERIOD=5s
 
 echo "Running scene $SCENE"
