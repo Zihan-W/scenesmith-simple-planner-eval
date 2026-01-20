@@ -70,8 +70,6 @@ python3 scripts/simulate_noninteractive.py \
     "$WORKDIR/robot_plan.json" \
     --package-xml $SCENE/package.xml \
     --package-xml models/iiwa/package.xml \
-    --ee-vel 1 \
-    --ee-accel 1 \
     --write-updated-scenario "$WORKDIR/out_bad.dmd.yaml" \
     --record-html "$WORKDIR/simulation_bad.html"
 
