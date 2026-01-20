@@ -287,7 +287,7 @@ def generate_single_antipodal_grasp(
             body_b = body_from_geom(b)
             if body_a.model_instance() == body_b.model_instance():
                 continue
-            # print(body_a.scoped_name().to_string(), "collides with", body_b.scoped_name().to_string())
+            print(body_a.scoped_name().to_string(), "collides with", body_b.scoped_name().to_string())
             return None
 
     return X_WG
@@ -313,13 +313,6 @@ def lock_joints_outside_first_n_positions(plant, plant_context, n_active_positio
         keep_unlocked = all(k < n_active_positions for k in pos_indices)
         if not keep_unlocked:
             joint.Lock(plant_context)
-
-def _collision_geometry_ids_for_instance(plant, instance):
-    ids = set()
-    for body_index in plant.GetBodyIndices(instance):
-        body = plant.get_body(body_index)
-        ids.update(plant.GetCollisionGeometriesForBody(body))
-    return ids
 
 
 def _all_collision_geometry_ids(plant):
@@ -355,9 +348,11 @@ def apply_robot_environment_collision_filters(
     mobile_iiwa_instance,
     wsg_instance,
     ghost_gripper_instance,
-    mode: str,  # "arm_only" or "gripper_only"
+    mode: str,
     target_model_name: str,
-    active_gripper_instance=None,  # ModelInstanceIndex; defaults to wsg_instance
+    active_gripper_instance=None,
+    plant_context=None,          # <-- NEW (must match sg_context's root context)
+    X_WT_override=None,          # <-- NEW (RigidTransform)
 ):
     """
     Configures SceneGraph collision filters so that the only remaining candidate pairs are:
@@ -467,6 +462,22 @@ def apply_robot_environment_collision_filters(
     if not T:
         raise ValueError(f"No collision geometries found for target model '{target_model_name}'.")
 
+    # If requested, override the target object's pose in THIS context before pruning.
+    if X_WT_override is not None:
+        if plant_context is None:
+            raise ValueError("X_WT_override was provided but plant_context is None.")
+
+        # Assumes target model is a single free body (fits your current usage).
+        target_body_indices = plant.GetBodyIndices(target_instance)
+        if len(target_body_indices) != 1:
+            raise ValueError(
+                f"Target model '{target_model_name}' has {len(target_body_indices)} bodies; "
+                "this helper assumes a single free body."
+            )
+        target_body = plant.get_body(target_body_indices[0])
+        # If it isn't floating, you'd need to set joints instead.
+        plant.SetFreeBodyPose(plant_context, target_body, X_WT_override)
+
     query_object = scene_graph.get_query_output_port().Eval(sg_context)
     T_list = list(T)
 
@@ -514,10 +525,11 @@ def solve_ik_for_pose(
     scene_graph,
     ghost_gripper_instance,
     target_model_name,
-    world_xy_bounds=[-10, 10, -10, 10], # should specify if q_initial_guess or q_ref is not given
-    q_ref=None,                 # <-- center cost around this
-    q_initial_guess=None,       # <-- initial guess
+    world_xy_bounds=[-10, 10, -10, 10],
+    q_ref=None,
+    q_initial_guess=None,
     arm_position_count=11,
+    X_WT_override=None,   # <-- NEW
 ):
     # -------------------------
     # Main IK context
@@ -601,11 +613,13 @@ def solve_ik_for_pose(
         plant=plant,
         scene_graph=scene_graph,
         sg_context=sg_context_arm,
+        plant_context=plant_context_arm,          # <-- NEW
         mobile_iiwa_instance=mobile_iiwa_instance,
         wsg_instance=wsg_instance,
         ghost_gripper_instance=ghost_gripper_instance,
         mode="arm_only",
-        target_model_name=target_model_name
+        target_model_name=target_model_name,
+        X_WT_override=X_WT_override,              # <-- NEW
     )
 
     c_arm = MinimumDistanceLowerBoundConstraint(
@@ -626,11 +640,13 @@ def solve_ik_for_pose(
         plant=plant,
         scene_graph=scene_graph,
         sg_context=sg_context_grip,
+        plant_context=plant_context_grip,         # <-- NEW
         mobile_iiwa_instance=mobile_iiwa_instance,
         wsg_instance=wsg_instance,
         ghost_gripper_instance=ghost_gripper_instance,
         mode="gripper_only",
-        target_model_name=target_model_name
+        target_model_name=target_model_name,
+        X_WT_override=X_WT_override,              # <-- NEW
     )
 
     c_grip = MinimumDistanceLowerBoundConstraint(
@@ -672,9 +688,13 @@ def solve_ik_for_pose(
     print("IK succeeded")
     return result.GetSolution(q)
 
-def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, target_model_name, world_xy_bounds):
-    return solve_ik_for_pose(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance, target_model_name, world_xy_bounds)
-
+def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance,
+        target_model_name, world_xy_bounds, X_WT_override=None):
+    return solve_ik_for_pose(
+        X_grasp, diagram, plant, scene_graph, ghost_gripper_instance,
+        target_model_name, world_xy_bounds,
+        X_WT_override=X_WT_override
+    )
 
 def hat(w):
     wx, wy, wz = w
@@ -723,7 +743,7 @@ def compute_target_pose_collision_free(
     """
     Samples an object placement target pose within the bounds, rejects samples where
     the *ghost gripper at the implied goal pose* is in penetration with the scene.
-    Returns X_WG_goal or None if no collision-free sample is found.
+    Returns (X_WG_goal, X_WO_goal) or (None, None) if no collision-free sample is found.
     """
     rng = np.random.default_rng()
 
@@ -789,9 +809,9 @@ def compute_target_pose_collision_free(
     plant.SetFreeBodyPose(plant_context, obj_body, X_WO_orig)
 
     if not in_collision:
-        return X_WG_goal
+        return X_WG_goal, X_WO_goal
 
-    return None
+    return None, None
 
 
 def retreat_along_gripper_y(X_WG: RigidTransform, distance: float) -> RigidTransform:
@@ -1023,7 +1043,7 @@ def main():
         n_place_tries = 10
         for place_try in range(n_place_tries):
             while True:
-                X_target = compute_target_pose_collision_free(
+                X_target, X_WO_place = compute_target_pose_collision_free(
                     task=task,
                     plant=plant,
                     scene_graph=scene_graph,
@@ -1049,7 +1069,8 @@ def main():
 
             q_place = solve_ik_for_grasp(
                 X_target, diagram, plant, scene_graph, ghost_gripper_instance,
-                chosen_target_model_name, world_xy_bounds
+                chosen_target_model_name, world_xy_bounds,
+                X_WT_override=X_WO_place,   # <-- NEW
             )
             if q_place is None:
                 print("Place IK failed.")
@@ -1065,6 +1086,7 @@ def main():
                 chosen_target_model_name,
                 q_ref=q_place_last,
                 q_initial_guess=q_place_last,
+                X_WT_override=X_WO_place,   # <-- NEW
             )
             if q_postplace is None:
                 print("Postplace IK failed.")
