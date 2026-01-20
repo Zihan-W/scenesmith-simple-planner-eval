@@ -457,8 +457,6 @@ def plan_rrt_segment(
     if not checker.CheckConfigCollisionFreePrefix(start11):
         raise RuntimeError("Start waypoint is in collision (robot-environment).")
     if not checker.CheckConfigCollisionFreePrefix(goal11):
-        import pdb
-        pdb.set_trace()
         raise RuntimeError("Goal waypoint is in collision (robot-environment).")
 
     rrt_options = RRTOptions(
@@ -727,32 +725,6 @@ def main():
 
     for a, b in zip(waypoints[:-1], waypoints[1:]):
         print(f"\nPlanning segment: {a.name} -> {b.name}")
-
-        diagram_context = diagram.CreateDefaultContext()
-        plant_context = plant.GetMyContextFromRoot(diagram_context)
-        q = b.q.copy()
-        plant.SetPositions(plant_context, q)
-        diagram.ForcedPublish(diagram_context)
-
-        sg_context = scene_graph.GetMyContextFromRoot(diagram_context)
-        query_object = scene_graph.get_query_output_port().Eval(sg_context)
-        inspector = query_object.inspector()
-        penetrations = query_object.ComputePointPairPenetration()
-
-        def body_from_geom(gid):
-            frame_id = inspector.GetFrameId(gid)
-            return plant.GetBodyFromFrameId(frame_id)
-
-        for pen in penetrations:
-            body_a = body_from_geom(pen.id_A)
-            body_b = body_from_geom(pen.id_B)
-            if body_a.model_instance() == body_b.model_instance():
-                continue
-            if "wsg" in body_a.scoped_name().to_string() \
-                    or "wsg" in body_b.scoped_name().to_string() \
-                    or "iiwa" in body_a.scoped_name().to_string() \
-                    or "iiwa" in body_b.scoped_name().to_string():
-                print(body_a.scoped_name().to_string(), "collides with", body_b.scoped_name().to_string())
 
         seg11 = plan_rrt_segment(
             checker=checker,
