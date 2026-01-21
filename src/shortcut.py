@@ -1,6 +1,9 @@
+import logging
 import numpy as np
 import networkx as nx
 from tqdm.auto import tqdm
+
+logger = logging.getLogger(__name__)
 
 def shortcut(path_in, ValidityChecker, num_tries=100, Distance=None, check_size=1e-1):
 	if Distance is None:
@@ -51,5 +54,5 @@ def shortcut(path_in, ValidityChecker, num_tries=100, Distance=None, check_size=
 			weights = segment_lengths / total_distance
 			total_shortcuts += 1
 
-	print("Applied %d shortcuts" % total_shortcuts)
+	logger.info("Applied %d shortcuts", total_shortcuts)
 	return path

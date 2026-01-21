@@ -7,7 +7,11 @@ import numpy as np
 import re
 
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 from pydrake.geometry import StartMeshcat, Role, GeometrySet, CollisionFilterDeclaration
 from pydrake.systems.analysis import Simulator
@@ -637,17 +641,17 @@ def main():
         sim_context=sim.get_mutable_context()
     )
 
-    print(f"Loaded scenario from: {scenario_path}")
-    print(f"Loaded plan from: {plan_path}")
+    logger.info("Loaded scenario from: %s", scenario_path)
+    logger.info("Loaded plan from: %s", plan_path)
     if segments:
-        print("Plan segments:")
+        logger.info("Plan segments:")
         for s in segments:
-            print(f"  - {s}")
+            logger.info("  - %s", s)
 
     t0 = timed_q_traj.start_time()
     t1 = timed_q_traj.end_time()
-    print(f"Timed duration: {t1 - t0:.3f} s")
-    print("Meshcat server running. Ctrl+C to exit.")
+    logger.info("Timed duration: %.3f s", t1 - t0)
+    logger.info("Meshcat server running. Ctrl+C to exit.")
 
     try:
         meshcat.StartRecording()
@@ -664,7 +668,7 @@ def main():
         meshcat.PublishRecording()
         html = meshcat.StaticHtml()
         Path(args.record_html).write_text(html)
-        print(f"Wrote Meshcat recording to: {args.record_html}")
+        logger.info("Wrote Meshcat recording to: %s", args.record_html)
 
         # --- After sim: optionally write updated scenario YAML ---
         if args.write_updated_scenario is not None:
@@ -681,12 +685,12 @@ def main():
             updated_yaml_text = strip_trailing_model_drivers_and_plant_config(updated_yaml_text)
 
             Path(args.write_updated_scenario).write_text(updated_yaml_text)
-            print(f"Wrote updated scenario YAML to: {args.write_updated_scenario}")
+            logger.info("Wrote updated scenario YAML to: %s", args.write_updated_scenario)
 
         while True:
             pass
     except KeyboardInterrupt:
-        print("\nExiting.")
+        logger.info("Exiting.")
 
 
 if __name__ == "__main__":

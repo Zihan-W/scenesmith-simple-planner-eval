@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # --- Task loading ---
 def load_task(task_path):
@@ -73,7 +80,7 @@ def main():
     with open(args.output, "w") as f:
         f.write(output_text)
 
-    print(f"Saved new directives file with mobile_iiwa + wsg_50 at '{args.output}'")
+    logger.info("Saved new directives file with mobile_iiwa + wsg_50 at '%s'", args.output)
 
 if __name__ == "__main__":
     main()

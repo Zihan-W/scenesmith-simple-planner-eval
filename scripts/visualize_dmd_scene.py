@@ -1,6 +1,13 @@
 import argparse
+import logging
 from pathlib import Path
 import xml.etree.ElementTree as ET
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 from pydrake.geometry import StartMeshcat
 from pydrake.multibody.parsing import (
@@ -38,7 +45,7 @@ def register_package_xml(parser, package_xml_path: Path):
     package_dir = str(package_xml_path.parent)
 
     parser.package_map().Add(package_name, package_dir)
-    print(f"Registered package '{package_name}' at {package_dir}")
+    logger.info("Registered package '%s' at %s", package_name, package_dir)
 
 
 def visualize_dmd_file(dmd_file: Path, package_xmls: list[Path]):
@@ -80,15 +87,15 @@ def visualize_dmd_file(dmd_file: Path, package_xmls: list[Path]):
     context = diagram.CreateDefaultContext()
     diagram.ForcedPublish(context)
 
-    print(f"Visualizing: {dmd_file}")
-    print("Meshcat server running. Press Ctrl+C to exit.")
+    logger.info("Visualizing: %s", dmd_file)
+    logger.info("Meshcat server running. Press Ctrl+C to exit.")
 
     # Keep objects alive
     try:
         while True:
             pass
     except KeyboardInterrupt:
-        print("\nExiting.")
+        logger.info("Exiting.")
 
 
 def main():

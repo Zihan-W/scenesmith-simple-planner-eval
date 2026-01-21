@@ -12,6 +12,7 @@ Planning script skeleton:
 
 import argparse
 import json
+import logging
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -19,6 +20,12 @@ from pathlib import Path
 from typing import List, Tuple, Optional
 
 import numpy as np
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 from pydrake.geometry import StartMeshcat
 from pydrake.multibody.parsing import Parser, LoadModelDirectives, ProcessModelDirectives
@@ -310,7 +317,7 @@ def register_package_xml(parser: Parser, package_xml_path: Path):
     package_dir = str(package_xml_path.parent)
 
     parser.package_map().Add(package_name, package_dir)
-    print(f"Registered package '{package_name}' at {package_dir}")
+    logger.info("Registered package '%s' at %s", package_name, package_dir)
 
 def load_task_json(task_file: Path) -> dict:
     if not task_file.exists():
@@ -511,7 +518,7 @@ def promote_segment_to_13dof(
 ) -> TrajectorySegment:
     """Appends constant gripper joints to every knot in seg.q_knots."""
     q = seg.q_knots
-    print(q.shape)
+    logger.debug("Segment shape: %s", q.shape)
     if q.shape[1] != 11:
         raise ValueError(f"Expected 11DoF segment, got {q.shape[1]}DoF")
 
@@ -604,7 +611,7 @@ def dump_piecewise_linear_trajectory_json(
     with open(path, "w") as f:
         json.dump(out, f, indent=2)
 
-    print(f"Wrote piecewise-linear trajectory: {q_traj.shape} to {path}")
+    logger.info("Wrote piecewise-linear trajectory: %s to %s", q_traj.shape, path)
 
 # -----------------------------------------------------------------------------
 # Main
@@ -705,9 +712,9 @@ def main():
 
     waypoints = embedded_waypoints
 
-    print(f"Loaded {len(waypoints)} waypoints from {waypoints_file}")
+    logger.info("Loaded %d waypoints from %s", len(waypoints), waypoints_file)
     for i, wp in enumerate(waypoints):
-        print(f"  {i}: {wp.name}")
+        logger.info("  %d: %s", i, wp.name)
 
     # ---------------------------------------------------------------------
     # (3) For each consecutive waypoint pair, plan with RRT
@@ -724,7 +731,7 @@ def main():
     current_gripper = GRIPPER_OPEN
 
     for a, b in zip(waypoints[:-1], waypoints[1:]):
-        print(f"\nPlanning segment: {a.name} -> {b.name}")
+        logger.info("Planning segment: %s -> %s", a.name, b.name)
 
         seg11 = plan_rrt_segment(
             checker=checker,
@@ -747,7 +754,7 @@ def main():
             gripper_right=current_gripper[1],
         )
 
-        print(f"  Segment knots: {seg13.q_knots.shape[0]}")
+        logger.info("  Segment knots: %d", seg13.q_knots.shape[0])
         segments.append(seg13)
 
         # Insert gripper-only segments at grasp and place (after arriving there).

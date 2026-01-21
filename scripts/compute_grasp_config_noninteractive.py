@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-import json
-from pathlib import Path
-import numpy as np
-import xml.etree.ElementTree as ET
 import argparse
+import json
+import logging
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
+import numpy as np
 import trimesh
 import trimesh.transformations as tf
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 from pydrake.all import (
     Parser,
@@ -62,7 +70,7 @@ def register_package_xml(parser: Parser, package_xml_path: Path):
     package_dir = str(package_xml_path.parent)
 
     parser.package_map().Add(package_name, package_dir)
-    print(f"Registered package '{package_name}' at {package_dir}")
+    logger.info("Registered package '%s' at %s", package_name, package_dir)
 
 
 def sample_points_from_body(
@@ -95,7 +103,7 @@ def sample_points_from_body(
             )
 
         mesh_path = shape.source().path()
-        print("Loading visual mesh:", mesh_path)
+        logger.info("Loading visual mesh: %s", mesh_path)
 
         mesh = trimesh.load(mesh_path, force="mesh", process=False)
         if not isinstance(mesh, trimesh.Trimesh):
@@ -682,10 +690,10 @@ def solve_ik_for_pose(
 
     result = solver.Solve(prog, None, options)
     if not result.is_success():
-        print("IK failed")
+        logger.info("IK failed")
         return None
 
-    print("IK succeeded")
+    logger.info("IK succeeded")
     return result.GetSolution(q)
 
 def solve_ik_for_grasp(X_grasp, diagram, plant, scene_graph, ghost_gripper_instance,
@@ -991,22 +999,22 @@ def main():
                     )
 
                     if X_grasp is None:
-                        print("Rejected grasp (collision).")
+                        logger.info("Rejected grasp (collision).")
                     else:
                         break
 
                 if X_grasp is not None:
                     break
 
-            print(f"\nGrasp candidate pose (world frame):")
-            print(X_grasp)
+            logger.info("Grasp candidate pose (world frame):")
+            logger.info("%s", X_grasp)
 
             q_grasp = solve_ik_for_grasp(
                 X_grasp, diagram, plant, scene_graph, ghost_gripper_instance,
                 chosen_target_model_name, world_xy_bounds
             )
             if q_grasp is None:
-                print("Grasp IK failed.")
+                logger.info("Grasp IK failed.")
                 # diagram.ForcedPublish(diagram_context)
                 continue
 
@@ -1024,16 +1032,16 @@ def main():
                 q_initial_guess=q_grasp_last,
             )
             if q_pregrasp is None:
-                print("Pregrasp IK failed.")
+                logger.info("Pregrasp IK failed.")
                 q_pregrasp_last = None
                 continue
             else:
                 q_pregrasp_last = np.asarray(q_pregrasp).copy()
-                print("Pregrasp IK succeeded.")
+                logger.info("Pregrasp IK succeeded.")
 
             plant.SetPositions(plant_context, q_grasp_last)
             diagram.ForcedPublish(diagram_context)
-            print("Grasp IK succeeded.")
+            logger.info("Grasp IK succeeded.")
             break
 
         # ---------------------------------------------------------------------
@@ -1059,13 +1067,13 @@ def main():
                 # diagram.ForcedPublish(diagram_context)
 
                 if X_target is None:
-                    print("Rejected place (collision).")
+                    logger.info("Rejected place (collision).")
                 else:
                     break
 
 
-            print(f"\nPlace candidate pose (world frame):")
-            print(X_target)
+            logger.info("Place candidate pose (world frame):")
+            logger.info("%s", X_target)
 
             q_place = solve_ik_for_grasp(
                 X_target, diagram, plant, scene_graph, ghost_gripper_instance,
@@ -1073,7 +1081,7 @@ def main():
                 X_WT_override=X_WO_place,   # <-- NEW
             )
             if q_place is None:
-                print("Place IK failed.")
+                logger.info("Place IK failed.")
                 continue
 
             q_place_last = np.asarray(q_place).copy()
@@ -1089,16 +1097,16 @@ def main():
                 X_WT_override=X_WO_place,   # <-- NEW
             )
             if q_postplace is None:
-                print("Postplace IK failed.")
+                logger.info("Postplace IK failed.")
                 q_postplace_last = None
                 continue
             else:
                 q_postplace_last = np.asarray(q_postplace).copy()
-                print("Postplace IK succeeded.")
+                logger.info("Postplace IK succeeded.")
 
             plant.SetPositions(plant_context, q_place_last)
             diagram.ForcedPublish(diagram_context)
-            print("Place IK succeeded.")
+            logger.info("Place IK succeeded.")
             break
 
         if q_postplace_last is not None:
@@ -1122,9 +1130,9 @@ def main():
     with open(waypoints_path, "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"Saved waypoints to: {waypoints_path}")
+    logger.info("Saved waypoints to: %s", waypoints_path)
 
-    print("\nExiting.")
+    logger.info("Exiting.")
 
 
 if __name__ == "__main__":
