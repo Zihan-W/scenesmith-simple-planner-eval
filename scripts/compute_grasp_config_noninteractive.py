@@ -689,6 +689,9 @@ def solve_ik_for_pose(
     options.SetOption(IpoptSolver().solver_id(), "acceptable_constr_viol_tol", 1e-6)
 
     result = solver.Solve(prog, None, options)
+    logger.info(f"SolutionResult: {result.get_solution_result()}")
+    if solver.solver_id() == SnoptSolver().solver_id():
+        logger.info(f"SNOPT INFO field: {result.get_solver_details().info}")
     if not result.is_success():
         logger.info("IK failed")
         return None
