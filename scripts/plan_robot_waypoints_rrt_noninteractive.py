@@ -360,9 +360,6 @@ class RobotEnvValidityChecker:
             # In Drake python this field is typically id_G (geometry id of the measured object).
             # If your build differs, print(dir(d)) once and adjust this name.
             if d.id_G in self._env_geometry_ids:
-                print(query_object.inspector().GetName(d.id_G))
-                import pdb
-                pdb.set_trace()
                 return False
 
         return True

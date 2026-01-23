@@ -9,6 +9,8 @@ output/*
 snopt.log
 robot_waypoints.json
 robot_plan.json
+robot_plan_good.json
+robot_plan_bad.json
 
 simulation.html
 simulation_good.html
