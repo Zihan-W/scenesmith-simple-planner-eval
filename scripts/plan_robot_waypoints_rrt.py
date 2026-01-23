@@ -884,4 +884,5 @@ def main():
 
 
 if __name__ == "__main__":
+    logger.warning("The interactive version is deprecated. Use plan_robot_waypoints_rrt_noninteractive.py instead.")
     main()

@@ -694,4 +694,5 @@ def main():
 
 
 if __name__ == "__main__":
+    logger.warning("The interactive version is deprecated. Use simulate_noninteractive.py instead.")
     main()

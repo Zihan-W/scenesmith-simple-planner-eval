@@ -1062,4 +1062,5 @@ def main():
 
 
 if __name__ == "__main__":
+    logger.warning("The interactive version is deprecated. Use compute_grasp_config_noninteractive.py instead.")
     main()
