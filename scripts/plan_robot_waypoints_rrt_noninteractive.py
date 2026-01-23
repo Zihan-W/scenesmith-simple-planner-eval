@@ -447,6 +447,7 @@ def plan_rrt_segment(
     q_goal,
     rng,
     world_xy_bounds,
+    max_verts=2000,
     max_iters=10000,
     step_size=0.1,
     do_shortcut: bool = False,
@@ -469,7 +470,7 @@ def plan_rrt_segment(
     rrt_options = RRTOptions(
         step_size=step_size,
         check_size=min(1e-2, step_size / 10.0),
-        max_vertices=int(1e5),
+        max_vertices=int(max_verts),
         max_iters=int(max_iters),
         goal_sample_frequency=0.01,
         always_swap=False,
@@ -635,7 +636,8 @@ def main():
         default=[],
         help="Path(s) to ROS-style package.xml to register with Drake",
     )
-    parser.add_argument("--rrt-iters", type=int, default=2000)
+    parser.add_argument("--rrt-verts", type=int, default=10000)
+    parser.add_argument("--rrt-iters", type=int, default=100000)
     parser.add_argument("--rrt-step", type=float, default=0.1)
     parser.add_argument("--render-rate", type=float, default=60.0)
     parser.add_argument("--q-speed", type=float, default=1.0)
@@ -739,6 +741,7 @@ def main():
             q_goal=b,
             rng=rng,
             world_xy_bounds=world_xy_bounds,
+            max_verts=args.rrt_verts,
             max_iters=args.rrt_iters,
             step_size=args.rrt_step,
             do_shortcut=not args.no_shortcut,
