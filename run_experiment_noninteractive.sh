@@ -142,6 +142,7 @@ run_timed_python "$TIMELIMIT" \
     --package-xml "$SCENE/package.xml" \
     --package-xml models/iiwa/package.xml \
     --out-traj "$WORKDIR/robot_plan.json" \
+    --shortcut-tries 100
   || true
 
 if [[ ! -f "$WORKDIR/robot_plan.json" ]]; then
