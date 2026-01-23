@@ -197,7 +197,24 @@ def apply_robot_environment_only_filters(
     # That’s the only family we want to keep.
     cfm.Apply(decl)
 
+
 class RobotEnvValidityChecker:
+    """
+    Collision + clearance validity checker for RRT.
+
+    Returns False if:
+      1) Any robot-env penetration is found (per your collision filters), OR
+      2) The between-fingers point is within `finger_clearance_m` of any
+         environment proximity geometry.
+
+    Notes on Drake API compatibility:
+      - This version assumes QueryObject.ComputeSignedDistanceToPoint(p_WQ, threshold)
+        exists (as in your traceback) and DOES NOT support the GeometrySet overload.
+      - Environment geometries are determined once at construction time by:
+          * collecting proximity geometries
+          * removing geometries owned by any `robot_instances`
+    """
+
     def __init__(
         self,
         *,
@@ -206,20 +223,37 @@ class RobotEnvValidityChecker:
         scene_graph,
         diagram_context,
         plant_context,
-        robot_instances,      # [mobile_iiwa_instance, wsg_instance]
-        q_full_fixed: np.ndarray,  # full plant positions used as baseline; only first 11 overwritten
+        robot_instances,              # list[ModelInstanceIndex]
+        q_full_fixed: np.ndarray,      # full plant positions used as baseline; only first prefix_size overwritten
         prefix_size: int = 11,
+        # --- clearance check params ---
+        gripper_instance=None,         # ModelInstanceIndex for gripper; defaults to last of robot_instances
+        gripper_body_name: str = "body",
+        p_GS_G: np.ndarray = np.array([0.054 - 0.01, 0.10625, 0.0]),
+        finger_clearance_m: float = 0.05,
+        # --- filtering options passed to your helper ---
+        ignore_arm_gripper_internal: bool = True,
     ):
         self._diagram = diagram
         self._plant = plant
         self._scene_graph = scene_graph
         self._diagram_context = diagram_context
         self._plant_context = plant_context
-        self._prefix_size = prefix_size
+        self._prefix_size = int(prefix_size)
+
+        self._robot_instances = list(robot_instances)
+        if len(self._robot_instances) == 0:
+            raise ValueError("robot_instances must be a non-empty list of model instances.")
 
         self._q_full_fixed = np.asarray(q_full_fixed, dtype=float).copy()
         if self._q_full_fixed.shape != (plant.num_positions(),):
             raise ValueError("q_full_fixed must have shape (plant.num_positions(),)")
+
+        self._gripper_instance = gripper_instance if gripper_instance is not None else self._robot_instances[-1]
+        self._gripper_body = plant.GetBodyByName(gripper_body_name, self._gripper_instance)
+
+        self._p_GS_G = np.asarray(p_GS_G, dtype=float).reshape((3,))
+        self._finger_clearance_m = float(finger_clearance_m)
 
         # Apply collision filters once (they live in SceneGraph context).
         sg_context = scene_graph.GetMyContextFromRoot(diagram_context)
@@ -228,8 +262,16 @@ class RobotEnvValidityChecker:
             scene_graph=scene_graph,
             sg_context=sg_context,
             robot_instances=robot_instances,
-            ignore_arm_gripper_internal=True,
+            ignore_arm_gripper_internal=ignore_arm_gripper_internal,
         )
+
+        # Cache environment proximity geometries for point-distance queries.
+        self._env_geometry_set = self._build_environment_geometry_set()
+        # Additionally cache as a Python set for fast membership tests in the distance results.
+        # Some Drake versions don't expose GeometrySet.geometries(); we store ids ourselves.
+        # (Set in _build_environment_geometry_set)
+        if not hasattr(self, "_env_geometry_ids"):
+            raise RuntimeError("Internal error: _env_geometry_ids not initialized.")
 
     def plant(self):
         return self._plant
@@ -242,19 +284,88 @@ class RobotEnvValidityChecker:
         q_full[: self._prefix_size] = q_prefix
         return q_full
 
+    def _build_environment_geometry_set(self) -> GeometrySet:
+        """
+        Build a GeometrySet of all proximity geometries that do NOT belong to any
+        instance in self._robot_instances. Also caches the ids in self._env_geometry_ids.
+        """
+        sg_context = self._scene_graph.GetMyContextFromRoot(self._diagram_context)
+        query_object = self._scene_graph.get_query_output_port().Eval(sg_context)
+        inspector = query_object.inspector()
+
+        # Drake API (your build): GetGeometryIds(geometry_set, role=None) -> set[GeometryId]
+        all_geoms = GeometrySet(inspector.GetAllGeometryIds())
+        prox_ids = inspector.GetGeometryIds(all_geoms, Role.kProximity)
+
+        env_ids = []
+        for gid in prox_ids:
+            frame_id = inspector.GetFrameId(gid)
+
+            # Try to map geometry -> body; if it fails (anchored/non-body), treat as environment.
+            try:
+                body = self._plant.GetBodyFromFrameId(frame_id)
+                if body.model_instance() in self._robot_instances:
+                    continue
+            except Exception:
+                pass
+
+            env_ids.append(gid)
+
+        if not env_ids:
+            raise RuntimeError(
+                "No environment proximity geometries found. "
+                "Check that your environment has proximity roles (collision geometry)."
+            )
+
+        self._env_geometry_ids = set(env_ids)
+        return GeometrySet(env_ids)
+
+    def _between_fingers_point_W(self) -> np.ndarray:
+        """
+        Compute p_WQ for the point between fingers:
+            p_WQ = X_WG * p_GS_G
+        where X_WG is the gripper body pose in world.
+        """
+        X_WG = self._plant.EvalBodyPoseInWorld(self._plant_context, self._gripper_body)
+        p_WQ = X_WG.multiply(self._p_GS_G)  # RigidTransform * point
+        return np.asarray(p_WQ, dtype=float).reshape((3,))
+
     def CheckConfigCollisionFreePrefix(self, q_prefix: np.ndarray) -> bool:
         q_full = self.embed_prefix(q_prefix)
 
-        # Set positions in plant context
+        # Set positions in plant context.
         self._plant.SetPositions(self._plant_context, q_full)
 
-        # Query collisions
+        # Query collisions.
         sg_context = self._scene_graph.GetMyContextFromRoot(self._diagram_context)
         query_object = self._scene_graph.get_query_output_port().Eval(sg_context)
 
         penetrations = query_object.ComputePointPairPenetration()
-        # With filters applied, any penetration means robot-env collision.
-        return len(penetrations) == 0
+        # With your filters applied, any penetration means robot-env collision.
+        if len(penetrations) != 0:
+            return False
+
+        if self._finger_clearance_m == 0:
+            return True  # If zero, then we're done.
+
+        # Clearance check: reject if the between-fingers point is within finger_clearance_m
+        # of any *environment* proximity geometry.
+        p_WQ = self._between_fingers_point_W()
+
+        # Your build supports: ComputeSignedDistanceToPoint(p_WQ, threshold)
+        dists_all = query_object.ComputeSignedDistanceToPoint(p_WQ, self._finger_clearance_m)
+
+        # Filter to environment geometries only. If any are returned, we're too close.
+        for d in dists_all:
+            # In Drake python this field is typically id_G (geometry id of the measured object).
+            # If your build differs, print(dir(d)) once and adjust this name.
+            if d.id_G in self._env_geometry_ids:
+                print(query_object.inspector().GetName(d.id_G))
+                import pdb
+                pdb.set_trace()
+                return False
+
+        return True
 
 def make_prefix_sampler(
     checker,
@@ -453,6 +564,7 @@ def plan_rrt_segment(
     do_shortcut: bool = False,
     shortcut_tries: int = 200,
     shortcut_check_size: float = 1e-2,
+    add_gripper_clearance: bool = False
 ) -> TrajectorySegment:
     """
     Plans in the first 11 positions only. Remaining positions held constant.
@@ -460,6 +572,15 @@ def plan_rrt_segment(
     """
     start11 = np.asarray(q_start.q[:11], dtype=float).copy()
     goal11  = np.asarray(q_goal.q[:11], dtype=float).copy()
+
+    if add_gripper_clearance:
+        checker._finger_clearance_m = 0.05
+        while not checker.CheckConfigCollisionFreePrefix(start11) or not checker.CheckConfigCollisionFreePrefix(goal11):
+            checker._finger_clearance_m -= 0.01
+        if checker._finger_clearance_m < 0.0:
+            checker._finger_clearance_m = 0.0
+    else:
+        checker._finger_clearance_m = 0.0
 
     # (Optional but helpful) ensure endpoints are valid
     if not checker.CheckConfigCollisionFreePrefix(start11):
@@ -735,6 +856,10 @@ def main():
     for a, b in zip(waypoints[:-1], waypoints[1:]):
         logger.info("Planning segment: %s -> %s", a.name, b.name)
 
+        add_gripper_clearance = False
+        if a.name == "postgrasp":
+            add_gripper_clearance = True
+
         seg11 = plan_rrt_segment(
             checker=checker,
             q_start=a,
@@ -747,6 +872,7 @@ def main():
             do_shortcut=not args.no_shortcut,
             shortcut_tries=args.shortcut_tries,
             shortcut_check_size=args.shortcut_check,
+            add_gripper_clearance=add_gripper_clearance
         )
 
         # Name the motion segment and promote it to 13DoF with the CURRENT gripper setting.
