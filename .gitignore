@@ -11,6 +11,8 @@ robot_waypoints.json
 robot_plan.json
 
 simulation.html
+simulation_good.html
+simulation_bad.html
 meshcats/*
 .venv
 logs
