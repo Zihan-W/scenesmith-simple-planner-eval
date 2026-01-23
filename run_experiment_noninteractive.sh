@@ -89,7 +89,8 @@ run_timed_python() {
 # -------------------------
 rm -f "$WORKDIR/robot_task.dmd.yaml"
 rm -f "$WORKDIR/robot_waypoints.json"
-rm -f "$WORKDIR/robot_plan.json"
+rm -f "$WORKDIR/robot_plan_good.json"
+rm -f "$WORKDIR/robot_plan_bad.json"
 rm -f "$WORKDIR/simulation_good.html"
 rm -f "$WORKDIR/simulation_bad.html"
 rm -f "$WORKDIR/out_good.dmd.yaml"
@@ -141,12 +142,29 @@ run_timed_python "$TIMELIMIT" \
     "$WORKDIR/robot_waypoints.json" \
     --package-xml "$SCENE/package.xml" \
     --package-xml models/iiwa/package.xml \
-    --out-traj "$WORKDIR/robot_plan.json" \
-    --shortcut-tries 100
+    --out-traj "$WORKDIR/robot_plan_good.json" \
+    --shortcut-tries 100 \
+    --gripper-clearance \
   || true
 
-if [[ ! -f "$WORKDIR/robot_plan.json" ]]; then
-  echo "Failed to compute robot plan in the allotted time for scene $SCENE."
+if [[ ! -f "$WORKDIR/robot_plan_good.json" ]]; then
+  echo "Failed to compute good robot plan in the allotted time for scene $SCENE."
+  exit 2
+fi
+
+run_timed_python "$TIMELIMIT" \
+  python3 scripts/plan_robot_waypoints_rrt_noninteractive.py \
+    "$SCENE/combined_house/robot_commands.json" \
+    "$WORKDIR/robot_task.dmd.yaml" \
+    "$WORKDIR/robot_waypoints.json" \
+    --package-xml "$SCENE/package.xml" \
+    --package-xml models/iiwa/package.xml \
+    --out-traj "$WORKDIR/robot_plan_bad.json" \
+    --shortcut-tries 100 \
+  || true
+
+if [[ ! -f "$WORKDIR/robot_plan_bad.json" ]]; then
+  echo "Failed to compute bad robot plan in the allotted time for scene $SCENE."
   exit 2
 fi
 
@@ -155,7 +173,7 @@ fi
 # -------------------------
 python3 scripts/simulate_noninteractive.py \
   "$WORKDIR/robot_task.dmd.yaml" \
-  "$WORKDIR/robot_plan.json" \
+  "$WORKDIR/robot_plan_good.json" \
   --package-xml "$SCENE/package.xml" \
   --package-xml models/iiwa/package.xml \
   --ee-vel 1 \
@@ -165,7 +183,7 @@ python3 scripts/simulate_noninteractive.py \
 
 python3 scripts/simulate_noninteractive.py \
   "$WORKDIR/robot_task.dmd.yaml" \
-  "$WORKDIR/robot_plan.json" \
+  "$WORKDIR/robot_plan_bad.json" \
   --package-xml "$SCENE/package.xml" \
   --package-xml models/iiwa/package.xml \
   --write-updated-scenario "$WORKDIR/out_bad.dmd.yaml" \

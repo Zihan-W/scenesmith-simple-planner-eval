@@ -769,6 +769,7 @@ def main():
     )
     parser.add_argument("--shortcut-tries", type=int, default=25)
     parser.add_argument("--shortcut-check", type=float, default=1e-2)
+    parser.add_argument("--gripper-clearance", action="store_true")
     parser.add_argument(
         "--out-traj",
         type=str,
@@ -857,7 +858,8 @@ def main():
         logger.info("Planning segment: %s -> %s", a.name, b.name)
 
         add_gripper_clearance = False
-        if a.name == "postgrasp":
+        if a.name == "postgrasp" and args.gripper_clearance:
+            logger.info("Using extra gripper clearance in this plan.")
             add_gripper_clearance = True
 
         seg11 = plan_rrt_segment(
