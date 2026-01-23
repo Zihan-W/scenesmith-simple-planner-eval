@@ -243,30 +243,18 @@ class RobotEnvValidityChecker:
         return q_full
 
     def CheckConfigCollisionFreePrefix(self, q_prefix: np.ndarray) -> bool:
-        """
-        Returns False iff a relevant geometry pair (after filters) has
-        strictly negative signed distance (i.e. penetration).
-        """
         q_full = self.embed_prefix(q_prefix)
 
         # Set positions in plant context
         self._plant.SetPositions(self._plant_context, q_full)
 
-        # Query distances
+        # Query collisions
         sg_context = self._scene_graph.GetMyContextFromRoot(self._diagram_context)
         query_object = self._scene_graph.get_query_output_port().Eval(sg_context)
 
-        # Only includes candidate pairs per SceneGraph filtering.
-        # Each result has .distance (signed), plus witness points, ids, etc.
-        results = query_object.ComputeSignedDistancePairwiseClosestPoints(
-            max_distance=0.1
-        )
-
-        # Negative => collision.
-        for r in results:
-            if r.distance < 0.0:
-                return False
-        return True
+        penetrations = query_object.ComputePointPairPenetration()
+        # With filters applied, any penetration means robot-env collision.
+        return len(penetrations) == 0
 
 def make_prefix_sampler(
     checker,
