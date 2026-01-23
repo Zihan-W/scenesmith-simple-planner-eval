@@ -99,10 +99,20 @@ def _retime_toppra(
 
     toppra = Toppra(rough_traj, plant, gridpoints)
 
+    vel_lower = plant.GetVelocityLowerLimits() * vel_multiplier
+    vel_upper = plant.GetVelocityUpperLimits() * vel_multiplier
+
+    gripper_close_time = 5 # seconds
+    gripper_distance = 0.05 - 0.005
+    gripper_vel_limit = gripper_distance / gripper_close_time
+    vel_lower[-2:] = -gripper_vel_limit
+    vel_upper[-2:] = gripper_vel_limit
+
     toppra.AddJointVelocityLimit(
-        vel_multiplier * plant.GetVelocityLowerLimits(),
-        vel_multiplier * plant.GetVelocityUpperLimits(),
+        vel_lower,
+        vel_upper,
     )
+
     toppra.AddJointAccelerationLimit(
         accel_multiplier * plant.GetAccelerationLowerLimits(),
         accel_multiplier * plant.GetAccelerationUpperLimits(),
