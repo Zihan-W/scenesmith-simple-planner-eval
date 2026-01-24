@@ -353,7 +353,11 @@ class RobotEnvValidityChecker:
         p_WQ = self._between_fingers_point_W()
 
         # Your build supports: ComputeSignedDistanceToPoint(p_WQ, threshold)
-        dists_all = query_object.ComputeSignedDistanceToPoint(p_WQ, self._finger_clearance_m)
+        try:
+            dists_all = query_object.ComputeSignedDistanceToPoint(p_WQ, self._finger_clearance_m)
+        except:
+            # Handle errors like "RuntimeError: DistanceToPoint from meshes: FeatureNormalSet: Cannot compute an edge normal because the two triangles sharing the edge make a very sharp edge."
+            return False
 
         # Filter to environment geometries only. If any are returned, we're too close.
         for d in dists_all:
