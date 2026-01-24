@@ -721,6 +721,7 @@ def main():
     wsg_body_names = ["wsg_50::" + name for name in body_names_for_instance(station.plant(), "wsg_50")]
     body_names = iiwa_body_names + wsg_body_names
     locking_cfg = ItemLockingMonitorConfig(
+        t_start = 5,
         unlock_near_geometry = body_names,
     )
     locking_monitor = ApplyItemLockingMonitorConfig(
