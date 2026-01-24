@@ -1127,8 +1127,8 @@ def main():
             {"name": "postgrasp", "q": q_pregrasp_last[:11].tolist()},
             {"name": "preplace",  "q": q_postplace_last[:11].tolist()},
             {"name": "place",     "q": q_place_last[:11].tolist()},
-            {"name": "postplace", "q": q_postplace_last[:11].tolist()},
-            {"name": "start",     "q": q_start.tolist()},
+            # {"name": "postplace", "q": q_postplace_last[:11].tolist()},
+            # {"name": "start",     "q": q_start.tolist()},
         ]
     }
 
