@@ -174,6 +174,7 @@ fi
 python3 scripts/simulate_noninteractive.py \
   "$WORKDIR/robot_task.dmd.yaml" \
   "$WORKDIR/robot_plan_good.json" \
+  --friction-mult 10 \
   --package-xml "$SCENE/package.xml" \
   --package-xml models/iiwa/package.xml \
   --ee-vel 1 \
@@ -184,6 +185,7 @@ python3 scripts/simulate_noninteractive.py \
 python3 scripts/simulate_noninteractive.py \
   "$WORKDIR/robot_task.dmd.yaml" \
   "$WORKDIR/robot_plan_bad.json" \
+  --friction-mult 10 \
   --package-xml "$SCENE/package.xml" \
   --package-xml models/iiwa/package.xml \
   --write-updated-scenario "$WORKDIR/out_bad.dmd.yaml" \

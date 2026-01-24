@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Tuple, Any, Dict
 import numpy as np
 import re
+import copy
 
 import logging
 logging.basicConfig(
@@ -13,7 +14,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from pydrake.geometry import StartMeshcat, Role, GeometrySet, CollisionFilterDeclaration
+from pydrake.geometry import StartMeshcat, Role, GeometrySet, CollisionFilterDeclaration, RoleAssign, ProximityProperties
 from pydrake.systems.analysis import Simulator
 from pydrake.systems.framework import DiagramBuilder
 from pydrake.systems.primitives import TrajectorySource, Demultiplexer, Multiplexer, Adder, Gain
@@ -23,7 +24,7 @@ from pydrake.trajectories import (
     PiecewisePolynomial,
 )
 from pydrake.multibody.optimization import Toppra, CalcGridPointsOptions
-from pydrake.multibody.plant import MultibodyPlant
+from pydrake.multibody.plant import MultibodyPlant, CoulombFriction
 from pydrake.multibody.tree import BodyIndex
 from pydrake.common.yaml import yaml_load, yaml_dump_typed
 
@@ -462,6 +463,92 @@ def apply_collision_filters(
 
     cfm.Apply(decl)
 
+
+def multiply_all_collision_friction(*, plant, scene_graph, root_context, K: float) -> None:
+    if K <= 0:
+        raise ValueError(f"K must be > 0, got {K}")
+
+    plant_context = plant.GetMyContextFromRoot(root_context)
+    sg_context = scene_graph.GetMyContextFromRoot(root_context)
+    inspector = scene_graph.model_inspector()
+
+    plant_source_id = plant.get_source_id()
+
+    n_seen = 0
+    n_updated = 0
+
+    for bi in range(plant.num_bodies()):
+        body = plant.get_body(BodyIndex(bi))
+        if body.index() == plant.world_body().index():
+            continue
+
+        # Collision geoms “as known by the plant” is the most reliable enumeration.
+        try:
+            geom_ids = plant.GetCollisionGeometriesForBody(body)
+        except TypeError:
+            geom_ids = plant.GetCollisionGeometriesForBody(body.index())
+
+        for gid in geom_ids:
+            n_seen += 1
+
+            # Optional sanity check: ensure these are plant-owned geoms.
+            if hasattr(inspector, "BelongsToSource") and not inspector.BelongsToSource(gid, plant_source_id):
+                continue
+
+            curr_props = inspector.GetProximityProperties(gid)
+            if curr_props is None:
+                continue
+
+            # Copy the properties, then replace just friction.
+            new_props = copy.deepcopy(curr_props)
+            old_fric = new_props.GetProperty("material", "coulomb_friction")
+            new_fric = CoulombFriction(
+                float(old_fric.static_friction()) * K,
+                float(old_fric.dynamic_friction()) * K,
+            )
+            new_props.UpdateProperty("material", "coulomb_friction", new_fric)
+
+            # Replace proximity role properties IN PLACE (no RemoveRole needed).
+            scene_graph.AssignRole(
+                sg_context, plant_source_id, gid, new_props, RoleAssign.kReplace
+            )
+            n_updated += 1
+
+    logger.info(
+        "Plant collision geoms seen: %d; scaled friction by K=%.3g on %d proximity geometries.",
+        n_seen, K, n_updated
+    )
+
+
+def audit_friction_runtime(plant, scene_graph, root_context, *, body_name_substr: str, max_print=20):
+    plant_context = plant.GetMyContextFromRoot(root_context)
+    sg_context = scene_graph.GetMyContextFromRoot(root_context)
+
+    query_object = scene_graph.get_query_output_port().Eval(sg_context)
+    inspector = query_object.inspector()
+
+    printed = 0
+    for body_index in range(plant.num_bodies()):
+        body = plant.get_body(BodyIndex(body_index))
+        if body_name_substr not in body.name():
+            continue
+
+        try:
+            gids = plant.GetCollisionGeometriesForBody(body)
+        except TypeError:
+            gids = plant.GetCollisionGeometriesForBody(body.index())
+
+        for gid in gids:
+            props = inspector.GetProximityProperties(gid)
+            if props is None or not props.HasProperty("material", "coulomb_friction"):
+                continue
+            fric = props.GetProperty("material", "coulomb_friction")
+            print(f"{body.name():30s} gid={gid}  mu_s={fric.static_friction():.4g}  mu_d={fric.dynamic_friction():.4g}")
+            printed += 1
+            if printed >= max_print:
+                return
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Build a manipulation.station HardwareStation and play a retimed plan"
@@ -501,6 +588,12 @@ def main():
         default=None,
         help="If set, write a new scenario YAML where default_free_body_pose entries are updated "
              "to the final simulated poses.",
+    )
+    parser.add_argument(
+        "--friction-mult",
+        type=float,
+        default=5.0,
+        help="Multiply Coulomb friction (mu_static, mu_dynamic) for all proximity geometries by this factor.",
     )
 
     args = parser.parse_args()
@@ -643,6 +736,21 @@ def main():
 
     sim = Simulator(diagram)
     sim.set_monitor(locking_monitor.Monitor)
+
+    print("=== BEFORE scaling ===")
+    audit_friction_runtime(station.plant(), station.scene_graph(), sim.get_mutable_context(), body_name_substr="left_finger")
+
+    # Scale friction before simulation starts.
+    multiply_all_collision_friction(
+        plant=station.plant(),
+        scene_graph=station.scene_graph(),
+        root_context=sim.get_mutable_context(),
+        K=args.friction_mult,
+    )
+
+    print("=== AFTER scaling ===")
+    audit_friction_runtime(station.plant(), station.scene_graph(), sim.get_mutable_context(), body_name_substr="left_finger")
+
     sim.Initialize()
 
     apply_collision_filters(
