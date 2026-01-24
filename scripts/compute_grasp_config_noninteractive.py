@@ -1062,7 +1062,7 @@ def main():
                     target_obj_name=target_obj_names[last_object_idx],
                     X_grasp=last_grasp_pose,
                     ghost_gripper_instance=ghost_gripper_instance,
-                    z_offset=0.1,
+                    z_offset=0.05,
                     ignore_target_object=True,   # usually yes: you expect the gripper to be “touching” the object
                     visualize=True,             # set True if you pass diagram=diagram
                     diagram=diagram,
