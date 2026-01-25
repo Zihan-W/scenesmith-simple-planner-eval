@@ -677,17 +677,18 @@ def solve_ik_for_pose(
     # options.SetOption(CommonSolverOption.kPrintFileName, "snopt.log")
     # options.SetOption(solver.solver_id(), "Major print level", 1)
     options.SetOption(SnoptSolver().solver_id(), "Timing level", 3)
-    options.SetOption(SnoptSolver().solver_id(), "Time Limit", 10)
+    options.SetOption(SnoptSolver().solver_id(), "Time Limit", 300)
     options.SetOption(SnoptSolver().solver_id(), "Major optimality tolerance", 1e-1)
 
     # IPOPT Options
     # options.SetOption(CommonSolverOption.kPrintToConsole, True)
     # options.SetOption(IpoptSolver().solver_id(), "print_level", 5)
-    options.SetOption(IpoptSolver().solver_id(), "max_wall_time", 10)
+    options.SetOption(IpoptSolver().solver_id(), "max_wall_time", 300)
     options.SetOption(IpoptSolver().solver_id(), "acceptable_tol", 1e-2)
     options.SetOption(IpoptSolver().solver_id(), "acceptable_iter", 5)
     options.SetOption(IpoptSolver().solver_id(), "acceptable_constr_viol_tol", 1e-6)
 
+    logger.info("Beginning IK solve...")
     result = solver.Solve(prog, None, options)
     logger.info(f"SolutionResult: {result.get_solution_result()}")
     if solver.solver_id() == SnoptSolver().solver_id():
