@@ -4,6 +4,17 @@ This repository is a companion to [SceneSmith](https://scenesmith.github.io/), p
 
 For the main SceneSmith codebase and research, please visit the [SceneSmith GitHub repository](https://github.com/nepfaff/scenesmith).
 
+## 🤖 Robot Evaluation Pipeline
+
+This repository focuses on the **Policy Interface** and **Validation** stages of the SceneSmith evaluation pipeline. For a comprehensive overview of how to generate scenes and perform end-to-end evaluation, refer to the [Robot Evaluation section of the main SceneSmith repository](https://github.com/nepfaff/scenesmith?tab=readme-ov-file#-robot-evaluation).
+
+The full evaluation process consists of four stages:
+
+1.  **Generate Prompts**: An LLM converts a high-level task into diverse scene prompts.
+2.  **Generate Scenes**: Scenes are generated using the SceneSmith pipeline from these prompts.
+3.  **Policy Interface (this repo)**: Scenes are converted into robot-executable poses for model-based policies.
+4.  **Validate (this repo)**: Task completion is verified using geometric and visual observations.
+
 ## Getting Started
 
 ### 1. Environment Setup
