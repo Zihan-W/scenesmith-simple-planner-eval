@@ -19,3 +19,4 @@ meshcats/*
 .venv
 logs
 *.log
+*.pdf

@@ -1,37 +1,81 @@
-### Useful commands:
+# SceneSmith: Simple Planner Evaluation
 
-To run the folder, do `bash run_experiment_folder.sh models/21-20-10_cleaned/`, for example.
+This repository is a companion to [SceneSmith](https://scenesmith.github.io/), providing a simple model-based planner and simulation wrapper to demonstrate robot evaluation using agentically-generated indoor scenes.
 
-To do all-in-one, just run `bash run_experiment.sh models/21-20-10_cleaned/scene_000` or `bash run_experiment.sh models/15-15-01_cleaned/scene_000`.
+For the main SceneSmith codebase and research, please visit the [SceneSmith GitHub repository](https://github.com/nepfaff/scenesmith).
 
-### Old:
+## Getting Started
 
-*All commands should be run from the root of the repository.*
+### 1. Environment Setup
 
-Add the robot to the directives (based on the task):
+We recommend using a virtual environment to manage dependencies:
+
+```bash
+# Create a virtual environment
+python3 -m venv venv
+
+# Activate the environment
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
+
+### 2. Scene Dataset
+
+Download the example scenes dataset from Hugging Face:
+
+[nepfaff/scenesmith-example-scenes](https://huggingface.co/datasets/nepfaff/scenesmith-example-scenes)
+
+Place the downloaded models in the `models/` directory.
+
+## Usage
+
+### Running Experiments
+
+To run evaluations on an entire folder of scenes:
+
+```bash
+bash run_experiment_folder.sh models/21-20-10_cleaned/
+```
+
+To run an experiment on a single scene:
+
+```bash
+bash run_experiment.sh models/21-20-10_cleaned/scene_000
+```
+
+## Manual Pipeline Workflow
+
+If you need to run the stages of the evaluation pipeline manually, follow these steps from the root of the repository:
+
+### 1. Prepare Scene Directives
+Add the robot to the scene directives based on the task:
+```bash
 python3 scripts/add_robot_to_directives.py \
     models/scene_008/combined_house/house.dmd.yaml \
     models/scene_008/pick_candle_task.json \
     pick_candle_task.dmd.yaml
 ```
 
-Visualize the directives file (with the robot):
-```
+### 2. Visualization
+Visualize the prepared scene:
+```bash
 python3 scripts/visualize_dmd_scene.py \
     pick_candle_task.dmd.yaml \
     --package-xml models/iiwa/package.xml \
     --package-xml models/scene_008/package.xml
 ```
 
-Visualize the directives file with Drake's `model_visualizer`:
-```
-export ROS_PACKAGE_PATH=/home/tommy/Documents/programming/work/rlg/snippets/policy-eval-for-nicholas/models/iiwa:/home/tommy/Documents/programming/work/rlg/snippets/policy-eval-for-nicholas/models/scene_008;
+Alternatively, use Drake's model visualizer:
+```bash
+export ROS_PACKAGE_PATH=$(pwd)/models/iiwa:$(pwd)/models/scene_008
 python3 -m pydrake.visualization.model_visualizer pick_candle_task.dmd.yaml
 ```
 
-Compute a grasp and place configuration for the manipuland:
-```
+### 3. Compute Grasp Configuration
+Compute a valid grasp and place configuration:
+```bash
 python3 scripts/compute_grasp_config.py \
     models/scene_008/pick_candle_task.json \
     pick_candle_task.dmd.yaml \
@@ -39,8 +83,9 @@ python3 scripts/compute_grasp_config.py \
     --package-xml models/scene_008/package.xml
 ```
 
-Compute a plan given robot waypoints from the grasp computation script:
-```
+### 4. Planning
+Compute a plan given the generated robot waypoints:
+```bash
 python3 scripts/plan_robot_waypoints_rrt.py \
     models/scene_008/pick_candle_task.json \
     pick_candle_task.dmd.yaml \
@@ -50,8 +95,9 @@ python3 scripts/plan_robot_waypoints_rrt.py \
     --out-traj robot_plan.json
 ```
 
-Simulate a plan from the planning script:
-```
+### 5. Simulation
+Simulate the generated plan:
+```bash
 python3 scripts/simulate.py \
     pick_candle_task.dmd.yaml \
     robot_plan.json \
@@ -61,4 +107,3 @@ python3 scripts/simulate.py \
     --ee-accel 1 \
     --write-updated-scenario out.dmd.yaml
 ```
-(Don't include the last two lines to run TOPPRA with only joint-space limits)
