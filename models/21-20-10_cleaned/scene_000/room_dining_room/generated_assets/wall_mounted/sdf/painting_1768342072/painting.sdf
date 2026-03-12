@@ -1,0 +1,58 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf xmlns:ns0="drake.mit.edu" version="1.7">
+  <model name="painting">
+    <link name="base_link">
+      <inertial>
+        <mass>1.500000</mass>
+        <pose>0.025223 0.014471 -0.002633 0 0 0</pose>
+        <inertia>
+          <ixx>1.231507e-01</ixx>
+          <iyy>7.371609e-01</iyy>
+          <izz>6.141365e-01</izz>
+          <ixy>4.565393e-04</ixy>
+          <ixz>1.647770e-03</ixz>
+          <iyz>-2.168846e-04</iyz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>painting.gltf</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name="collision_0">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.400</mu>
+              <mu2>0.400</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>painting_collision_0.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_1">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.400</mu>
+              <mu2>0.400</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>painting_collision_1.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

@@ -1,0 +1,429 @@
+directives:
+- add_model:
+    name: room_geometry_dining_room
+    file: package://scene/room_geometry/room_geometry_dining_room.sdf
+- add_model:
+    name: dining_room_dining_table_0
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/dining_table_1768339805/dining_table.sdf
+- add_weld:
+    parent: world
+    child: dining_room_dining_table_0::base_link
+    X_PC:
+      translation: [2.444975965839416, 2.763099506945507, -0.0030165603865405176]
+      rotation: !AngleAxis
+        angle_deg: 0.20278669347891085
+        axis: [0.38358643378045526, 0.15993706147248365, -0.9095502098219423]
+- add_model:
+    name: dining_room_floor_lamp_0
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/floor_lamp_1768339677/floor_lamp.sdf
+- add_weld:
+    parent: world
+    child: dining_room_floor_lamp_0::base_link
+    X_PC:
+      translation: [4.692025787930463, 3.5891803337774886, -3.636708015274063e-05]
+      rotation: !AngleAxis
+        angle_deg: 7.305056487733961
+        axis: [0.00011198222746808334, 0.0004903902250116747, 0.999999873488696]
+- add_model:
+    name: dining_room_dining_chair_0
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/dining_chair_1768339677/dining_chair.sdf
+- add_weld:
+    parent: world
+    child: dining_room_dining_chair_0::base_link
+    X_PC:
+      translation: [1.9295433782344138, 3.0626563798166995, -0.00048080213690704474]
+      rotation: !AngleAxis
+        angle_deg: 179.99166186425265
+        axis: [-0.0006881995504632964, 0.0010937766603851557, 0.9999991650166493]
+- add_model:
+    name: dining_room_dining_chair_1
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/dining_chair_1768339677/dining_chair.sdf
+- add_weld:
+    parent: world
+    child: dining_room_dining_chair_1::base_link
+    X_PC:
+      translation: [2.93657612255634, 3.1320272911208855, -0.0004820259284164901]
+      rotation: !AngleAxis
+        angle_deg: 179.2758226624706
+        axis: [0.0006816628743606351, -0.0010703946013910653, -0.9999991947952374]
+- add_model:
+    name: dining_room_dining_chair_2
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/dining_chair_1768339677/dining_chair.sdf
+- add_weld:
+    parent: world
+    child: dining_room_dining_chair_2::base_link
+    X_PC:
+      translation: [1.9066406422922912, 2.3866971322382184, -0.00048202592841649]
+      rotation: !AngleAxis
+        angle_deg: 0.4903171665488775
+        axis: [0.2518008533004547, 0.1566963880045524, -0.9550092000936378]
+- add_model:
+    name: dining_room_dining_chair_3
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/dining_chair_1768339677/dining_chair.sdf
+- add_weld:
+    parent: world
+    child: dining_room_dining_chair_3::base_link
+    X_PC:
+      translation: [2.9317271969485974, 2.462787822487957, -0.0004820259284164887]
+      rotation: !AngleAxis
+        angle_deg: 0.1454684705666954
+        axis: [0.8465361266734758, 0.5316531881817548, 0.0268602630821918]
+- add_model:
+    name: dining_room_credenza_0
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/credenza_1768340992/credenza.sdf
+- add_weld:
+    parent: world
+    child: dining_room_credenza_0::base_link
+    X_PC:
+      translation: [2.4782025592357537, 0.3176515472478594, -0.0008256939587382363]
+      rotation: !AngleAxis
+        angle_deg: 0.10709460514645994
+        axis: [-0.9998654467321934, -0.01638843269420988, -0.0007125341105831367]
+- add_model:
+    name: dining_room_dining_chair_4
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/dining_chair_1768339677/dining_chair.sdf
+- add_weld:
+    parent: world
+    child: dining_room_dining_chair_4::base_link
+    X_PC:
+      translation: [1.4374695991928184, 2.75848615997949, -0.0004820259284164899]
+      rotation: !AngleAxis
+        angle_deg: 91.40141797134639
+        axis: [0.0017235620655171205, -0.0004160952205100763, -0.9999984280980514]
+- add_model:
+    name: dining_room_dining_chair_5
+    file: package://scene/room_dining_room/generated_assets/furniture/sdf/dining_chair_1768339677/dining_chair.sdf
+- add_weld:
+    parent: world
+    child: dining_room_dining_chair_5::base_link
+    X_PC:
+      translation: [3.4786722960894956, 2.737434722914146, -0.0004820259284164899]
+      rotation: !AngleAxis
+        angle_deg: 90.72108058403641
+        axis: [0.0003863492315551264, 0.0017410902049689312, 0.9999984096683202]
+- add_model:
+    name: dining_room_painting_0
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/painting_1768342072/painting.sdf
+- add_weld:
+    parent: world
+    child: dining_room_painting_0::base_link
+    X_PC:
+      translation: [2.0681979877319336, 0.04999999999999982, 1.5596576593437816]
+      rotation: !AngleAxis
+        angle_deg: 1.3468424222310214
+        axis: [-6.123233995736765e-17, 1.0, -5.2095078660101854e-15]
+- add_model:
+    name: dining_room_wall_sconce_0
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/wall_sconce_1768342143/wall_sconce.sdf
+- add_weld:
+    parent: world
+    child: dining_room_wall_sconce_0::base_link
+    X_PC:
+      translation: [3.444446842338448, 0.04999999999999982, 1.6095186668508092]
+      rotation: !AngleAxis
+        angle_deg: 0.35152192505122504
+        axis: [-6.123233995736765e-17, 1.0, -1.9960880926320136e-14]
+- add_model:
+    name: dining_room_wall_sconce_1
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/wall_sconce_1768342143/wall_sconce.sdf
+- add_weld:
+    parent: world
+    child: dining_room_wall_sconce_1::base_link
+    X_PC:
+      translation: [0.7628296929609082, 0.04999999999999982, 1.6103632216321717]
+      rotation: !AngleAxis
+        angle_deg: 0.12449551629304491
+        axis: [6.123233995736767e-17, -1.0, -5.636111843055428e-14]
+- add_model:
+    name: dining_room_photograph_0
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/photograph_1768342072/photograph.sdf
+- add_weld:
+    parent: world
+    child: dining_room_photograph_0::base_link
+    X_PC:
+      translation: [1.0027903350368723, 4.45, 1.25]
+      rotation: !AngleAxis
+        angle_deg: 180.0
+        axis: [0.0, 0.0, 1.0]
+- add_model:
+    name: dining_room_photograph_1
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/photograph_1768342072/photograph.sdf
+- add_weld:
+    parent: world
+    child: dining_room_photograph_1::base_link
+    X_PC:
+      translation: [0.9926823684609924, 4.45, 2.1]
+      rotation: !AngleAxis
+        angle_deg: 180.0
+        axis: [0.0, 0.0, 1.0]
+- add_model:
+    name: dining_room_clock_0
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/clock_1768342135/clock.sdf
+- add_weld:
+    parent: world
+    child: dining_room_clock_0::base_link
+    X_PC:
+      translation: [4.952991740299388, 4.45, 1.7097121232115153]
+      rotation: !AngleAxis
+        angle_deg: 180.0
+        axis: [-0.002616851558667023, -1.6023594425826662e-19, 0.9999965760380982]
+- add_model:
+    name: dining_room_mirror_0
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/mirror_1768342072/mirror.sdf
+- add_weld:
+    parent: world
+    child: dining_room_mirror_0::base_link
+    X_PC:
+      translation: [5.45, 0.8686048358652378, 1.5608353634738878]
+      rotation: !AngleAxis
+        angle_deg: 90.00467889087466
+        axis: [-0.009036336805783574, 0.009036336805783574, 0.9999183412830593]
+- add_model:
+    name: dining_room_print_0
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/print_1768342072/print.sdf
+- add_weld:
+    parent: world
+    child: dining_room_print_0::base_link
+    X_PC:
+      translation: [0.04999999999999982, 2.2774040581243007, 1.4998983007558366]
+      rotation: !AngleAxis
+        angle_deg: 90.00751306506695
+        axis: [-0.011450350638028997, -0.011450350638028997, -0.9998688808741536]
+- add_model:
+    name: dining_room_print_1
+    file: package://scene/room_dining_room/generated_assets/wall_mounted/sdf/print_1768342072/print.sdf
+- add_weld:
+    parent: world
+    child: dining_room_print_1::base_link
+    X_PC:
+      translation: [0.04999999999999982, 3.3, 1.5072032201816112]
+      rotation: !AngleAxis
+        angle_deg: 90.0
+        axis: [0.0, 0.0, -1.0]
+- add_model:
+    name: dining_room_pendant_light_0
+    file: package://scene/room_dining_room/generated_assets/ceiling_mounted/sdf/pendant_light_1768343189/pendant_light.sdf
+- add_weld:
+    parent: world
+    child: dining_room_pendant_light_0::base_link
+    X_PC:
+      translation: [2.809973042553782, 2.254233296705469, 2.8]
+      rotation: !AngleAxis
+        angle_deg: 0.36596268327380305
+        axis: [0.0, 0.0, -1.0]
+- add_model:
+    name: dining_room_recessed_downlight_0
+    file: package://scene/room_dining_room/generated_assets/ceiling_mounted/sdf/recessed_downlight_1768342910/recessed_downlight.sdf
+- add_weld:
+    parent: world
+    child: dining_room_recessed_downlight_0::base_link
+    X_PC:
+      translation: [0.8540212258675455, 3.6762491411937246, 2.8]
+      rotation: !AngleAxis
+        angle_deg: 0.2632238842681389
+        axis: [0.0, 0.0, 1.0]
+- add_model:
+    name: dining_room_recessed_downlight_1
+    file: package://scene/room_dining_room/generated_assets/ceiling_mounted/sdf/recessed_downlight_1768342910/recessed_downlight.sdf
+- add_weld:
+    parent: world
+    child: dining_room_recessed_downlight_1::base_link
+    X_PC:
+      translation: [4.652716374109392, 3.654433790321741, 2.8]
+      rotation: !AngleAxis
+        angle_deg: 0.24565456188850077
+        axis: [0.0, 0.0, 1.0]
+- add_model:
+    name: dining_room_recessed_downlight_2
+    file: package://scene/room_dining_room/generated_assets/ceiling_mounted/sdf/recessed_downlight_1768342910/recessed_downlight.sdf
+- add_weld:
+    parent: world
+    child: dining_room_recessed_downlight_2::base_link
+    X_PC:
+      translation: [0.8423380972872492, 0.8524849414140747, 2.8]
+      rotation: !AngleAxis
+        angle_deg: 0.5515091679135249
+        axis: [0.0, 0.0, 1.0]
+- add_model:
+    name: dining_room_recessed_downlight_3
+    file: package://scene/room_dining_room/generated_assets/ceiling_mounted/sdf/recessed_downlight_1768342910/recessed_downlight.sdf
+- add_weld:
+    parent: world
+    child: dining_room_recessed_downlight_3::base_link
+    X_PC:
+      translation: [4.6823953066321025, 0.8651069793935029, 2.8]
+      rotation: !AngleAxis
+        angle_deg: 0.24264397235854035
+        axis: [0.0, 0.0, 1.0]
+- add_model:
+    name: dining_room_smoke_detector_0
+    file: package://scene/room_dining_room/generated_assets/ceiling_mounted/sdf/smoke_detector_1768342780/smoke_detector.sdf
+- add_weld:
+    parent: world
+    child: dining_room_smoke_detector_0::base_link
+    X_PC:
+      translation: [1.9443668393436684, 0.31374342755341833, 2.8]
+      rotation: !AngleAxis
+        angle_deg: 0.18980170762667165
+        axis: [0.0, 0.0, 1.0]
+- add_model:
+    name: dining_room_water_tumbler_glass_0
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/water_tumbler_glass_1768343959/water_tumbler_glass.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.2708142432227794, 2.7324373107339386, 0.8325976211272507]
+        rotation: !AngleAxis
+          angle_deg: 0.17194438890192737
+          axis: [0.33808153861927437, -0.5251482032115015, -0.7809739034747293]
+- add_model:
+    name: dining_room_glass_vase_1_f1_c
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/glass_vase_1768344887/glass_vase.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.7801250541052602, 2.760803812611513, 0.8325216793618466]
+        rotation: !AngleAxis
+          angle_deg: 0.1871696459683331
+          axis: [0.19366978958659467, 0.10299551337955477, -0.975645395020735]
+- add_model:
+    name: dining_room_eucalyptus_stem_0_f1_0
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/eucalyptus_stem_1768343959/eucalyptus_stem.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.766916990361761, 2.78446602876135, 0.8393252192343367]
+        rotation: !AngleAxis
+          angle_deg: 147.0368230376015
+          axis: [-0.0935107229460979, 0.20782505961320646, -0.9736860321946008]
+- add_model:
+    name: dining_room_eucalyptus_stem_0_f1_1
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/eucalyptus_stem_1768343959/eucalyptus_stem.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.8159220334572126, 2.7467375614165177, 1.0851685838726266]
+        rotation: !AngleAxis
+          angle_deg: 171.12180253435324
+          axis: [0.18973261030243949, -0.2070721792054601, -0.9597513475827603]
+- add_model:
+    name: dining_room_eucalyptus_stem_0_f1_2
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/eucalyptus_stem_1768343959/eucalyptus_stem.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.795844897395322, 2.7572752563188616, 1.0998508078881792]
+        rotation: !AngleAxis
+          angle_deg: 179.58281748009912
+          axis: [-0.06986983523694909, -0.15864118855871784, -0.9848609949716959]
+- add_model:
+    name: dining_room_dinner_plate_0_s0_0
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/dinner_plate_1768343959/dinner_plate.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [3.074690487147829, 0.34152300986309947, 0.29901245577677654]
+        rotation: !AngleAxis
+          angle_deg: 8.006866227548356
+          axis: [-0.02462210670226664, -0.041424306672563846, -0.9988382144663066]
+- add_model:
+    name: dining_room_dinner_plate_0_s0_1
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/dinner_plate_1768343959/dinner_plate.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [3.0745711250996592, 0.3416419648504758, 0.30737769378976465]
+        rotation: !AngleAxis
+          angle_deg: 8.023436136616523
+          axis: [0.009922505959958522, -0.03925667389341423, -0.9991798924269347]
+- add_model:
+    name: dining_room_dinner_plate_0_s0_2
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/dinner_plate_1768343959/dinner_plate.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [3.0745414161899913, 0.34184142201491774, 0.31575368856490577]
+        rotation: !AngleAxis
+          angle_deg: 7.971495976601587
+          axis: [0.047791551730460194, -0.039697413557438, -0.9980681754970672]
+- add_model:
+    name: dining_room_dinner_plate_0_s0_3
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/dinner_plate_1768343959/dinner_plate.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [3.0744773898830764, 0.34173263299145273, 0.32412816012277074]
+        rotation: !AngleAxis
+          angle_deg: 8.08538205509829
+          axis: [0.07808355769770411, -0.03863738060613884, -0.996197827159428]
+- add_model:
+    name: dining_room_folded_cloth_towel_0
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/folded_cloth_towel_1768344430/folded_cloth_towel.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [1.9039485071154525, 0.3063255574594479, 0.5213107000355871]
+        rotation: !AngleAxis
+          angle_deg: 10.445957399227188
+          axis: [-0.068226431323711, -0.16056385965178727, 0.9846646134814393]
+- add_model:
+    name: dining_room_glass_bowl_0_f0_c
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/glass_bowl_1768347882/glass_bowl.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.4778829927652795, 0.3186307144652638, 0.7639228311824208]
+        rotation: !AngleAxis
+          angle_deg: 0.45394443393563694
+          axis: [-0.5802211108627522, -0.8128983295124851, 0.05039611478085377]
+- add_model:
+    name: dining_room_apple_0_f0_0
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/apple_1768346528/apple.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.4164692415983087, 0.3444546361168339, 0.7997766760108413]
+        rotation: !AngleAxis
+          angle_deg: 82.64169469262698
+          axis: [-0.25660626360615846, 0.9665130856938488, 0.002383413653098608]
+- add_model:
+    name: dining_room_apple_0_f0_1
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/apple_1768346528/apple.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.507027132521585, 0.38415788323730093, 0.7957362778344952]
+        rotation: !AngleAxis
+          angle_deg: 66.54655247428238
+          axis: [0.8185051701624773, 0.53023972835219, 0.22112240251564252]
+- add_model:
+    name: dining_room_apple_0_f0_2
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/apple_1768346528/apple.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.512152762462282, 0.2552727472266567, 0.7965783221721127]
+        rotation: !AngleAxis
+          angle_deg: 165.19000253555612
+          axis: [-0.33678195246863685, -0.5046098536856949, -0.7949508236706937]
+- add_model:
+    name: dining_room_citrus_fruit_0_f0_3
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/citrus_fruit_1768347052/citrus_fruit.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.419682338984143, 0.27491079087816317, 0.811622431381183]
+        rotation: !AngleAxis
+          angle_deg: 100.6181533446527
+          axis: [0.06420716005659927, 0.9632321891130844, 0.26088539716488796]
+- add_model:
+    name: dining_room_citrus_fruit_0_f0_4
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/citrus_fruit_1768347052/citrus_fruit.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.4760315119961134, 0.33743617393136316, 0.8288708014728039]
+        rotation: !AngleAxis
+          angle_deg: 44.24028868269592
+          axis: [0.6320181212101148, 0.6243369177791847, -0.45908224487560434]
+- add_model:
+    name: dining_room_citrus_fruit_0_f0_5
+    file: package://scene/room_dining_room/generated_assets/manipuland/sdf/citrus_fruit_1768347052/citrus_fruit.sdf
+    default_free_body_pose:
+      base_link:
+        translation: [2.4295697055523195, 0.32101586527356907, 0.8434412447115672]
+        rotation: !AngleAxis
+          angle_deg: 178.5616322136672
+          axis: [-0.7608358146073596, -0.06121197838001101, 0.6460510482257269]
+- add_frame:
+    name: room_dining_room_frame
+    X_PF:
+      base_frame: world
+      translation: [2.75, 2.25, 0]
+- add_weld:
+    parent: room_dining_room_frame
+    child: room_geometry_dining_room::room_geometry_body_link

@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf xmlns:ns0="drake.mit.edu" version="1.7">
+  <model name="print">
+    <link name="base_link">
+      <inertial>
+        <mass>2.500000</mass>
+        <pose>0.005708 0.007890 0.006284 0 0 0</pose>
+        <inertia>
+          <ixx>6.244670e-02</ixx>
+          <iyy>1.989405e-01</iyy>
+          <izz>1.365620e-01</izz>
+          <ixy>9.840507e-06</ixy>
+          <ixz>-4.087103e-04</ixz>
+          <iyz>-6.688643e-05</iyz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>print.gltf</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name="collision_0">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>print_collision_0.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

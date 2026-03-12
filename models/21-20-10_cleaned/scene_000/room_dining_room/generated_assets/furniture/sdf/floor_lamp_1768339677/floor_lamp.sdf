@@ -1,0 +1,2203 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf xmlns:ns0="drake.mit.edu" version="1.7">
+  <model name="floor_lamp">
+    <link name="base_link">
+      <inertial>
+        <mass>5.000000</mass>
+        <pose>-0.00180576 0.00191232 0.93862368 0.00000000 0.00000000 0.00000000</pose>
+        <inertia>
+          <ixx>3.703729e+00</ixx>
+          <iyy>3.691469e+00</iyy>
+          <izz>1.741450e-01</izz>
+          <ixy>2.033577e-04</ixy>
+          <ixz>8.149856e-03</ixz>
+          <iyz>-2.493920e-03</iyz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>floor_lamp.gltf</uri>
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name="collision_0">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_0.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_1">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_1.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_2">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_2.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_3">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_3.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_4">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_4.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_5">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_5.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_6">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_6.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_7">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_7.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_8">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_8.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_9">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_9.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_10">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_10.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_11">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_11.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_12">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_12.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_13">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_13.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_14">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_14.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_15">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_15.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_16">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_16.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_17">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_17.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_18">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_18.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_19">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_19.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_20">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_20.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_21">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_21.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_22">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_22.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_23">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_23.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_24">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_24.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_25">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_25.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_26">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_26.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_27">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_27.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_28">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_28.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_29">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_29.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_30">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_30.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_31">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_31.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_32">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_32.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_33">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_33.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_34">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_34.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_35">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_35.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_36">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_36.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_37">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_37.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_38">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_38.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_39">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_39.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_40">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_40.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_41">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_41.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_42">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_42.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_43">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_43.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_44">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_44.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_45">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_45.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_46">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_46.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_47">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_47.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_48">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_48.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_49">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_49.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_50">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_50.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_51">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_51.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_52">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_52.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_53">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_53.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_54">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_54.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_55">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_55.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_56">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_56.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_57">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_57.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_58">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_58.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_59">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_59.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_60">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_60.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_61">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_61.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_62">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_62.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_63">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_63.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_64">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_64.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_65">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_65.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_66">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_66.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_67">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_67.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_68">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_68.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_69">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_69.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_70">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_70.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_71">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_71.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_72">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_72.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_73">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_73.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_74">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_74.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_75">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_75.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_76">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_76.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_77">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_77.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_78">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_78.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_79">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_79.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_80">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_80.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_81">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_81.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_82">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_82.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_83">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_83.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_84">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_84.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_85">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_85.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_86">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_86.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_87">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_87.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_88">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_88.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_89">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_89.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_90">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_90.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_91">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_91.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_92">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_92.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_93">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_93.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_94">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_94.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_95">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_95.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_96">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_96.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_97">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_97.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_98">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_98.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_99">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_99.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_100">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_100.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_101">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_101.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_102">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_102.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_103">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_103.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_104">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_104.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_105">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_105.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_106">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_106.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_107">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_107.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_108">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_108.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_109">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_109.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_110">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_110.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_111">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_111.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_112">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_112.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_113">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_113.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_114">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_114.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_115">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_115.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_116">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_116.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_117">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_117.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_118">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_118.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_119">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_119.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_120">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_120.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_121">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_121.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_122">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_122.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_123">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_123.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_124">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_124.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_125">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_125.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_126">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_126.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_127">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.740</mu>
+              <mu2>0.740</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>floor_lamp_collision_127.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.44000000 1.44000000 1.44000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

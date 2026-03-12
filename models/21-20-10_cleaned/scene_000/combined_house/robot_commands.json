@@ -1,0 +1,549 @@
+{
+  "task": "Pick a fruit from the fruit bowl and place it on a plate on the dining table.",
+  "robot_start_xy": [
+    4.177360808362734,
+    -1.0
+  ],
+  "world_bounds": {
+    "min": [
+      -2.0,
+      -2.0,
+      0.0
+    ],
+    "max": [
+      7.5,
+      6.5,
+      2.8
+    ]
+  },
+  "commands": [
+    {
+      "action": "pick_and_place",
+      "rank": 1,
+      "confidence": 0.72,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_5",
+      "target_position": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3417,
+        0.3741
+      ],
+      "reasoning": "Citrus fruit is visibly in the glass fruit bowl. Dinner plates are stacked together and appear on/at the dining table setting; the top plate (s0_3) is the most accessible to place onto."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 2,
+      "confidence": 0.68,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_5",
+      "target_position": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3418,
+        0.3658
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_2 is part of the plate stack on the dining table but is less accessible than the top plate."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 3,
+      "confidence": 0.66,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_5",
+      "target_position": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_min": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_max": [
+        3.0746,
+        0.3416,
+        0.3574
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_1 is in the same stacked set on the dining table, more buried than s0_2/s0_3."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 4,
+      "confidence": 0.66,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_5",
+      "target_position": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_min": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_max": [
+        3.0747,
+        0.3415,
+        0.349
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_0 is the bottom of the stack and least accessible."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 5,
+      "confidence": 0.72,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_4",
+      "target_position": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3417,
+        0.3741
+      ],
+      "reasoning": "Citrus fruit is visibly in the fruit bowl; top plate (s0_3) is most accessible for placement."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 6,
+      "confidence": 0.68,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_4",
+      "target_position": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3418,
+        0.3658
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_2 is in the table plate stack but not the top."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 7,
+      "confidence": 0.66,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_4",
+      "target_position": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_min": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_max": [
+        3.0746,
+        0.3416,
+        0.3574
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_1 is lower in the stack and harder to access."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 8,
+      "confidence": 0.66,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_4",
+      "target_position": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_min": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_max": [
+        3.0747,
+        0.3415,
+        0.349
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_0 is bottom of the stack and least accessible."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 9,
+      "confidence": 0.7,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_3",
+      "target_position": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3417,
+        0.3741
+      ],
+      "reasoning": "Citrus fruit is visibly in the fruit bowl; top plate (s0_3) is most accessible for placement."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 10,
+      "confidence": 0.66,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_3",
+      "target_position": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3418,
+        0.3658
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_2 is in the table plate stack but below the top plate."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 11,
+      "confidence": 0.64,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_3",
+      "target_position": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_min": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_max": [
+        3.0746,
+        0.3416,
+        0.3574
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_1 is more buried in the stack."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 12,
+      "confidence": 0.64,
+      "drake_model_name": "dining_room_citrus_fruit_0_f0_3",
+      "target_position": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_min": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_max": [
+        3.0747,
+        0.3415,
+        0.349
+      ],
+      "reasoning": "Fruit is in the bowl; plate s0_0 is bottom of the stack and least accessible."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 13,
+      "confidence": 0.68,
+      "drake_model_name": "dining_room_apple_0_f0_0",
+      "target_position": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3417,
+        0.3741
+      ],
+      "reasoning": "Apple is visibly in the fruit bowl; top plate (s0_3) is most accessible for placement."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 14,
+      "confidence": 0.64,
+      "drake_model_name": "dining_room_apple_0_f0_0",
+      "target_position": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3418,
+        0.3658
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_2 is in the dining-table plate stack but below the top."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 15,
+      "confidence": 0.62,
+      "drake_model_name": "dining_room_apple_0_f0_0",
+      "target_position": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_min": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_max": [
+        3.0746,
+        0.3416,
+        0.3574
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_1 is lower in the stack and harder to access."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 16,
+      "confidence": 0.62,
+      "drake_model_name": "dining_room_apple_0_f0_0",
+      "target_position": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_min": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_max": [
+        3.0747,
+        0.3415,
+        0.349
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_0 is bottom of the stack and least accessible."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 17,
+      "confidence": 0.68,
+      "drake_model_name": "dining_room_apple_0_f0_1",
+      "target_position": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3417,
+        0.3741
+      ],
+      "reasoning": "Apple is visibly in the fruit bowl; top plate (s0_3) is most accessible for placement."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 18,
+      "confidence": 0.64,
+      "drake_model_name": "dining_room_apple_0_f0_1",
+      "target_position": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3418,
+        0.3658
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_2 is in the dining-table plate stack but below the top."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 19,
+      "confidence": 0.62,
+      "drake_model_name": "dining_room_apple_0_f0_1",
+      "target_position": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_min": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_max": [
+        3.0746,
+        0.3416,
+        0.3574
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_1 is lower in the stack and harder to access."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 20,
+      "confidence": 0.62,
+      "drake_model_name": "dining_room_apple_0_f0_1",
+      "target_position": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_min": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_max": [
+        3.0747,
+        0.3415,
+        0.349
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_0 is bottom of the stack and least accessible."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 21,
+      "confidence": 0.68,
+      "drake_model_name": "dining_room_apple_0_f0_2",
+      "target_position": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3417,
+        0.3241
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3417,
+        0.3741
+      ],
+      "reasoning": "Apple is visibly in the fruit bowl; top plate (s0_3) is most accessible for placement."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 22,
+      "confidence": 0.64,
+      "drake_model_name": "dining_room_apple_0_f0_2",
+      "target_position": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_min": [
+        3.0745,
+        0.3418,
+        0.3158
+      ],
+      "placement_bounds_max": [
+        3.0745,
+        0.3418,
+        0.3658
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_2 is in the dining-table plate stack but below the top."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 23,
+      "confidence": 0.62,
+      "drake_model_name": "dining_room_apple_0_f0_2",
+      "target_position": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_min": [
+        3.0746,
+        0.3416,
+        0.3074
+      ],
+      "placement_bounds_max": [
+        3.0746,
+        0.3416,
+        0.3574
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_1 is lower in the stack and harder to access."
+    },
+    {
+      "action": "pick_and_place",
+      "rank": 24,
+      "confidence": 0.62,
+      "drake_model_name": "dining_room_apple_0_f0_2",
+      "target_position": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_min": [
+        3.0747,
+        0.3415,
+        0.299
+      ],
+      "placement_bounds_max": [
+        3.0747,
+        0.3415,
+        0.349
+      ],
+      "reasoning": "Apple is in the bowl; plate s0_0 is bottom of the stack and least accessible."
+    }
+  ]
+}

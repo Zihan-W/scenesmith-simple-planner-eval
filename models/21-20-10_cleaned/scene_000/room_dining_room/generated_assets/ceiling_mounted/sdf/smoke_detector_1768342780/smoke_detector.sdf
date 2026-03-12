@@ -1,0 +1,282 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf xmlns:ns0="drake.mit.edu" version="1.7">
+  <model name="smoke_detector">
+    <link name="base_link">
+      <inertial>
+        <mass>0.150000</mass>
+        <pose>0.000005 0.000040 -0.021997 0 0 0</pose>
+        <inertia>
+          <ixx>2.308576e-04</ixx>
+          <iyy>2.312608e-04</iyy>
+          <izz>4.149758e-04</izz>
+          <ixy>4.793498e-08</ixy>
+          <ixz>5.983878e-08</ixz>
+          <iyz>5.187997e-08</iyz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>smoke_detector.gltf</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name="collision_0">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_0.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_1">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_1.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_2">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_2.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_3">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_3.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_4">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_4.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_5">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_5.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_6">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_6.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_7">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_7.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_8">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_8.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_9">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_9.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_10">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_10.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_11">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_11.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_12">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_12.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_13">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_13.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_14">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_14.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_15">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.350</mu>
+              <mu2>0.350</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>smoke_detector_collision_15.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

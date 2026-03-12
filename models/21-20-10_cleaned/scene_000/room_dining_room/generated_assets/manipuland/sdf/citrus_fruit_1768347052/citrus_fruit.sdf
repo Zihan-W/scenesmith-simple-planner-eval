@@ -1,0 +1,1050 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf xmlns:ns0="drake.mit.edu" version="1.7">
+  <model name="citrus_fruit">
+    <link name="base_link">
+      <inertial>
+        <mass>0.400000</mass>
+        <pose>0.000208 0.000067 0.032008 0 0 0</pose>
+        <inertia>
+          <ixx>1.922963e-04</ixx>
+          <iyy>1.902376e-04</iyy>
+          <izz>1.990503e-04</izz>
+          <ixy>2.597106e-06</ixy>
+          <ixz>3.151587e-07</ixz>
+          <iyz>9.762129e-07</iyz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit.gltf</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name="collision_0">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_0.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_1">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_1.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_2">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_2.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_3">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_3.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_4">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_4.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_5">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_5.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_6">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_6.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_7">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_7.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_8">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_8.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_9">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_9.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_10">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_10.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_11">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_11.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_12">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_12.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_13">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_13.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_14">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_14.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_15">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_15.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_16">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_16.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_17">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_17.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_18">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_18.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_19">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_19.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_20">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_20.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_21">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_21.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_22">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_22.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_23">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_23.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_24">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_24.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_25">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_25.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_26">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_26.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_27">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_27.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_28">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_28.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_29">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_29.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_30">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_30.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_31">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_31.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_32">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_32.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_33">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_33.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_34">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_34.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_35">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_35.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_36">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_36.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_37">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_37.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_38">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_38.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_39">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_39.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_40">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_40.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_41">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_41.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_42">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_42.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_43">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_43.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_44">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_44.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_45">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_45.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_46">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_46.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_47">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_47.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_48">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_48.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_49">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_49.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_50">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_50.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_51">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_51.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_52">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_52.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_53">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_53.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_54">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_54.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_55">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_55.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_56">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_56.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_57">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_57.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_58">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_58.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_59">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_59.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_60">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_60.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_61">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_61.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_62">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_62.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_63">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.800</mu>
+              <mu2>0.800</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>citrus_fruit_collision_63.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

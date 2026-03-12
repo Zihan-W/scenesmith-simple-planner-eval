@@ -1,0 +1,282 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf xmlns:ns0="drake.mit.edu" version="1.7">
+  <model name="recessed_downlight">
+    <link name="base_link">
+      <inertial>
+        <mass>0.350000</mass>
+        <pose>-0.000275 0.000016 -0.040810 0 0 0</pose>
+        <inertia>
+          <ixx>9.223711e-04</ixx>
+          <iyy>9.298828e-04</iyy>
+          <izz>1.602948e-03</izz>
+          <ixy>2.323644e-07</ixy>
+          <ixz>1.433091e-06</ixz>
+          <iyz>9.719476e-07</iyz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight.gltf</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name="collision_0">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_0.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_1">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_1.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_2">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_2.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_3">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_3.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_4">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_4.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_5">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_5.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_6">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_6.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_7">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_7.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_8">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_8.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_9">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_9.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_10">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_10.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_11">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_11.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_12">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_12.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_13">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_13.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_14">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_14.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_15">
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.100</mu>
+              <mu2>1.100</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>recessed_downlight_collision_15.obj</uri>
+            <ns0:declare_convex />
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

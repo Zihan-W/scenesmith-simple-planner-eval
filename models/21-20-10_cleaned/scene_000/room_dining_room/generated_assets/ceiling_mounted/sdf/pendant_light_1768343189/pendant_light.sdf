@@ -1,0 +1,299 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf xmlns:ns0="drake.mit.edu" version="1.7">
+  <model name="pendant_light">
+    <link name="base_link">
+      <inertial>
+        <mass>1.200000</mass>
+        <pose>0.00022250 -0.00001125 -1.30399750 0.00000000 0.00000000 0.00000000</pose>
+        <inertia>
+          <ixx>1.561103e-01</ixx>
+          <iyy>1.574356e-01</iyy>
+          <izz>1.426851e-02</izz>
+          <ixy>8.421394e-07</ixy>
+          <ixz>3.429955e-06</ixz>
+          <iyz>-4.026212e-07</iyz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>pendant_light.gltf</uri>
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name="collision_0">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_0.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_1">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_1.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_2">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_2.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_3">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_3.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_4">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_4.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_5">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_5.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_6">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_6.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_7">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_7.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_8">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_8.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_9">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_9.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_10">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_10.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_11">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_11.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_12">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_12.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_13">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_13.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_14">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_14.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name="collision_15">
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.900</mu>
+              <mu2>0.900</mu2>
+            </ode>
+          </friction>
+        </surface>
+        <geometry>
+          <mesh>
+            <uri>pendant_light_collision_15.obj</uri>
+            <ns0:declare_convex />
+            <scale>1.25000000 1.25000000 1.25000000</scale>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
