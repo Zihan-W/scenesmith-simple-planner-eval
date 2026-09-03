@@ -207,9 +207,9 @@ def main() -> None:
         len(plant.GetCollisionGeometriesForBody(plant.get_body(body_index)))
         for body_index in plant.GetBodyIndices(zerith)
     )
-    if collision_geometry_count != 35:
+    if collision_geometry_count != 37:
         raise ValueError(
-            f"Expected 35 Zerith collision geometries, got {collision_geometry_count}"
+            f"Expected 37 Zerith collision geometries, got {collision_geometry_count}"
         )
 
     base_frame = plant.GetFrameByName("dipan_link", zerith)

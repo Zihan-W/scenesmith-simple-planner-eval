@@ -46,9 +46,9 @@ python scripts/convert_zerith_for_drake.py --check
 
 The generated OBJ files are deterministic derivatives of the upstream STL
 files and are intentionally excluded from Git. The generated URDF and
-conversion manifest are committed for review. The current whole-mesh convex
-collision proxies are loadable in Drake, but are not yet suitable for
-contact-dynamics evaluation.
+conversion manifest are committed for review. The current model uses three box
+proxies for `dipan_link`; most other links still use whole-mesh convex proxies
+and require further validation before contact-dynamics evaluation.
 
 Inspect left-arm kinematics in a SceneSmith scene:
 

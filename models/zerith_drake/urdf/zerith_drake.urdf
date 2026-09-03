@@ -15,10 +15,22 @@
         <color rgba="1 1 1 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="dipan_lower_base">
+      <origin xyz="0.0569 0.0 -0.066" rpy="0 0 0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/dipan_link.obj" />
+        <box size="0.62 0.452 0.17" />
+      </geometry>
+    </collision>
+    <collision name="dipan_rear_mast">
+      <origin xyz="-0.0764 0.0 0.5551" rpy="0 0 0" />
+      <geometry>
+        <box size="0.235 0.23 1.1" />
+      </geometry>
+    </collision>
+    <collision name="dipan_top_cap">
+      <origin xyz="-0.0764 0.0 1.1182" rpy="0 0 0" />
+      <geometry>
+        <box size="0.188 0.196 0.035" />
       </geometry>
     </collision>
   </link>

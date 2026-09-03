@@ -43,6 +43,15 @@ class JointControllerConfig:
     initial_position: float = 0.0
 
 
+@dataclass(frozen=True)
+class Penetration:
+    """One active penetration pair involving a Zerith collision geometry."""
+
+    depth: float
+    frame_a: str
+    frame_b: str
+
+
 JOINT_CONFIGS = (
     JointControllerConfig("left_shoulder_pitch_joint", 80.0, 8.0, 36.0, 0.01),
     JointControllerConfig("left_shoulder_roll_joint", 80.0, 8.0, 36.0, 0.01),
@@ -131,6 +140,14 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         help="Meshcat port; Drake selects an available port when omitted.",
     )
+    parser.add_argument(
+        "--initial-penetration-limit",
+        type=float,
+        help=(
+            "Fail before simulation if an active robot penetration exceeds "
+            "this depth in meters."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -218,6 +235,61 @@ def _calc_pd_actuation(meshcat: Meshcat, plant, zerith, plant_context) -> np.nda
     return actuation
 
 
+def _find_robot_penetrations(
+    plant,
+    scene_graph,
+    root_context,
+    zerith,
+) -> list[Penetration]:
+    """Return active penetrations involving Zerith after collision filtering."""
+    robot_geometry_ids = set()
+    for body_index in plant.GetBodyIndices(zerith):
+        body = plant.get_body(body_index)
+        robot_geometry_ids.update(plant.GetCollisionGeometriesForBody(body))
+
+    scene_graph_context = scene_graph.GetMyContextFromRoot(root_context)
+    query_object = scene_graph.get_query_output_port().Eval(scene_graph_context)
+    inspector = query_object.inspector()
+    penetrations = []
+    for pair in query_object.ComputePointPairPenetration():
+        if (
+            pair.id_A not in robot_geometry_ids
+            and pair.id_B not in robot_geometry_ids
+        ):
+            continue
+        penetrations.append(
+            Penetration(
+                depth=pair.depth,
+                frame_a=inspector.GetName(inspector.GetFrameId(pair.id_A)),
+                frame_b=inspector.GetName(inspector.GetFrameId(pair.id_B)),
+            )
+        )
+    return sorted(penetrations, key=lambda item: item.depth, reverse=True)
+
+
+def _report_initial_penetrations(
+    penetrations: list[Penetration],
+    penetration_limit: float | None,
+) -> None:
+    """Print active initial penetrations and enforce an optional depth limit."""
+    print(f"Initial active robot penetration pairs: {len(penetrations)}")
+    for penetration in penetrations:
+        print(
+            f"  {penetration.depth:.6f} m: "
+            f"{penetration.frame_a} <-> {penetration.frame_b}"
+        )
+
+    if (
+        penetration_limit is not None
+        and penetrations
+        and penetrations[0].depth > penetration_limit
+    ):
+        raise ValueError(
+            f"Maximum initial penetration {penetrations[0].depth:.6f} m "
+            f"exceeds limit {penetration_limit:.6f} m"
+        )
+
+
 def main() -> None:
     """Build and run the contact-aware left-arm simulation."""
     args = _parse_args()
@@ -268,9 +340,9 @@ def main() -> None:
         len(plant.GetCollisionGeometriesForBody(plant.get_body(body_index)))
         for body_index in plant.GetBodyIndices(zerith)
     )
-    if collision_geometry_count != 35:
+    if collision_geometry_count != 37:
         raise ValueError(
-            f"Expected 35 Zerith collision geometries, got {collision_geometry_count}"
+            f"Expected 37 Zerith collision geometries, got {collision_geometry_count}"
         )
 
     base_frame = plant.GetFrameByName("dipan_link", zerith)
@@ -310,6 +382,16 @@ def main() -> None:
     _set_initial_positions(plant, zerith, plant_context)
     locked_joints = _lock_uncontrolled_joints(plant, zerith, plant_context)
     _add_sliders(meshcat, plant, zerith, plant_context)
+    initial_penetrations = _find_robot_penetrations(
+        plant,
+        scene_graph,
+        context,
+        zerith,
+    )
+    _report_initial_penetrations(
+        initial_penetrations,
+        args.initial_penetration_limit,
+    )
 
     actuation_port = plant.get_actuation_input_port()
     actuation_port.FixValue(

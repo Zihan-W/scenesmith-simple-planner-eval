@@ -22,8 +22,26 @@ OUTPUT_PACKAGE_RELATIVE_PATH = Path("models/zerith_drake")
 OUTPUT_PACKAGE_NAME = "zerith_drake"
 OUTPUT_URDF_NAME = "zerith_drake.urdf"
 EXPECTED_MESH_COUNT = 35
-EXPECTED_MESH_REFERENCE_COUNT = 70
-CONVERTER_VERSION = 1
+EXPECTED_SOURCE_MESH_REFERENCE_COUNT = 70
+EXPECTED_OUTPUT_MESH_REFERENCE_COUNT = 69
+CONVERTER_VERSION = 2
+DIPAN_COLLISION_BOXES = (
+    {
+        "name": "dipan_lower_base",
+        "xyz": (0.0569, 0.0, -0.0660),
+        "size": (0.6200, 0.4520, 0.1700),
+    },
+    {
+        "name": "dipan_rear_mast",
+        "xyz": (-0.0764, 0.0, 0.5551),
+        "size": (0.2350, 0.2300, 1.1000),
+    },
+    {
+        "name": "dipan_top_cap",
+        "xyz": (-0.0764, 0.0, 1.1182),
+        "size": (0.1880, 0.1960, 0.0350),
+    },
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -107,9 +125,9 @@ def _rewrite_urdf(
         )
         replacement_count += 1
 
-    if replacement_count != EXPECTED_MESH_REFERENCE_COUNT:
+    if replacement_count != EXPECTED_SOURCE_MESH_REFERENCE_COUNT:
         raise ValueError(
-            f"Expected {EXPECTED_MESH_REFERENCE_COUNT} mesh references, "
+            f"Expected {EXPECTED_SOURCE_MESH_REFERENCE_COUNT} mesh references, "
             f"rewrote {replacement_count}"
         )
 
@@ -125,11 +143,47 @@ def _rewrite_urdf(
         raise ValueError("Unexpected original limits for left_wrist_roll_joint")
     left_wrist_limit.set("effort", "9")
     left_wrist_limit.set("velocity", "16.747")
+    _replace_dipan_collision(tree.getroot())
 
     output_urdf.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(tree, space="  ")
     tree.write(output_urdf, encoding="utf-8", xml_declaration=True)
     return replacement_count
+
+
+def _replace_dipan_collision(root: ET.Element) -> None:
+    """Replace dipan_link's whole-mesh convex hull with three box proxies."""
+    dipan_link = root.find("./link[@name='dipan_link']")
+    if dipan_link is None:
+        raise ValueError("Missing dipan_link")
+
+    collisions = dipan_link.findall("collision")
+    if len(collisions) != 1:
+        raise ValueError(
+            f"Expected one source dipan_link collision, found {len(collisions)}"
+        )
+    dipan_link.remove(collisions[0])
+
+    for box_spec in DIPAN_COLLISION_BOXES:
+        collision = ET.SubElement(
+            dipan_link,
+            "collision",
+            {"name": box_spec["name"]},
+        )
+        ET.SubElement(
+            collision,
+            "origin",
+            {
+                "xyz": " ".join(str(value) for value in box_spec["xyz"]),
+                "rpy": "0 0 0",
+            },
+        )
+        geometry = ET.SubElement(collision, "geometry")
+        ET.SubElement(
+            geometry,
+            "box",
+            {"size": " ".join(str(value) for value in box_spec["size"])},
+        )
 
 
 def _package_xml_contents() -> str:
@@ -160,9 +214,12 @@ def _manifest_contents(source_commit: str) -> str:
     """Return deterministic conversion metadata."""
     manifest = {
         "converter_version": CONVERTER_VERSION,
+        "dipan_collision_proxy": "three_boxes",
+        "expected_collision_geometry_count": 37,
         "mesh_count": EXPECTED_MESH_COUNT,
-        "mesh_reference_count": EXPECTED_MESH_REFERENCE_COUNT,
+        "output_mesh_reference_count": EXPECTED_OUTPUT_MESH_REFERENCE_COUNT,
         "output_format": "obj",
+        "source_mesh_reference_count": EXPECTED_SOURCE_MESH_REFERENCE_COUNT,
         "source_commit": source_commit,
         "source_repository": "https://github.com/inFpZero/Zerith_Model.git",
     }
@@ -199,10 +256,19 @@ def _check_generated_package(
             expected_urdf,
             SOURCE_PACKAGE_NAME,
         )
-        if replacement_count != EXPECTED_MESH_REFERENCE_COUNT:
+        if replacement_count != EXPECTED_SOURCE_MESH_REFERENCE_COUNT:
             raise ValueError(f"Unexpected reference count: {replacement_count}")
         if output_urdf.read_bytes() != expected_urdf.read_bytes():
             raise ValueError(f"Derived URDF has drifted: {output_urdf}")
+
+    output_mesh_references = ET.parse(output_urdf).getroot().findall(
+        "./link/*/geometry/mesh"
+    )
+    if len(output_mesh_references) != EXPECTED_OUTPUT_MESH_REFERENCE_COUNT:
+        raise ValueError(
+            f"Expected {EXPECTED_OUTPUT_MESH_REFERENCE_COUNT} output mesh "
+            f"references, found {len(output_mesh_references)}"
+        )
 
     if package_xml.read_text(encoding="utf-8") != _package_xml_contents():
         raise ValueError(f"package.xml has drifted: {package_xml}")
@@ -224,7 +290,8 @@ def _check_generated_package(
     print(f"Check passed: {output_package}")
     print(f"Source commit: {source_commit}")
     print(f"OBJ meshes: {len(output_meshes)}")
-    print(f"URDF mesh references: {EXPECTED_MESH_REFERENCE_COUNT}")
+    print(f"Source URDF mesh references: {EXPECTED_SOURCE_MESH_REFERENCE_COUNT}")
+    print(f"Generated URDF mesh references: {EXPECTED_OUTPUT_MESH_REFERENCE_COUNT}")
 
 
 def main() -> None:
