@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""Visualize Zerith in a SceneSmith scene and inspect its left arm.
+
+This script is a kinematic model-integration check. It welds Zerith's
+``dipan_link`` to the world and exposes Meshcat sliders for the seven left-arm
+joints and two left-gripper joints. The generated Drake URDF includes collision
+geometry, but this viewer does not run a dynamics simulation.
+"""
+
+import argparse
+import time
+import xml.etree.ElementTree as ET
+
+from pathlib import Path
+
+import numpy as np
+
+from pydrake.all import (
+    AddMultibodyPlantSceneGraph,
+    DiagramBuilder,
+    LoadModelDirectives,
+    Meshcat,
+    MeshcatVisualizer,
+    Parser,
+    ProcessModelDirectives,
+    RigidTransform,
+    RollPitchYaw,
+)
+
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+ZERITH_PACKAGE_NAME = "zerith_drake"
+ZERITH_MODEL_RELATIVE_PATH = Path("models/zerith_drake")
+ZERITH_URDF_RELATIVE_PATH = Path("urdf/zerith_drake.urdf")
+
+LEFT_ARM_JOINTS = (
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "left_wrist_roll_joint",
+    "left_wrist_yaw_joint",
+    "left_wrist_pitch_joint",
+)
+LEFT_GRIPPER_JOINTS = (
+    "left_jaw_left_finger_joint",
+    "left_jaw_right_finger_joint",
+)
+
+
+def _parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Visualize Zerith and control its left arm with sliders."
+    )
+    parser.add_argument(
+        "scene_dmd",
+        type=Path,
+        help="Path to house_furniture_welded.dmd.yaml or another scene DMD.",
+    )
+    parser.add_argument(
+        "--scene-package-xml",
+        type=Path,
+        help="Scene package.xml; inferred from scene_dmd when omitted.",
+    )
+    parser.add_argument(
+        "--robot-model-dir",
+        type=Path,
+        default=REPOSITORY_ROOT / ZERITH_MODEL_RELATIVE_PATH,
+        help="Generated Drake package containing Zerith's urdf/ and meshes/.",
+    )
+    parser.add_argument(
+        "--robot-xyz",
+        type=float,
+        nargs=3,
+        default=(4.177360808362734, 0.60, 0.1815),
+        metavar=("X", "Y", "Z"),
+        help="World position of dipan_link in meters.",
+    )
+    parser.add_argument(
+        "--robot-yaw-deg",
+        type=float,
+        default=90.0,
+        help="World yaw of dipan_link in degrees.",
+    )
+    parser.add_argument(
+        "--meshcat-port",
+        type=int,
+        help="Meshcat port; Drake selects an available port when omitted.",
+    )
+    return parser.parse_args()
+
+
+def _find_package_xml(scene_dmd: Path) -> Path:
+    """Find the nearest package.xml containing a scene DMD."""
+    for directory in scene_dmd.parents:
+        package_xml = directory / "package.xml"
+        if package_xml.is_file():
+            return package_xml
+    raise FileNotFoundError(
+        f"Could not find package.xml above {scene_dmd}. "
+        "Pass --scene-package-xml explicitly."
+    )
+
+
+def _register_package_xml(parser: Parser, package_xml: Path) -> None:
+    """Register a ROS-style package.xml in a Drake parser."""
+    root = ET.parse(package_xml).getroot()
+    name = root.findtext("name")
+    if name is None:
+        raise ValueError(f"Missing <name> in {package_xml}")
+    parser.package_map().Add(name.strip(), str(package_xml.parent))
+
+
+def _add_joint_sliders(
+    meshcat: Meshcat,
+    plant,
+    plant_context,
+    zerith,
+) -> list[str]:
+    """Add Meshcat sliders for Zerith's left arm and gripper joints."""
+    positions = plant.GetPositions(plant_context)
+    position_lower_limits = plant.GetPositionLowerLimits()
+    position_upper_limits = plant.GetPositionUpperLimits()
+    slider_names = []
+
+    for joint_name in LEFT_ARM_JOINTS + LEFT_GRIPPER_JOINTS:
+        joint = plant.GetJointByName(joint_name, zerith)
+        if joint.num_positions() != 1:
+            raise ValueError(f"Expected one position for joint {joint_name}")
+
+        position_index = joint.position_start()
+        step = 0.001 if joint_name in LEFT_GRIPPER_JOINTS else 0.01
+        meshcat.AddSlider(
+            joint_name,
+            min=position_lower_limits[position_index],
+            max=position_upper_limits[position_index],
+            step=step,
+            value=positions[position_index],
+        )
+        slider_names.append(joint_name)
+
+    return slider_names
+
+
+def _run_slider_loop(meshcat: Meshcat, diagram, context, plant, zerith) -> None:
+    """Update the plant configuration from the left-arm Meshcat sliders."""
+    plant_context = plant.GetMyMutableContextFromRoot(context)
+    slider_names = _add_joint_sliders(meshcat, plant, plant_context, zerith)
+    meshcat.AddButton("Stop", "Escape")
+
+    try:
+        while meshcat.GetButtonClicks("Stop") < 1:
+            positions = plant.GetPositions(plant_context).copy()
+            for joint_name in slider_names:
+                joint = plant.GetJointByName(joint_name, zerith)
+                positions[joint.position_start()] = meshcat.GetSliderValue(joint_name)
+            plant.SetPositions(plant_context, positions)
+            diagram.ForcedPublish(context)
+            time.sleep(0.05)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        for slider_name in slider_names:
+            meshcat.DeleteSlider(slider_name)
+        meshcat.DeleteButton("Stop")
+
+
+def main() -> None:
+    """Load the scene and Zerith model, then run the slider interface."""
+    args = _parse_args()
+    scene_dmd = args.scene_dmd.resolve()
+    package_xml = (
+        args.scene_package_xml.resolve()
+        if args.scene_package_xml is not None
+        else _find_package_xml(scene_dmd)
+    )
+    robot_model_dir = args.robot_model_dir.resolve()
+    robot_urdf = robot_model_dir / ZERITH_URDF_RELATIVE_PATH
+
+    if not scene_dmd.is_file():
+        raise FileNotFoundError(f"Scene DMD does not exist: {scene_dmd}")
+    if not package_xml.is_file():
+        raise FileNotFoundError(f"Scene package.xml does not exist: {package_xml}")
+    if not robot_urdf.is_file():
+        raise FileNotFoundError(
+            f"Zerith URDF does not exist: {robot_urdf}\n"
+            "Run `python scripts/convert_zerith_for_drake.py`."
+        )
+
+    meshcat = Meshcat(args.meshcat_port)
+    meshcat.Delete()
+    builder = DiagramBuilder()
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.0)
+    parser = Parser(plant)
+    parser.SetAutoRenaming(True)
+    _register_package_xml(parser, package_xml)
+    parser.package_map().Add(ZERITH_PACKAGE_NAME, str(robot_model_dir))
+
+    directives = LoadModelDirectives(str(scene_dmd))
+    ProcessModelDirectives(directives, parser)
+    model_instances = parser.AddModels(str(robot_urdf))
+    if len(model_instances) != 1:
+        raise RuntimeError(f"Expected one Zerith model, got {len(model_instances)}")
+
+    zerith = model_instances[0]
+    collision_geometry_count = sum(
+        len(plant.GetCollisionGeometriesForBody(plant.get_body(body_index)))
+        for body_index in plant.GetBodyIndices(zerith)
+    )
+    if collision_geometry_count != 35:
+        raise ValueError(
+            f"Expected 35 Zerith collision geometries, got {collision_geometry_count}"
+        )
+
+    base_frame = plant.GetFrameByName("dipan_link", zerith)
+    world_from_base = RigidTransform(
+        RollPitchYaw(0.0, 0.0, np.deg2rad(args.robot_yaw_deg)),
+        args.robot_xyz,
+    )
+    plant.WeldFrames(plant.world_frame(), base_frame, world_from_base)
+
+    plant.Finalize()
+    MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat)
+    diagram = builder.Build()
+    context = diagram.CreateDefaultContext()
+    diagram.ForcedPublish(context)
+
+    print(f"Meshcat URL: {meshcat.web_url()}")
+    print(f"Scene: {scene_dmd}")
+    print(f"Zerith URDF: {robot_urdf}")
+    print(f"Zerith base frame: dipan_link at XYZ {tuple(args.robot_xyz)}")
+    print(f"Zerith yaw: {args.robot_yaw_deg} degrees")
+    print("Active end effector: left_end_effector_link")
+    print(f"Active joints: {', '.join(LEFT_ARM_JOINTS + LEFT_GRIPPER_JOINTS)}")
+    print(f"Zerith collision geometries: {collision_geometry_count}")
+    print("Move the Meshcat sliders; press Escape or Ctrl+C to exit.")
+
+    _run_slider_loop(meshcat, diagram, context, plant, zerith)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>zerith_drake</name>
+  <version>0.1.0</version>
+  <description>Drake-compatible Zerith H1 Pro model.</description>
+  <maintainer email="noreply@example.com">SceneSmith</maintainer>
+  <license>See upstream Zerith_Model repository</license>
+</package>

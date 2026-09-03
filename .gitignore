@@ -18,5 +18,6 @@ simulation_bad.html
 meshcats/*
 .venv
 logs
+models/zerith_drake/meshes/*.obj
 *.log
 *.pdf

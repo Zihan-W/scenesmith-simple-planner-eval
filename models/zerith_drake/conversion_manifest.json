@@ -1,0 +1,8 @@
+{
+  "converter_version": 1,
+  "mesh_count": 35,
+  "mesh_reference_count": 70,
+  "output_format": "obj",
+  "source_commit": "ddd6dc76ec9ec0a8ebd597d5576e466e11aa72be",
+  "source_repository": "https://github.com/inFpZero/Zerith_Model.git"
+}

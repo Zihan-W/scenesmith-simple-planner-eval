@@ -1,0 +1,3 @@
+[submodule "models/Zerith_Model"]
+	path = models/Zerith_Model
+	url = https://github.com/inFpZero/Zerith_Model.git

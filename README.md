@@ -33,6 +33,41 @@ Download the example scenes dataset from Hugging Face:
 
 Place the downloaded models in the `models/` directory. We have included an example scene and robot task in the `models/21-20-10_cleaned/scene_000/` directory to help get you started.
 
+### 3. Experimental Zerith Setup
+
+Initialize the upstream Zerith model and generate its Drake-compatible OBJ
+meshes before running the Zerith examples:
+
+```bash
+git submodule update --init --recursive
+python scripts/convert_zerith_for_drake.py
+python scripts/convert_zerith_for_drake.py --check
+```
+
+The generated OBJ files are deterministic derivatives of the upstream STL
+files and are intentionally excluded from Git. The generated URDF and
+conversion manifest are committed for review. The current whole-mesh convex
+collision proxies are loadable in Drake, but are not yet suitable for
+contact-dynamics evaluation.
+
+Inspect left-arm kinematics in a SceneSmith scene:
+
+```bash
+python scripts/visualize_zerith_left_arm.py \
+    <scene-root>/combined_house/house_furniture_welded.dmd.yaml \
+    --robot-xyz <x> <y> <z> \
+    --robot-yaw-deg <yaw>
+```
+
+Run the experimental finite-torque left-arm controller:
+
+```bash
+python scripts/simulate_zerith_left_arm.py \
+    <scene-root>/combined_house/house_furniture_welded.dmd.yaml \
+    --robot-xyz <x> <y> <z> \
+    --robot-yaw-deg <yaw>
+```
+
 ## Usage
 
 ### Running Experiments
