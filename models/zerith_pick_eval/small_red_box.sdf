@@ -3,7 +3,7 @@
   <model name="small_red_box">
     <link name="base_link">
       <inertial>
-        <pose>0 0 0.0157 0 0 0</pose>
+        <pose>0 0 0 0 0 0</pose>
         <mass>0.1</mass>
         <inertia>
           <ixx>2.083333e-05</ixx>
@@ -15,7 +15,7 @@
         </inertia>
       </inertial>
       <visual name="visual">
-        <pose>0 0 0.0157 0 0 0</pose>
+        <pose>0 0 0 0 0 0</pose>
         <geometry>
           <box>
             <size>0.06 0.04 0.03</size>
@@ -27,7 +27,7 @@
         </material>
       </visual>
       <collision name="collision">
-        <pose>0 0 0.0157 0 0 0</pose>
+        <pose>0 0 0 0 0 0</pose>
         <geometry>
           <box>
             <size>0.06 0.04 0.03</size>

@@ -14,6 +14,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from src.zerith_online_env import LEFT_ARM_SERVO_CONFIGS, ZerithOnlineEnv
+from src.zerith_robot_config import (
+    ROBOT_BASE_XYZ_METERS,
+    ROBOT_BASE_YAW_DEG,
+)
 
 ZERITH_MODEL_RELATIVE_PATH = Path("models/zerith_drake")
 
@@ -37,6 +41,13 @@ def _parse_args() -> argparse.Namespace:
         help="Scene package.xml; inferred from scene_dmd when omitted.",
     )
     parser.add_argument(
+        "--additional-package-xml",
+        action="append",
+        default=[],
+        type=Path,
+        help="Additional package.xml to register; may be repeated.",
+    )
+    parser.add_argument(
         "--robot-model-dir",
         type=Path,
         default=REPOSITORY_ROOT / ZERITH_MODEL_RELATIVE_PATH,
@@ -51,7 +62,7 @@ def _parse_args() -> argparse.Namespace:
         "--robot-xyz",
         type=float,
         nargs=3,
-        default=(3.05, 3.07, 0.1815),
+        default=ROBOT_BASE_XYZ_METERS,
         metavar=("X", "Y", "Z"),
         help=(
             "World position of the welded dipan_link in meters "
@@ -61,7 +72,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--robot-yaw-deg",
         type=float,
-        default=180.0,
+        default=ROBOT_BASE_YAW_DEG,
         help=(
             "World yaw of dipan_link in degrees "
             "(default: facing the coffee table)."
@@ -202,6 +213,7 @@ def main() -> None:
     env = ZerithOnlineEnv(
         scene_dmd=args.scene_dmd,
         scene_package_xml=args.scene_package_xml,
+        additional_package_xmls=args.additional_package_xml,
         robot_model_dir=args.robot_model_dir,
         target_model_name=args.target_model_name,
         robot_xyz=args.robot_xyz,

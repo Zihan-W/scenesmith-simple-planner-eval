@@ -2,6 +2,11 @@
 
 import numpy as np
 
+from src.zerith_robot_config import (
+    ROBOT_BASE_XYZ_METERS as _ROBOT_BASE_XYZ_METERS,
+    ROBOT_BASE_YAW_DEG,
+)
+
 LEFT_GRASP_FRAME_NAME = "left_grasp_frame"
 LEFT_GRASP_PARENT_FRAME_NAME = "left_wrist_pitch_link"
 
@@ -17,8 +22,7 @@ BOX_SIZE_METERS = np.array([0.06, 0.04, 0.03])
 GRASP_WIDTH_METERS = BOX_SIZE_METERS[1]
 PREGRASP_DISTANCE_METERS = 0.09
 LIFT_DISTANCE_METERS = 0.07
-ROBOT_BASE_XYZ_METERS = np.array([2.65, 2.95, 0.1815])
-ROBOT_BASE_YAW_DEG = 180.0
+ROBOT_BASE_XYZ_METERS = np.asarray(_ROBOT_BASE_XYZ_METERS, dtype=float)
 
 
 def add_left_grasp_frame(plant, zerith_model_instance):

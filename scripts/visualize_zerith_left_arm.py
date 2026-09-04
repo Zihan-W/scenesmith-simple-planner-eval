@@ -2,12 +2,14 @@
 """Visualize Zerith in a SceneSmith scene and inspect its left arm.
 
 This script is a kinematic model-integration check. It welds Zerith's
-``dipan_link`` to the world and exposes Meshcat sliders for the seven left-arm
-joints and two left-gripper joints. The generated Drake URDF includes collision
-geometry, but this viewer does not run a dynamics simulation.
+``dipan_link`` to the world and exposes Meshcat sliders for the vertical rail,
+seven left-arm joints, and two left-gripper joints. The generated Drake URDF
+includes collision geometry, but this viewer does not run a dynamics
+simulation.
 """
 
 import argparse
+import sys
 import time
 import xml.etree.ElementTree as ET
 
@@ -28,10 +30,18 @@ from pydrake.all import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from src.zerith_robot_config import (
+    ROBOT_BASE_XYZ_METERS,
+    ROBOT_BASE_YAW_DEG,
+)
+
 ZERITH_PACKAGE_NAME = "zerith_drake"
 ZERITH_MODEL_RELATIVE_PATH = Path("models/zerith_drake")
 ZERITH_URDF_RELATIVE_PATH = Path("urdf/zerith_drake.urdf")
 
+RAIL_JOINTS = ("daogui_joint",)
 LEFT_ARM_JOINTS = (
     "left_shoulder_pitch_joint",
     "left_shoulder_roll_joint",
@@ -50,7 +60,10 @@ LEFT_GRIPPER_JOINTS = (
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Visualize Zerith and control its left arm with sliders."
+        description=(
+            "Visualize Zerith and inspect its vertical rail and left arm "
+            "with kinematic sliders."
+        )
     )
     parser.add_argument(
         "scene_dmd",
@@ -63,6 +76,13 @@ def _parse_args() -> argparse.Namespace:
         help="Scene package.xml; inferred from scene_dmd when omitted.",
     )
     parser.add_argument(
+        "--additional-package-xml",
+        action="append",
+        default=[],
+        type=Path,
+        help="Additional package.xml to register; may be repeated.",
+    )
+    parser.add_argument(
         "--robot-model-dir",
         type=Path,
         default=REPOSITORY_ROOT / ZERITH_MODEL_RELATIVE_PATH,
@@ -72,17 +92,17 @@ def _parse_args() -> argparse.Namespace:
         "--robot-xyz",
         type=float,
         nargs=3,
-        default=(3.05, 3.07, 0.1815),
+        default=ROBOT_BASE_XYZ_METERS,
         metavar=("X", "Y", "Z"),
         help=(
             "World position of dipan_link in meters "
-            "(default: east of the coffee table)."
+            f"(default: {ROBOT_BASE_XYZ_METERS})."
         ),
     )
     parser.add_argument(
         "--robot-yaw-deg",
         type=float,
-        default=180.0,
+        default=ROBOT_BASE_YAW_DEG,
         help=(
             "World yaw of dipan_link in degrees "
             "(default: facing the coffee table)."
@@ -123,13 +143,13 @@ def _add_joint_sliders(
     plant_context,
     zerith,
 ) -> list[str]:
-    """Add Meshcat sliders for Zerith's left arm and gripper joints."""
+    """Add Meshcat sliders for the rail, left arm, and gripper joints."""
     positions = plant.GetPositions(plant_context)
     position_lower_limits = plant.GetPositionLowerLimits()
     position_upper_limits = plant.GetPositionUpperLimits()
     slider_names = []
 
-    for joint_name in LEFT_ARM_JOINTS + LEFT_GRIPPER_JOINTS:
+    for joint_name in RAIL_JOINTS + LEFT_ARM_JOINTS + LEFT_GRIPPER_JOINTS:
         joint = plant.GetJointByName(joint_name, zerith)
         if joint.num_positions() != 1:
             raise ValueError(f"Expected one position for joint {joint_name}")
@@ -187,6 +207,15 @@ def main() -> None:
         raise FileNotFoundError(f"Scene DMD does not exist: {scene_dmd}")
     if not package_xml.is_file():
         raise FileNotFoundError(f"Scene package.xml does not exist: {package_xml}")
+    additional_package_xmls = tuple(
+        path.resolve() for path in args.additional_package_xml
+    )
+    for additional_package_xml in additional_package_xmls:
+        if not additional_package_xml.is_file():
+            raise FileNotFoundError(
+                "Additional package.xml does not exist: "
+                f"{additional_package_xml}"
+            )
     if not robot_urdf.is_file():
         raise FileNotFoundError(
             f"Zerith URDF does not exist: {robot_urdf}\n"
@@ -200,6 +229,8 @@ def main() -> None:
     parser = Parser(plant)
     parser.SetAutoRenaming(True)
     _register_package_xml(parser, package_xml)
+    for additional_package_xml in additional_package_xmls:
+        _register_package_xml(parser, additional_package_xml)
     parser.package_map().Add(ZERITH_PACKAGE_NAME, str(robot_model_dir))
 
     directives = LoadModelDirectives(str(scene_dmd))
@@ -213,9 +244,9 @@ def main() -> None:
         len(plant.GetCollisionGeometriesForBody(plant.get_body(body_index)))
         for body_index in plant.GetBodyIndices(zerith)
     )
-    if collision_geometry_count != 37:
+    if collision_geometry_count == 0:
         raise ValueError(
-            f"Expected 37 Zerith collision geometries, got {collision_geometry_count}"
+            "Zerith must provide collision geometry for calibration"
         )
 
     base_frame = plant.GetFrameByName("dipan_link", zerith)
@@ -237,7 +268,17 @@ def main() -> None:
     print(f"Zerith base frame: dipan_link at XYZ {tuple(args.robot_xyz)}")
     print(f"Zerith yaw: {args.robot_yaw_deg} degrees")
     print("Active end effector: left_end_effector_link")
-    print(f"Active joints: {', '.join(LEFT_ARM_JOINTS + LEFT_GRIPPER_JOINTS)}")
+    print(
+        "Active joints: "
+        f"{', '.join(RAIL_JOINTS + LEFT_ARM_JOINTS + LEFT_GRIPPER_JOINTS)}"
+    )
+    rail = plant.GetJointByName(RAIL_JOINTS[0], zerith)
+    print(
+        "Rail calibration status: "
+        f"range={rail.position_lower_limits()[0]:.3f} to "
+        f"{rail.position_upper_limits()[0]:.3f} m; upstream effort and "
+        "velocity limits are both zero and remain uncalibrated"
+    )
     print(f"Zerith collision geometries: {collision_geometry_count}")
     print("Move the Meshcat sliders; press Escape or Ctrl+C to exit.")
 

@@ -30,6 +30,11 @@ from pydrake.all import (
     Simulator,
 )
 
+from src.zerith_robot_config import (
+    ROBOT_BASE_XYZ_METERS,
+    ROBOT_BASE_YAW_DEG,
+)
+
 ZERITH_PACKAGE_NAME = "zerith_drake"
 ZERITH_URDF_RELATIVE_PATH = Path("urdf/zerith_drake.urdf")
 GRIPPER_MAX_OPENING = 0.08
@@ -148,8 +153,8 @@ class ZerithOnlineEnv:
         target_model_name: str,
         scene_package_xml: Path | None = None,
         target_body_name: str = "base_link",
-        robot_xyz: Sequence[float] = (3.05, 3.07, 0.1815),
-        robot_yaw_deg: float = 180.0,
+        robot_xyz: Sequence[float] = ROBOT_BASE_XYZ_METERS,
+        robot_yaw_deg: float = ROBOT_BASE_YAW_DEG,
         q_home: Sequence[float] | None = None,
         physics_dt: float = 0.001,
         controller_dt: float = 0.005,
