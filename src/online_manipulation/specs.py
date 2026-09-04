@@ -96,7 +96,7 @@ class ObservedBodySpec:
 class ScenarioSpec:
     """Scene paths and runtime options independent of any robot or task.
 
-    The Zerith runtime currently accepts ``penetration_allowance_m`` and
+    The current Drake runtime accepts ``penetration_allowance_m`` and
     ``stiction_tolerance_m_s`` as positive Drake contact parameters. Initial
     object poses are keyed by ``ObservedBodySpec.observation_name``.
     """
