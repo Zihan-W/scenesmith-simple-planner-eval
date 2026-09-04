@@ -22,6 +22,7 @@ from pydrake.all import (
     Meshcat,
     MeshcatVisualizer,
     MeshcatVisualizerParams,
+    MultibodyForces,
     Parser,
     ProcessModelDirectives,
     RigidTransform,
@@ -42,7 +43,7 @@ GRIPPER_MAX_OPENING = 0.08
 
 @dataclasses.dataclass(frozen=True)
 class JointServoConfig:
-    """PD gains and torque limit for a single controlled joint."""
+    """Acceleration-domain PD gains and actuator torque limit."""
 
     name: str
     kp: float
@@ -51,17 +52,17 @@ class JointServoConfig:
 
 
 LEFT_ARM_SERVO_CONFIGS = (
-    JointServoConfig("left_shoulder_pitch_joint", 80.0, 8.0, 36.0),
-    JointServoConfig("left_shoulder_roll_joint", 80.0, 8.0, 36.0),
-    JointServoConfig("left_shoulder_yaw_joint", 20.0, 3.5, 27.0),
-    JointServoConfig("left_elbow_joint", 60.0, 6.0, 27.0),
-    JointServoConfig("left_wrist_roll_joint", 2.0, 0.1, 9.0),
-    JointServoConfig("left_wrist_yaw_joint", 2.0, 0.2, 9.0),
-    JointServoConfig("left_wrist_pitch_joint", 2.0, 0.2, 9.0),
+    JointServoConfig("left_shoulder_pitch_joint", 80.0, 18.0, 36.0),
+    JointServoConfig("left_shoulder_roll_joint", 80.0, 18.0, 36.0),
+    JointServoConfig("left_shoulder_yaw_joint", 40.0, 13.0, 27.0),
+    JointServoConfig("left_elbow_joint", 60.0, 16.0, 27.0),
+    JointServoConfig("left_wrist_roll_joint", 30.0, 11.0, 9.0),
+    JointServoConfig("left_wrist_yaw_joint", 30.0, 11.0, 9.0),
+    JointServoConfig("left_wrist_pitch_joint", 30.0, 11.0, 9.0),
 )
 LEFT_GRIPPER_SERVO_CONFIGS = (
-    JointServoConfig("left_jaw_left_finger_joint", 100.0, 4.0, 25.0),
-    JointServoConfig("left_jaw_right_finger_joint", 100.0, 4.0, 25.0),
+    JointServoConfig("left_jaw_left_finger_joint", 100.0, 20.0, 25.0),
+    JointServoConfig("left_jaw_right_finger_joint", 100.0, 20.0, 25.0),
 )
 ALL_SERVO_CONFIGS = LEFT_ARM_SERVO_CONFIGS + LEFT_GRIPPER_SERVO_CONFIGS
 
@@ -152,9 +153,11 @@ class ZerithOnlineEnv:
         robot_model_dir: Path,
         target_model_name: str,
         scene_package_xml: Path | None = None,
+        additional_package_xmls: Sequence[Path] = (),
         target_body_name: str = "base_link",
         robot_xyz: Sequence[float] = ROBOT_BASE_XYZ_METERS,
         robot_yaw_deg: float = ROBOT_BASE_YAW_DEG,
+        rail_position: float = 0.0,
         q_home: Sequence[float] | None = None,
         physics_dt: float = 0.001,
         controller_dt: float = 0.005,
@@ -172,6 +175,9 @@ class ZerithOnlineEnv:
             if scene_package_xml is not None
             else find_package_xml(self._scene_dmd)
         )
+        self._additional_package_xmls = tuple(
+            Path(path).resolve() for path in additional_package_xmls
+        )
         self._robot_urdf = (
             self._robot_model_dir / ZERITH_URDF_RELATIVE_PATH
         )
@@ -188,6 +194,11 @@ class ZerithOnlineEnv:
                 f"Zerith URDF does not exist: {self._robot_urdf}\n"
                 "Run python scripts/convert_zerith_for_drake.py."
             )
+        for package_xml in self._additional_package_xmls:
+            if not package_xml.is_file():
+                raise FileNotFoundError(
+                    f"Additional package.xml does not exist: {package_xml}"
+                )
 
         self.physics_dt = float(physics_dt)
         self.controller_dt = float(controller_dt)
@@ -217,6 +228,7 @@ class ZerithOnlineEnv:
             raise ValueError(
                 "q_home must contain exactly seven left-arm joint positions"
             )
+        self._rail_position = float(rail_position)
 
         self.meshcat = meshcat
         if self.meshcat is not None:
@@ -230,6 +242,8 @@ class ZerithOnlineEnv:
         parser = Parser(self.plant)
         parser.SetAutoRenaming(True)
         _register_package_xml(parser, self._scene_package_xml)
+        for package_xml in self._additional_package_xmls:
+            _register_package_xml(parser, package_xml)
         parser.package_map().Add(
             ZERITH_PACKAGE_NAME,
             str(self._robot_model_dir),
@@ -285,6 +299,16 @@ class ZerithOnlineEnv:
             for config in LEFT_GRIPPER_SERVO_CONFIGS
         )
         self._all_joints = self._arm_joints + self._gripper_joints
+        self._rail_joint = self.plant.GetJointByName(
+            "daogui_joint",
+            self._zerith,
+        )
+        if not (
+            self._rail_joint.position_lower_limits()[0]
+            <= self._rail_position
+            <= self._rail_joint.position_upper_limits()[0]
+        ):
+            raise ValueError("rail_position violates daogui_joint limits")
         self._arm_position_lower_limits = np.array(
             [joint.position_lower_limits()[0] for joint in self._arm_joints]
         )
@@ -348,6 +372,7 @@ class ZerithOnlineEnv:
             strict=True,
         ):
             positions[joint.position_start()] = value
+        positions[self._rail_joint.position_start()] = self._rail_position
         # The Zerith finger joints are open at zero. Moving the left finger
         # negative and the right finger positive closes the gripper.
         positions[self._gripper_joints[0].position_start()] = 0.0
@@ -411,7 +436,7 @@ class ZerithOnlineEnv:
         )
 
     def _update_servo(self) -> None:
-        """Update gravity-compensated PD torque and record one sample."""
+        """Update coupled inverse-dynamics PD torque and record one sample."""
         if self._simulator is None:
             raise RuntimeError("Call reset() before updating the controller")
         plant_context = self._plant_context()
@@ -431,8 +456,29 @@ class ZerithOnlineEnv:
         limits = np.array(
             [config.effort_limit for config in ALL_SERVO_CONFIGS]
         )
-        pd_torque = kp * (q_desired - q) - kd * v
-        raw_torque = gravity_torque + pd_torque
+        desired_acceleration = np.zeros(self.plant.num_velocities())
+        for index, joint in enumerate(self._all_joints):
+            desired_acceleration[joint.velocity_start()] = (
+                kp[index] * (q_desired[index] - q[index])
+                - kd[index] * v[index]
+            )
+        force_elements = MultibodyForces(self.plant)
+        self.plant.CalcForceElementsContribution(
+            plant_context,
+            force_elements,
+        )
+        generalized_force = self.plant.CalcInverseDynamics(
+            plant_context,
+            desired_acceleration,
+            force_elements,
+        )
+        raw_torque = np.array(
+            [
+                generalized_force[joint.velocity_start()]
+                for joint in self._all_joints
+            ]
+        )
+        pd_torque = raw_torque - gravity_torque
         applied_torque = np.clip(raw_torque, -limits, limits)
         saturated = ~np.isclose(raw_torque, applied_torque, atol=1e-12)
 
