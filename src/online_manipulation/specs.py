@@ -94,7 +94,12 @@ class ObservedBodySpec:
 
 @dataclasses.dataclass(frozen=True)
 class ScenarioSpec:
-    """Scene paths and runtime options independent of any robot or task."""
+    """Scene paths and runtime options independent of any robot or task.
+
+    The Zerith runtime currently accepts ``penetration_allowance_m`` and
+    ``stiction_tolerance_m_s`` as positive Drake contact parameters. Initial
+    object poses are keyed by ``ObservedBodySpec.observation_name``.
+    """
 
     dmd_path: Path
     package_xmls: tuple[Path, ...] = ()
@@ -125,15 +130,36 @@ class ScenarioSpec:
         if len(set(observation_names)) != len(observation_names):
             raise ValueError("Observed body names must be unique")
         object.__setattr__(self, "observed_bodies", observed_bodies)
+        initial_object_poses = dict(self.initial_object_poses)
+        unknown_initial_poses = (
+            initial_object_poses.keys() - set(observation_names)
+        )
+        if unknown_initial_poses:
+            raise ValueError(
+                "Initial object poses are not declared as observed bodies: "
+                f"{sorted(unknown_initial_poses)}"
+            )
+        if any(
+            not isinstance(pose, Pose)
+            for pose in initial_object_poses.values()
+        ):
+            raise TypeError("Initial object poses must be Pose instances")
+        object.__setattr__(
+            self,
+            "initial_object_poses",
+            initial_object_poses,
+        )
         if self.output_directory is not None:
             object.__setattr__(
                 self,
                 "output_directory",
                 Path(self.output_directory),
             )
-        for name, value in self.contact_parameters.items():
+        contact_parameters = dict(self.contact_parameters)
+        for name, value in contact_parameters.items():
             if not name or not math.isfinite(float(value)):
                 raise ValueError("Contact parameters require names and values")
+        object.__setattr__(self, "contact_parameters", contact_parameters)
 
 
 @dataclasses.dataclass(frozen=True)

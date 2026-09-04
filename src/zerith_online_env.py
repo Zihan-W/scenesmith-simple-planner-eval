@@ -8,7 +8,7 @@ physics_dt.
 
 import csv
 import dataclasses
-
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -23,6 +23,7 @@ from pydrake.all import (
     MeshcatVisualizerParams,
     Parser,
     ProcessModelDirectives,
+    Quaternion,
     RigidTransform,
     Role,
     RollPitchYaw,
@@ -30,7 +31,11 @@ from pydrake.all import (
 )
 
 from src.online_manipulation.controller import CoupledInverseDynamicsServo
-from src.online_manipulation.drake_utils import register_package_xml
+from src.online_manipulation.drake_utils import (
+    register_package_xml,
+    set_free_body_world_pose,
+)
+from src.online_manipulation.observations import Pose
 from src.online_manipulation.specs import JointSpec
 from src.zerith_grasp_geometry import add_left_grasp_frame
 from src.zerith_robot_config import (
@@ -41,6 +46,9 @@ from src.zerith_robot_config import (
 ZERITH_PACKAGE_NAME = "zerith_drake"
 ZERITH_URDF_RELATIVE_PATH = Path("urdf/zerith_drake.urdf")
 GRIPPER_MAX_OPENING = 0.08
+SUPPORTED_CONTACT_PARAMETERS = frozenset(
+    ("penetration_allowance_m", "stiction_tolerance_m_s")
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -149,10 +157,12 @@ class ZerithOnlineEnv:
         *,
         scene_dmd: Path,
         robot_model_dir: Path,
-        target_model_name: str,
+        target_model_name: str | None = None,
         scene_package_xml: Path | None = None,
         additional_package_xmls: Sequence[Path] = (),
         target_body_name: str = "base_link",
+        initial_body_poses: Mapping[tuple[str, str], Pose] | None = None,
+        contact_parameters: Mapping[str, float] | None = None,
         robot_xyz: Sequence[float] = ROBOT_BASE_XYZ_METERS,
         robot_yaw_deg: float = ROBOT_BASE_YAW_DEG,
         rail_position: float = 0.0,
@@ -177,6 +187,31 @@ class ZerithOnlineEnv:
         self._additional_package_xmls = tuple(
             Path(path).resolve() for path in additional_package_xmls
         )
+        self._initial_body_poses = dict(initial_body_poses or {})
+        if any(
+            len(name_pair) != 2 or not all(name_pair)
+            for name_pair in self._initial_body_poses
+        ):
+            raise ValueError(
+                "initial_body_poses keys must be (model_name, body_name)"
+            )
+        self._contact_parameters = {
+            name: float(value)
+            for name, value in (contact_parameters or {}).items()
+        }
+        unknown_contact_parameters = (
+            self._contact_parameters.keys() - SUPPORTED_CONTACT_PARAMETERS
+        )
+        if unknown_contact_parameters:
+            raise ValueError(
+                "Unsupported contact parameters: "
+                f"{sorted(unknown_contact_parameters)}"
+            )
+        if any(
+            not np.isfinite(value) or value <= 0.0
+            for value in self._contact_parameters.values()
+        ):
+            raise ValueError("Contact parameters must be finite and positive")
         self._robot_urdf = (
             self._robot_model_dir / ZERITH_URDF_RELATIVE_PATH
         )
@@ -249,6 +284,14 @@ class ZerithOnlineEnv:
             builder,
             time_step=self.physics_dt,
         )
+        if "penetration_allowance_m" in self._contact_parameters:
+            self.plant.set_penetration_allowance(
+                self._contact_parameters["penetration_allowance_m"]
+            )
+        if "stiction_tolerance_m_s" in self._contact_parameters:
+            self.plant.set_stiction_tolerance(
+                self._contact_parameters["stiction_tolerance_m_s"]
+            )
         parser = Parser(self.plant)
         parser.SetAutoRenaming(True)
         _register_package_xml(parser, self._scene_package_xml)
@@ -267,13 +310,15 @@ class ZerithOnlineEnv:
             )
         self._zerith = model_instances[0]
         add_left_grasp_frame(self.plant, self._zerith)
-        self._target_instance = self.plant.GetModelInstanceByName(
-            target_model_name
-        )
-        self._target_body = self.plant.GetBodyByName(
-            target_body_name,
-            self._target_instance,
-        )
+        self._target_body = None
+        if target_model_name is not None:
+            target_instance = self.plant.GetModelInstanceByName(
+                target_model_name
+            )
+            self._target_body = self.plant.GetBodyByName(
+                target_body_name,
+                target_instance,
+            )
         self._end_effector_body = self.plant.GetBodyByName(
             "left_end_effector_link",
             self._zerith,
@@ -458,6 +503,21 @@ class ZerithOnlineEnv:
         positions[self._gripper_joints[1].position_start()] = 0.0
         self.plant.SetPositions(plant_context, positions)
 
+        for (model_name, body_name), pose in self._initial_body_poses.items():
+            model_instance = self.plant.GetModelInstanceByName(model_name)
+            body = self.plant.GetBodyByName(body_name, model_instance)
+            quaternion = np.asarray(pose.quaternion_wxyz, dtype=float)
+            quaternion /= np.linalg.norm(quaternion)
+            set_free_body_world_pose(
+                self.plant,
+                plant_context,
+                body,
+                RigidTransform(
+                    Quaternion(quaternion),
+                    np.asarray(pose.translation_m, dtype=float),
+                ),
+            )
+
         controlled_names = {config.name for config in ALL_SERVO_CONFIGS}
         for joint_index in self.plant.GetJointIndices(self._zerith):
             joint = self.plant.get_joint(joint_index)
@@ -559,31 +619,35 @@ class ZerithOnlineEnv:
             plant_context,
             self._end_effector_body,
         )
-        target_pose = self.plant.EvalBodyPoseInWorld(
-            plant_context,
-            self._target_body,
-        )
-        target_velocity = self.plant.EvalBodySpatialVelocityInWorld(
-            plant_context,
-            self._target_body,
-        )
-        return {
+        observation = {
             "q_left": q[: len(LEFT_ARM_SERVO_CONFIGS)].copy(),
             "v_left": v[: len(LEFT_ARM_SERVO_CONFIGS)].copy(),
             "gripper_width": float(
                 GRIPPER_MAX_OPENING - (q[-1] - q[-2])
             ),
             "end_effector_pose": _pose_vector(end_effector_pose),
-            "red_box_pose": _pose_vector(target_pose),
-            "red_box_velocity": np.concatenate(
-                (
-                    target_velocity.rotational(),
-                    target_velocity.translational(),
-                )
-            ),
             "contact_count": self._contact_count(plant_context),
             "simulation_time": float(plant_context.get_time()),
         }
+        if self._target_body is not None:
+            target_pose = self.plant.EvalBodyPoseInWorld(
+                plant_context,
+                self._target_body,
+            )
+            target_velocity = self.plant.EvalBodySpatialVelocityInWorld(
+                plant_context,
+                self._target_body,
+            )
+            observation.update(
+                red_box_pose=_pose_vector(target_pose),
+                red_box_velocity=np.concatenate(
+                    (
+                        target_velocity.rotational(),
+                        target_velocity.translational(),
+                    )
+                ),
+            )
+        return observation
 
     def step(
         self,

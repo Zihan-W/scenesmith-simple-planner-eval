@@ -1,5 +1,6 @@
 """Integration tests for the Zerith RobotAdapter implementation."""
 
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,12 +14,17 @@ from src.online_manipulation import (
     GripperAction,
     JointDeltaAction,
     JointPositionAction,
+    NullTask,
+    ObservedBodySpec,
     Pose,
     RobotAdapter,
+    ScenarioSpec,
+    TimingConfig,
 )
 from src.online_manipulation.adapters.zerith import (
     ZerithLegacyActionTranslator,
     ZerithRobotAdapter,
+    make_legacy_zerith_online_environment,
     make_zerith_robot_spec,
 )
 from src.zerith_online_env import ALL_SERVO_CONFIGS
@@ -127,6 +133,74 @@ class ZerithRobotAdapterTest(unittest.TestCase):
             ),
             1.0,
         )
+
+    def test_null_task_scene_does_not_require_a_target_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            scene_root = Path(directory)
+            dmd_path = scene_root / "empty.dmd.yaml"
+            package_xml = scene_root / "package.xml"
+            model_path = scene_root / "movable.sdf"
+            model_path.write_text(
+                """<sdf version="1.7">
+<model name="movable">
+  <link name="body">
+    <inertial>
+      <mass>1</mass>
+      <inertia>
+        <ixx>0.01</ixx><iyy>0.01</iyy><izz>0.01</izz>
+      </inertia>
+    </inertial>
+  </link>
+</model>
+</sdf>
+""",
+                encoding="utf-8",
+            )
+            dmd_path.write_text(
+                """directives:
+- add_model:
+    name: movable
+    file: package://empty_scene/movable.sdf
+    default_free_body_pose:
+        body:
+            base_frame: world
+            translation: [0, 0, 1]
+            rotation: !Rpy { deg: [0, 0, 0] }
+""",
+                encoding="utf-8",
+            )
+            package_xml.write_text(
+                "<package format=\"2\"><name>empty_scene</name></package>\n",
+                encoding="utf-8",
+            )
+            initial_pose = Pose(
+                (0.2, 0.3, 1.5),
+                (1.0, 0.0, 0.0, 0.0),
+            )
+            scenario = ScenarioSpec(
+                dmd_path=dmd_path,
+                package_xmls=(package_xml,),
+                initial_object_poses={"movable": initial_pose},
+                observed_bodies=(
+                    ObservedBodySpec("movable", "movable", "body"),
+                ),
+                contact_parameters={
+                    "penetration_allowance_m": 0.001,
+                    "stiction_tolerance_m_s": 0.01,
+                },
+            )
+            env = make_legacy_zerith_online_environment(
+                scenario=scenario,
+                adapter=_adapter(),
+                timing=TimingConfig(),
+                episode_duration=0.2,
+                task=NullTask(),
+            )
+            observation, _ = env.reset(seed=0)
+            self.assertEqual(
+                observation.objects["movable"].pose,
+                initial_pose,
+            )
 
     def test_legacy_translation_preserves_named_action_semantics(self) -> None:
         translator = ZerithLegacyActionTranslator(_adapter().spec)

@@ -4,6 +4,7 @@ import csv
 import dataclasses
 import json
 import math
+import traceback
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -153,6 +154,45 @@ def _write_trace(path: Path, trace: Sequence[Mapping[str, Any]]) -> None:
         writer.writerows(trace)
 
 
+def _write_exception_artifacts(
+    *,
+    env: OnlineEnvironment,
+    destination: Path | None,
+    seed: int,
+    step: int,
+    trace: Sequence[Mapping[str, Any]],
+    error: Exception,
+    traceback_text: str,
+    record_html: bool,
+) -> None:
+    """Persist partial diagnostics for an exception, then let caller re-raise."""
+    if destination is None:
+        return
+    payload = {
+        "seed": int(seed),
+        "success": False,
+        "termination_reason": "exception",
+        "failed_step": int(step),
+        "exception_type": type(error).__name__,
+        "exception_message": str(error),
+        "traceback": traceback_text,
+        "policy_steps_completed": len(trace),
+    }
+    if trace:
+        _write_trace(destination / "trace.csv", trace)
+    if record_html:
+        try:
+            env.save_recording(destination / "simulation.html")
+        except Exception as recording_error:  # Preserve the original failure.
+            payload["recording_error"] = (
+                f"{type(recording_error).__name__}: {recording_error}"
+            )
+    (destination / "failure.json").write_text(
+        json.dumps(_jsonable(payload), indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def run_episode(
     *,
     env: OnlineEnvironment,
@@ -198,10 +238,23 @@ def run_episode(
     last_info: Mapping[str, Any] = reset_info
 
     for step in range(max_steps):
-        action = policy.act(observation)
-        observation, reward, terminated, truncated, last_info = env.step(
-            action
-        )
+        try:
+            action = policy.act(observation)
+            observation, reward, terminated, truncated, last_info = env.step(
+                action
+            )
+        except Exception as error:
+            _write_exception_artifacts(
+                env=env,
+                destination=destination,
+                seed=seed,
+                step=step,
+                trace=trace,
+                error=error,
+                traceback_text=traceback.format_exc(),
+                record_html=record_html,
+            )
+            raise
         row = _trace_row(
             step=step,
             action=action,

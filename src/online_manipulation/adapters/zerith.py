@@ -671,7 +671,7 @@ class LegacyZerithRuntimeBackend:
 
     def _minimum_robot_signed_distance(
         self,
-        query_radius_m: float = 1.0,
+        query_radius_m: float = 0.05,
     ) -> tuple[float, bool]:
         """Return filtered robot-related distance or a query-radius bound."""
         plant = self.runtime.plant
@@ -758,24 +758,17 @@ def make_legacy_zerith_environment(
     scenario: ScenarioSpec,
     adapter: ZerithRobotAdapter,
     timing: TimingConfig,
-    target_model_name: str,
+    target_model_name: str | None = None,
     target_body_name: str = "base_link",
     episode_duration: float = 30.0,
     max_joint_delta: float = 0.1,
 ) -> ZerithOnlineEnv:
     """Construct the validated legacy runtime from generic specifications.
 
-    This function is a temporary migration boundary. Target identity remains
-    an explicit compatibility argument until Phase 4 moves it into Task.
+    This function is a temporary migration boundary. The optional target is
+    retained only for callers of the legacy dictionary observation; generic
+    observations use ``ScenarioSpec.observed_bodies`` instead.
     """
-    if scenario.initial_object_poses:
-        raise NotImplementedError(
-            "Legacy Zerith runtime does not apply ScenarioSpec object poses"
-        )
-    if scenario.contact_parameters:
-        raise NotImplementedError(
-            "Legacy Zerith runtime does not apply contact parameters"
-        )
     if not scenario.package_xmls:
         raise ValueError(
             "Legacy Zerith runtime requires the scene package.xml as the "
@@ -783,6 +776,16 @@ def make_legacy_zerith_environment(
         )
     scene_package_xml = scenario.package_xmls[0]
     additional_package_xmls = scenario.package_xmls[1:]
+    body_specs_by_name = {
+        body.observation_name: body for body in scenario.observed_bodies
+    }
+    initial_body_poses = {
+        (
+            body_specs_by_name[name].model_instance_name,
+            body_specs_by_name[name].body_name,
+        ): pose
+        for name, pose in scenario.initial_object_poses.items()
+    }
     meshcat = None
     if scenario.visualization.enabled:
         meshcat = Meshcat(scenario.visualization.port)
@@ -808,6 +811,8 @@ def make_legacy_zerith_environment(
         scene_package_xml=scene_package_xml,
         additional_package_xmls=additional_package_xmls,
         target_body_name=target_body_name,
+        initial_body_poses=initial_body_poses,
+        contact_parameters=scenario.contact_parameters,
         robot_xyz=adapter.spec.base_pose.translation_m,
         robot_yaw_deg=robot_yaw_deg,
         rail_position=adapter.spec.locked_joint_positions[_RAIL_JOINT_NAME],
@@ -828,7 +833,7 @@ def make_legacy_zerith_online_environment(
     scenario: ScenarioSpec,
     adapter: ZerithRobotAdapter,
     timing: TimingConfig,
-    target_model_name: str,
+    target_model_name: str | None = None,
     target_body_name: str = "base_link",
     episode_duration: float = 30.0,
     max_joint_delta: float = 0.1,

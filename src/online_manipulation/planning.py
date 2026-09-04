@@ -21,7 +21,10 @@ from pydrake.planning import RobotDiagramBuilder
 from src.online_manipulation.contact import (
     FREE_MOTION_CONTACT_POLICY,
 )
-from src.online_manipulation.drake_utils import register_package_xml
+from src.online_manipulation.drake_utils import (
+    register_package_xml,
+    set_free_body_world_pose,
+)
 from src.online_manipulation.observations import Pose
 from src.online_manipulation.protocols import ContactPolicy, RobotAdapter
 from src.online_manipulation.specs import (
@@ -205,10 +208,12 @@ class PlanningQuery:
         bodies cannot be synchronized from a body pose alone and fail loudly.
         """
         expected = {spec.observation_name for spec in self.observed_bodies}
-        missing = expected - poses.keys()
-        if missing:
-            raise KeyError(f"Missing observed body poses: {sorted(missing)}")
+        unknown = poses.keys() - expected
+        if unknown:
+            raise KeyError(f"Unknown observed body poses: {sorted(unknown)}")
         for spec in self.observed_bodies:
+            if spec.observation_name not in poses:
+                continue
             model_instance = self.plant.GetModelInstanceByName(
                 spec.model_instance_name
             )
@@ -237,30 +242,18 @@ class PlanningQuery:
                     f"Observed body is articulated rather than free: "
                     f"{spec.model_instance_name}::{spec.body_name}"
                 )
-            floating_joint = floating_joints[0]
             pose = poses[spec.observation_name]
             quaternion = np.asarray(pose.quaternion_wxyz, dtype=float)
             quaternion /= np.linalg.norm(quaternion)
-            world_from_parent_joint = (
-                floating_joint.frame_on_parent().CalcPoseInWorld(
-                    self._plant_context
-                )
-            )
             world_from_body = RigidTransform(
                 Quaternion(quaternion),
                 np.asarray(pose.translation_m, dtype=float),
             )
-            body_from_child_joint = (
-                floating_joint.frame_on_child().CalcPoseInBodyFrame(
-                    self._plant_context
-                )
-            )
-            self.plant.SetFreeBodyPose(
+            set_free_body_world_pose(
+                self.plant,
                 self._plant_context,
                 body,
-                world_from_parent_joint.inverse()
-                @ world_from_body
-                @ body_from_child_joint,
+                world_from_body,
             )
         current_positions = self.plant.GetPositions(
             self._plant_context
@@ -786,10 +779,12 @@ def build_planning_query(
     robot_adapter.configure_model(plant, robot_model_instance)
     plant.Finalize()
     diagram = builder.Build()
-    return PlanningQuery(
+    query = PlanningQuery(
         diagram=diagram,
         plant=plant,
         robot_model_instance=robot_model_instance,
         robot_adapter=robot_adapter,
         observed_bodies=scenario.observed_bodies,
     )
+    query.set_observed_body_poses(scenario.initial_object_poses)
+    return query

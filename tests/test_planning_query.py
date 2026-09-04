@@ -210,12 +210,15 @@ class PlanningQueryTest(unittest.TestCase):
         query = _planning_query()
         updated = Pose((2.0, 1.0, 0.5), (1.0, 0.0, 0.0, 0.0))
         fixed = query.body_pose("obstacle", "body")
-        query.set_observed_body_poses({"target": updated, "fixed": fixed})
+        query.set_observed_body_poses({"target": updated})
         self.assertEqual(query.body_pose("movable", "body"), updated)
         self.assertEqual(query.body_pose("obstacle", "body"), fixed)
 
         query.check_configuration([math.pi / 2.0])
         self.assertEqual(query.body_pose("movable", "body"), updated)
+
+        with self.assertRaisesRegex(KeyError, "Unknown observed body"):
+            query.set_observed_body_poses({"undeclared": updated})
 
     def test_differential_ik_returns_bounded_collision_checked_edge(self):
         query = _planning_query()

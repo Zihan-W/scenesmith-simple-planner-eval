@@ -61,6 +61,21 @@ class _Policy:
         return HoldAction()
 
 
+class _FailingPolicy(_Policy):
+    """Raise after one completed policy period for artifact testing."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.action_count = 0
+
+    def act(self, observation):
+        del observation
+        self.action_count += 1
+        if self.action_count == 2:
+            raise RuntimeError("intentional policy failure")
+        return HoldAction()
+
+
 class _Environment:
     """Two-step deterministic online environment used by runner tests."""
 
@@ -196,6 +211,30 @@ class EpisodeRunnerTest(unittest.TestCase):
                     max_steps=1,
                     output_directory=output,
                 )
+
+    def test_exception_is_reraised_after_failure_artifacts_are_saved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "episode"
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "intentional policy failure",
+            ):
+                run_episode(
+                    env=_Environment(),
+                    policy=_FailingPolicy(),
+                    seed=11,
+                    max_steps=4,
+                    output_directory=output,
+                    record_html=True,
+                )
+            failure = json.loads(
+                (output / "failure.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(failure["failed_step"], 1)
+            self.assertEqual(failure["exception_type"], "RuntimeError")
+            self.assertEqual(failure["policy_steps_completed"], 1)
+            self.assertTrue((output / "trace.csv").is_file())
+            self.assertTrue((output / "simulation.html").is_file())
 
 
 if __name__ == "__main__":

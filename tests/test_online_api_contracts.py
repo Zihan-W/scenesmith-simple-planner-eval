@@ -15,11 +15,13 @@ from src.online_manipulation import (
     JointDeltaAction,
     JointSpec,
     ObjectObservation,
+    ObservedBodySpec,
     Observation,
     Pose,
     RobotAdapter,
     RobotObservation,
     RobotSpec,
+    ScenarioSpec,
     SpatialVelocity,
     Task,
     TaskEvaluation,
@@ -194,6 +196,21 @@ class PublicContractTest(unittest.TestCase):
         )
         self.assertIn("arbitrary_object", payload["objects"])
         self.assertNotIn("red_box_pose", payload)
+
+    def test_initial_pose_requires_a_declared_observed_body(self) -> None:
+        with self.assertRaisesRegex(ValueError, "observed bodies"):
+            ScenarioSpec(
+                dmd_path=Path("scene.dmd.yaml"),
+                initial_object_poses={"missing": _pose()},
+            )
+        scenario = ScenarioSpec(
+            dmd_path=Path("scene.dmd.yaml"),
+            initial_object_poses={"object": _pose()},
+            observed_bodies=(
+                ObservedBodySpec("object", "model", "body"),
+            ),
+        )
+        self.assertEqual(scenario.initial_object_poses["object"], _pose())
 
 
 if __name__ == "__main__":
