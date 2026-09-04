@@ -325,6 +325,51 @@ class ZerithRobotAdapterTest(unittest.TestCase):
             translator.last_decision["reasons"],
         )
 
+    def test_joint_limit_adjustment_reports_reason(self) -> None:
+        adapter = _adapter()
+        translator = ZerithLegacyActionTranslator(
+            adapter.spec,
+            maximum_joint_delta=10.0,
+        )
+        joint = adapter.spec.controlled_joints[0]
+        action = translator.translate(
+            JointPositionAction(
+                (joint.name,),
+                (joint.position_upper + 1.0,),
+            )
+        )
+        self.assertAlmostEqual(action[0], joint.position_upper)
+        self.assertEqual(translator.last_decision["status"], "adjusted")
+        self.assertIn(
+            "joint_position_limit",
+            translator.last_decision["reasons"],
+        )
+
+    def test_invalid_gripper_width_rejects_composite_atomically(self) -> None:
+        adapter = _adapter()
+        translator = ZerithLegacyActionTranslator(
+            adapter.spec,
+            maximum_joint_delta=0.01,
+        )
+        action = translator.translate(
+            CompositeAction(
+                arm=JointDeltaAction(
+                    (adapter.spec.controlled_joint_names[0],),
+                    (0.005,),
+                ),
+                gripper=GripperAction(
+                    adapter.spec.gripper.maximum_width_m + 0.01
+                ),
+            )
+        )
+        np.testing.assert_allclose(action[:7], np.zeros(7))
+        self.assertEqual(action[7], 1.0)
+        self.assertEqual(translator.last_decision["status"], "rejected")
+        self.assertIn(
+            "gripper_width_limit",
+            translator.last_decision["reasons"],
+        )
+
     def test_colliding_cartesian_edge_is_rejected_as_hold(self) -> None:
         class FakePlanningQuery:
             """Return one expected online collision rejection."""
