@@ -119,5 +119,5 @@ class OnlineEnvironment(Protocol):
     ) -> tuple[Observation, float, bool, bool, dict]:
         """Advance exactly one policy period."""
 
-    def write_updated_scenario(self, output_path: Path) -> None:
+    def write_updated_scenario(self, output_path: Path) -> tuple[str, ...]:
         """Write current free-object poses without modifying the input DMD."""

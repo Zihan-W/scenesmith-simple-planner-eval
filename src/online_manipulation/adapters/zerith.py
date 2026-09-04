@@ -26,6 +26,7 @@ from src.online_manipulation.actions import (
     RobotAction,
 )
 from src.online_manipulation.environment import OnlineManipulationEnv
+from src.online_manipulation.dmd_finalizer import write_updated_dmd
 from src.online_manipulation.observations import (
     ContactObservation,
     ObjectObservation,
@@ -578,13 +579,14 @@ class LegacyZerithRuntimeBackend:
         self,
         runtime: ZerithOnlineEnv,
         adapter: ZerithRobotAdapter,
-        observed_bodies: Sequence[ObservedBodySpec],
+        scenario: ScenarioSpec,
         planning_query: PlanningQuery | None = None,
     ):
         """Store the runtime and explicit generic object observation list."""
         self.runtime = runtime
         self.adapter = adapter
-        self.observed_bodies = tuple(observed_bodies)
+        self.scenario = scenario
+        self.observed_bodies = tuple(scenario.observed_bodies)
         self.action_translator = ZerithLegacyActionTranslator(
             adapter.spec,
             planning_query=planning_query,
@@ -625,6 +627,16 @@ class LegacyZerithRuntimeBackend:
     def robot_penetrations(self):
         """Expose the legacy robot penetration diagnostic during migration."""
         return self.runtime.robot_penetrations()
+
+    def write_updated_scenario(self, output_path: Path) -> tuple[str, ...]:
+        """Write selected free bodies from the active simulation context."""
+        return write_updated_dmd(
+            input_path=self.scenario.dmd_path,
+            output_path=output_path,
+            plant=self.runtime.plant,
+            plant_context=self.runtime.plant_context,
+            body_specs=self.scenario.observed_bodies,
+        )
 
     def _observation(self) -> Observation:
         """Read a generic observation from the active Drake context."""
@@ -768,7 +780,7 @@ def make_legacy_zerith_online_environment(
     backend = LegacyZerithRuntimeBackend(
         runtime=runtime,
         adapter=adapter,
-        observed_bodies=scenario.observed_bodies,
+        scenario=scenario,
         planning_query=planning_query,
     )
     return OnlineManipulationEnv(backend, task=task)

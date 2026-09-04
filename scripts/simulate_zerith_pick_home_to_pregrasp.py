@@ -127,6 +127,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--meshcat-port", type=int)
     parser.add_argument("--record-html", type=Path)
     parser.add_argument(
+        "--write-updated-scenario",
+        type=Path,
+        help="Write selected final free-body poses to a new DMD file.",
+    )
+    parser.add_argument(
         "--output-json",
         type=Path,
         help="Defaults to online_pregrasp.json beside pick-home-json.",
@@ -572,6 +577,7 @@ def main() -> None:
                 observation_name=TARGET_OBSERVATION_NAME,
                 model_instance_name="living_room_box_0",
                 body_name="base_link",
+                write_back=True,
             ),
         ),
         visualization=VisualizationConfig(
@@ -633,6 +639,11 @@ def main() -> None:
     passed = len(episodes) == args.episodes and all(
         episode["success"] for episode in episodes
     )
+    updated_bodies = ()
+    if args.write_updated_scenario is not None:
+        updated_bodies = env.write_updated_scenario(
+            args.write_updated_scenario.resolve()
+        )
     output = {
         "passed": passed,
         "calibration_status": (
@@ -654,6 +665,12 @@ def main() -> None:
         "episodes_requested": args.episodes,
         "episodes_completed": len(episodes),
         "episodes": episodes,
+        "updated_scenario": (
+            str(args.write_updated_scenario.resolve())
+            if args.write_updated_scenario is not None
+            else None
+        ),
+        "updated_bodies": list(updated_bodies),
     }
     output_path = (
         args.output_json.resolve()

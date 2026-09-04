@@ -1,6 +1,7 @@
 """Contract tests for the generic OnlineManipulationEnv facade."""
 
 import unittest
+from pathlib import Path
 
 from src.online_manipulation import (
     HoldAction,
@@ -67,6 +68,10 @@ class _FakeRuntimeBackend:
             "backend_steps": len(self.actions)
         }
 
+    def write_updated_scenario(self, output_path):
+        self.output_path = Path(output_path)
+        return ("target",)
+
 
 class OnlineManipulationEnvTest(unittest.TestCase):
     """Validate public reset, step, and time-limit semantics."""
@@ -99,10 +104,12 @@ class OnlineManipulationEnvTest(unittest.TestCase):
         self.assertFalse(terminated)
         self.assertTrue(truncated)
 
-    def test_write_back_is_explicitly_unavailable_before_phase_five(self) -> None:
-        env = OnlineManipulationEnv(_FakeRuntimeBackend())
-        with self.assertRaisesRegex(NotImplementedError, "Phase 5"):
-            env.write_updated_scenario("unused.dmd.yaml")
+    def test_write_back_delegates_to_runtime_backend(self) -> None:
+        backend = _FakeRuntimeBackend()
+        env = OnlineManipulationEnv(backend)
+        updated = env.write_updated_scenario("updated.dmd.yaml")
+        self.assertEqual(updated, ("target",))
+        self.assertEqual(backend.output_path, Path("updated.dmd.yaml"))
 
     def test_pick_lift_task_terminates_after_required_stable_time(self) -> None:
         class LiftBackend(_FakeRuntimeBackend):

@@ -31,6 +31,7 @@ from src.online_manipulation.planning import (
     build_planning_query,
 )
 from src.online_manipulation.environment import OnlineManipulationEnv
+from src.online_manipulation.dmd_finalizer import write_updated_dmd
 from src.online_manipulation.protocols import (
     ContactPolicy,
     OnlineEnvironment,
@@ -86,6 +87,7 @@ __all__ = [
     "Policy",
     "PlanningQuery",
     "build_planning_query",
+    "write_updated_dmd",
     "Pose",
     "RobotAction",
     "RobotAdapter",

@@ -23,6 +23,7 @@ Current phase: Phase 5 — Episode Runner and DMD Finalizer
 * `d4334fe` Define online manipulation public contracts
 * `a2debf7` Introduce Zerith online environment adapter
 * `8cab195` Add typed online manipulation environment facade
+* `30736b5` Add task and planning query interfaces
 
 ## Current Validated State
 
@@ -205,6 +206,37 @@ minimum nonpenetration distance and validated the 376-sample
 PICK_HOME-to-PREGRASP edge with 26.28 mm minimum safety clearance. Its context
 time remained 0.0 s. A real NullTask PREGRASP episode also passed in 81 policy
 steps with the gripper open.
+
+## Phase 5A Selective DMD Finalizer
+
+`ObservedBodySpec.write_back` is an explicit, deny-by-default selection for
+scenario finalization. The finalizer updates only the selected direct
+`add_model.default_free_body_pose` entry, preserves every other DMD line, and
+expresses the final world pose in the entry's original `base_frame`. It refuses
+to overwrite the source DMD or proceed without an explicit selection.
+
+The public environment now delegates `write_updated_scenario()` to its runtime
+backend. A one-episode real Zerith PREGRASP regression wrote only
+`living_room_box_0`; its 19.88 micrometer settling displacement was preserved.
+Drake successfully reloaded the generated DMD and recovered world translation
+`[1.98312044694348, 2.7700146302787867, 0.5107344413880195]` meters. A textual
+diff confirmed that no furniture, room, robot, or other manipuland definition
+changed.
+
+Reproduce the 28-test suite and real round-trip:
+
+```bash
+.venv/bin/python -B -m unittest discover -s tests -v
+
+SCENE_ROOT=/root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000
+.venv/bin/python -B scripts/simulate_zerith_pick_home_to_pregrasp.py \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml "$SCENE_ROOT/package.xml" \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --rail-position 0.4 --episodes 1 \
+  --write-updated-scenario \
+    output/zerith_pick_eval/roundtrip_pregrasp.dmd.yaml
+```
 
 ## Phase 0 Reproducible Commands
 

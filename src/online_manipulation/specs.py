@@ -78,6 +78,7 @@ class ObservedBodySpec:
     observation_name: str
     model_instance_name: str
     body_name: str
+    write_back: bool = False
 
     def __post_init__(self) -> None:
         """Require stable nonempty public and Drake identifiers."""

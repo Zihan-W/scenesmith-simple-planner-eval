@@ -25,6 +25,9 @@ class RuntimeBackend(Protocol):
     ) -> tuple[Observation, bool, dict]:
         """Apply one typed action for exactly one policy period."""
 
+    def write_updated_scenario(self, output_path: Path) -> tuple[str, ...]:
+        """Write explicitly selected free-body poses to a new DMD file."""
+
 
 class OnlineManipulationEnv:
     """Expose deterministic Gym-style reset and step over a runtime backend.
@@ -108,8 +111,6 @@ class OnlineManipulationEnv:
             result_info,
         )
 
-    def write_updated_scenario(self, output_path: Path) -> None:
-        """Write final object poses after the Phase 5 finalizer is installed."""
-        raise NotImplementedError(
-            "DMD scenario write-back is implemented in Phase 5"
-        )
+    def write_updated_scenario(self, output_path: Path) -> tuple[str, ...]:
+        """Write selected final object poses without changing the input DMD."""
+        return self._backend.write_updated_scenario(Path(output_path))
