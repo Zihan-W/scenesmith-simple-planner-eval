@@ -21,5 +21,7 @@ meshcats/*
 .venv
 logs
 models/zerith_drake/meshes/*.obj
+# Deprecated local prototype; preserved for reference but never committed.
+scripts/simulate_zerith_safe_pregrasp.py
 *.log
 *.pdf
