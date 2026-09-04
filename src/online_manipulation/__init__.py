@@ -30,6 +30,11 @@ from src.online_manipulation.planning import (
     PlanningQuery,
     build_planning_query,
 )
+from src.online_manipulation.runner import (
+    EpisodeResult,
+    run_episode,
+    run_episodes,
+)
 from src.online_manipulation.environment import OnlineManipulationEnv
 from src.online_manipulation.dmd_finalizer import write_updated_dmd
 from src.online_manipulation.protocols import (
@@ -67,6 +72,7 @@ __all__ = [
     "ContactPolicy",
     "ConfigurationCheck",
     "EdgeCheck",
+    "EpisodeResult",
     "FREE_MOTION_CONTACT_POLICY",
     "GripperAction",
     "GripperSpec",
@@ -88,6 +94,8 @@ __all__ = [
     "PlanningQuery",
     "build_planning_query",
     "write_updated_dmd",
+    "run_episode",
+    "run_episodes",
     "Pose",
     "RobotAction",
     "RobotAdapter",

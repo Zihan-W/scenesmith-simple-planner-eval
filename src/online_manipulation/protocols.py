@@ -121,3 +121,12 @@ class OnlineEnvironment(Protocol):
 
     def write_updated_scenario(self, output_path: Path) -> tuple[str, ...]:
         """Write current free-object poses without modifying the input DMD."""
+
+    def finalize_episode(self) -> dict:
+        """Return task-owned final metadata for the current episode."""
+
+    def start_recording(self) -> None:
+        """Start optional visualization recording."""
+
+    def save_recording(self, output_path: Path) -> None:
+        """Save the active visualization recording."""

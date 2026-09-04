@@ -12,6 +12,7 @@ from pydrake.all import (
     Meshcat,
     Quaternion,
     RigidTransform,
+    Role,
     RollPitchYaw,
     RotationMatrix,
 )
@@ -601,11 +602,14 @@ class LegacyZerithRuntimeBackend:
         """Reset runtime and translator state, then normalize observation."""
         self.runtime.reset()
         self.action_translator.reset()
+        distance, is_lower_bound = self._minimum_robot_signed_distance()
         return self._observation(), {
             "control_updates": 0,
             "physics_steps_per_control": (
                 self.runtime.physics_steps_per_control
             ),
+            "minimum_collision_distance_m": distance,
+            "minimum_collision_distance_is_lower_bound": is_lower_bound,
         }
 
     def step(
@@ -622,6 +626,11 @@ class LegacyZerithRuntimeBackend:
         self.action_translator.update_from_runtime_info(info)
         normalized_info = dict(info)
         normalized_info["legacy_action"] = legacy_action.copy()
+        distance, is_lower_bound = self._minimum_robot_signed_distance()
+        normalized_info["minimum_collision_distance_m"] = distance
+        normalized_info[
+            "minimum_collision_distance_is_lower_bound"
+        ] = is_lower_bound
         return self._observation(), done, normalized_info
 
     def robot_penetrations(self):
@@ -637,6 +646,59 @@ class LegacyZerithRuntimeBackend:
             plant_context=self.runtime.plant_context,
             body_specs=self.scenario.observed_bodies,
         )
+
+    def start_recording(self) -> None:
+        """Start Meshcat recording for a visualization-enabled scenario."""
+        if self.runtime.meshcat is None:
+            raise RuntimeError(
+                "Scenario visualization must be enabled to record HTML"
+            )
+        self.runtime.meshcat.StartRecording()
+
+    def save_recording(self, output_path: Path) -> None:
+        """Stop and write the active Meshcat recording as standalone HTML."""
+        if self.runtime.meshcat is None:
+            raise RuntimeError(
+                "Scenario visualization must be enabled to record HTML"
+            )
+        self.runtime.meshcat.StopRecording()
+        self.runtime.meshcat.PublishRecording()
+        destination = Path(output_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            self.runtime.meshcat.StaticHtml(),
+            encoding="utf-8",
+        )
+
+    def _minimum_robot_signed_distance(
+        self,
+        query_radius_m: float = 1.0,
+    ) -> tuple[float, bool]:
+        """Return filtered robot-related distance or a query-radius bound."""
+        plant = self.runtime.plant
+        plant_context = self.runtime.plant_context
+        query = plant.get_geometry_query_input_port().Eval(plant_context)
+        inspector = query.inspector()
+        robot_geometry_ids = set()
+        for body_index in plant.GetBodyIndices(
+            self.runtime.robot_model_instance
+        ):
+            body = plant.get_body(body_index)
+            frame_id = plant.GetBodyFrameIdOrThrow(body.index())
+            robot_geometry_ids.update(
+                inspector.GetGeometries(frame_id, Role.kProximity)
+            )
+        distances = [
+            float(pair.distance)
+            for pair in query.ComputeSignedDistancePairwiseClosestPoints(
+                query_radius_m
+            )
+            if pair.id_A in robot_geometry_ids
+            or pair.id_B in robot_geometry_ids
+        ]
+        if distances:
+            return min(distances), False
+        return query_radius_m, True
 
     def _observation(self) -> Observation:
         """Read a generic observation from the active Drake context."""

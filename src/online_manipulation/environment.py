@@ -28,6 +28,12 @@ class RuntimeBackend(Protocol):
     def write_updated_scenario(self, output_path: Path) -> tuple[str, ...]:
         """Write explicitly selected free-body poses to a new DMD file."""
 
+    def start_recording(self) -> None:
+        """Start an optional visualization recording."""
+
+    def save_recording(self, output_path: Path) -> None:
+        """Stop and save an active visualization recording."""
+
 
 class OnlineManipulationEnv:
     """Expose deterministic Gym-style reset and step over a runtime backend.
@@ -114,3 +120,17 @@ class OnlineManipulationEnv:
     def write_updated_scenario(self, output_path: Path) -> tuple[str, ...]:
         """Write selected final object poses without changing the input DMD."""
         return self._backend.write_updated_scenario(Path(output_path))
+
+    def finalize_episode(self) -> dict:
+        """Return task-owned final metadata for the current episode."""
+        if self._observation is None:
+            raise RuntimeError("Call reset() before finalizing an episode")
+        return dict(self._task.finalize(self))
+
+    def start_recording(self) -> None:
+        """Start backend visualization recording when configured."""
+        self._backend.start_recording()
+
+    def save_recording(self, output_path: Path) -> None:
+        """Save an active backend visualization recording."""
+        self._backend.save_recording(Path(output_path))

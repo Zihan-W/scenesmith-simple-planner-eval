@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
 Last updated: 2026-09-05
-Current phase: Phase 5 — Episode Runner and DMD Finalizer
+Current phase: Phase 6 — External Policy Examples
 
 ## Product Goal
 
@@ -24,6 +24,7 @@ Current phase: Phase 5 — Episode Runner and DMD Finalizer
 * `a2debf7` Introduce Zerith online environment adapter
 * `8cab195` Add typed online manipulation environment facade
 * `30736b5` Add task and planning query interfaces
+* `cee8389` Add selective DMD pose finalization
 
 ## Current Validated State
 
@@ -238,6 +239,26 @@ SCENE_ROOT=/root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000
     output/zerith_pick_eval/roundtrip_pregrasp.dmd.yaml
 ```
 
+## Phase 5B Episode Runner
+
+`run_episode()` and `run_episodes()` now execute external Policy objects over
+the public environment contract. They support deterministic seeds, a strict
+runner step limit, complete reset between episodes, and non-overwriting output
+directories. The runner owns no robot, object, task, or motion-state names.
+
+Each episode summary records success, termination reason, simulated duration,
+policy-step count, live robot-related minimum signed distance, maximum joint
+tracking error, torque-saturation statistics, contact events, task finalization
+metadata, and initial/final poses of every observed object. Artifacts are
+`summary.json`, `trace.csv`, optional `simulation.html`, and optional
+`final.dmd.yaml`.
+
+The 31-test suite covers the runner metrics, both artifact formats, optional
+HTML/final-DMD hooks, multi-seed reset, distinct directory naming, and refusal
+to overwrite a nonempty result directory. A real headless Zerith hold episode
+also passed through the runner and reported the expected 1.64127 mm minimum
+robot-related signed distance with zero tracking error.
+
 ## Phase 0 Reproducible Commands
 
 Run from `/root/workspace/scenesmith-simple-planner-eval` after activating the
@@ -314,7 +335,7 @@ largest reported step error was `0.013955 rad`.
 * [x] Phase 2: introduce ScenarioSpec and ZerithRobotAdapter
 * [x] Phase 3: generalize controller, action and observation
 * [x] Phase 4: implement Task, ContactPolicy and PlanningQuery
-* [ ] Phase 5: implement EpisodeRunner and DMD finalizer
+* [x] Phase 5: implement EpisodeRunner and DMD finalizer
 * [ ] Phase 6: add external policy, BT and TAMP examples
 * [ ] Phase 7: run PickLift integration test
 * [ ] Phase 8: documentation, API audit and clean worktree
@@ -328,6 +349,6 @@ largest reported step error was `0.013955 rad`.
 
 ## Next Action
 
-Begin Phase 5 by implementing generic DMD write-back with reload round-trip
-validation, then add deterministic headless EpisodeRunner JSON/CSV/optional
-HTML outputs without embedding a policy or task in Environment.
+Begin Phase 6 by adding external HoldPolicy, JointStepPolicy, and a staged
+PickLiftPolicy. Preserve the validated open-gripper PREGRASP result while the
+physical APPROACH/CLOSE/LIFT sequence is developed and diagnosed.
