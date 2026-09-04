@@ -59,14 +59,47 @@ python scripts/visualize_zerith_left_arm.py \
     --robot-yaw-deg <yaw>
 ```
 
-Run the experimental finite-torque left-arm controller:
+Run the online finite-torque left-arm control regression:
 
 ```bash
 python scripts/simulate_zerith_left_arm.py \
-    <scene-root>/combined_house/house_furniture_welded.dmd.yaml \
-    --robot-xyz <x> <y> <z> \
-    --robot-yaw-deg <yaw>
+    <scene-root>/combined_house/house_furniture_welded.dmd.yaml
 ```
+
+This test uses a 1 kHz Drake plant, a 200 Hz gravity-compensated PD
+servo, and a 10 Hz policy interface. It performs a five-second home-pose hold
+followed by a positive and negative step test for each left-arm joint. It does
+not load a plan or use RRT or TOPPRA. Controller-frequency state, gravity, PD,
+raw, applied, and saturation values are written to
+`zerith_online_control.csv`; the run is recorded in
+`zerith_online_control.html`.
+
+Policies can use the environment directly:
+
+```python
+from pathlib import Path
+
+import numpy as np
+
+from src.zerith_online_env import ZerithOnlineEnv
+
+env = ZerithOnlineEnv(
+    scene_dmd=Path("<scene-root>/combined_house/house_furniture_welded.dmd.yaml"),
+    robot_model_dir=Path("models/zerith_drake"),
+    target_model_name="living_room_box_0",
+)
+observation = env.reset()
+
+done = False
+while not done:
+    action = np.r_[np.zeros(7), 1.0]
+    observation, reward, done, info = env.step(action)
+```
+
+The action is seven accumulated joint-target increments in radians followed by
+one normalized gripper command (`-1` closed, `+1` open). Each action is held
+for one policy period. The first version returns zero reward; task rewards and
+termination belong to the evaluation layer.
 
 ## Usage
 

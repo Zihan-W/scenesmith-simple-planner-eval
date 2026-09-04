@@ -1,90 +1,29 @@
 #!/usr/bin/env python3
-"""Run contact-aware PD control of Zerith's left arm in a SceneSmith scene."""
+"""Run online Zerith hold-pose and per-joint step regression tests."""
 
 import argparse
-import time
-import xml.etree.ElementTree as ET
+import sys
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
-from pydrake.all import (
-    AddMultibodyPlantSceneGraph,
-    DiagramBuilder,
-    LoadModelDirectives,
-    Meshcat,
-    MeshcatVisualizer,
-    MeshcatVisualizerParams,
-    Parser,
-    ProcessModelDirectives,
-    RigidTransform,
-    Role,
-    RollPitchYaw,
-    Simulator,
-)
+from pydrake.all import Meshcat
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
-ZERITH_PACKAGE_NAME = "zerith_drake"
+sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from src.zerith_online_env import LEFT_ARM_SERVO_CONFIGS, ZerithOnlineEnv
+
 ZERITH_MODEL_RELATIVE_PATH = Path("models/zerith_drake")
-ZERITH_URDF_RELATIVE_PATH = Path("urdf/zerith_drake.urdf")
-
-
-@dataclass(frozen=True)
-class JointControllerConfig:
-    """Parameters for one independently actuated joint."""
-
-    name: str
-    kp: float
-    kd: float
-    effort_limit: float
-    slider_step: float
-    initial_position: float = 0.0
-
-
-@dataclass(frozen=True)
-class Penetration:
-    """One active penetration pair involving a Zerith collision geometry."""
-
-    depth: float
-    frame_a: str
-    frame_b: str
-
-
-JOINT_CONFIGS = (
-    JointControllerConfig("left_shoulder_pitch_joint", 80.0, 8.0, 36.0, 0.01),
-    JointControllerConfig("left_shoulder_roll_joint", 80.0, 8.0, 36.0, 0.01),
-    JointControllerConfig("left_shoulder_yaw_joint", 60.0, 6.0, 27.0, 0.01),
-    JointControllerConfig("left_elbow_joint", 60.0, 6.0, 27.0, 0.01),
-    JointControllerConfig("left_wrist_roll_joint", 20.0, 2.0, 9.0, 0.01),
-    JointControllerConfig("left_wrist_yaw_joint", 20.0, 2.0, 9.0, 0.01),
-    JointControllerConfig("left_wrist_pitch_joint", 20.0, 2.0, 9.0, 0.01),
-    JointControllerConfig(
-        "left_jaw_left_finger_joint",
-        500.0,
-        10.0,
-        25.0,
-        0.001,
-        -0.04,
-    ),
-    JointControllerConfig(
-        "left_jaw_right_finger_joint",
-        500.0,
-        10.0,
-        25.0,
-        0.001,
-        0.04,
-    ),
-)
 
 
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description=(
-            "Simulate Zerith's left arm with finite-torque PD control and "
-            "Drake contact dynamics."
+            "Exercise Zerith through an online reset()/step(action) control "
+            "environment without RRT, TOPPRA, or a trajectory file."
         )
     )
     parser.add_argument(
@@ -104,36 +43,79 @@ def _parse_args() -> argparse.Namespace:
         help="Generated Drake package containing Zerith's urdf/ and meshes/.",
     )
     parser.add_argument(
+        "--target-model-name",
+        default="living_room_box_0",
+        help="Scene model instance exposed as red_box_pose in observations.",
+    )
+    parser.add_argument(
         "--robot-xyz",
         type=float,
         nargs=3,
-        default=(4.177360808362734, 0.60, 0.1815),
+        default=(3.05, 3.07, 0.1815),
         metavar=("X", "Y", "Z"),
-        help="World position of the welded dipan_link in meters.",
+        help=(
+            "World position of the welded dipan_link in meters "
+            "(default: east of the coffee table)."
+        ),
     )
     parser.add_argument(
         "--robot-yaw-deg",
         type=float,
-        default=90.0,
-        help="World yaw of dipan_link in degrees.",
+        default=180.0,
+        help=(
+            "World yaw of dipan_link in degrees "
+            "(default: facing the coffee table)."
+        ),
+    )
+    parser.add_argument(
+        "--q-home",
+        type=float,
+        nargs=7,
+        default=(0.0,) * 7,
+        metavar=("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"),
+        help="Seven-joint left-arm home posture in radians.",
     )
     parser.add_argument(
         "--time-step",
         type=float,
         default=0.001,
-        help="MultibodyPlant discrete time step in seconds.",
+        help="Drake plant time step in seconds (default: 0.001, 1000 Hz).",
     )
     parser.add_argument(
         "--control-period",
         type=float,
         default=0.005,
-        help="PD command update period in seconds.",
+        help="Gravity-compensated PD period (default: 0.005, 200 Hz).",
+    )
+    parser.add_argument(
+        "--policy-period",
+        type=float,
+        default=0.1,
+        help="Policy action period (default: 0.1, 10 Hz).",
+    )
+    parser.add_argument(
+        "--hold-duration",
+        type=float,
+        default=5.0,
+        help="Duration of the q_home hold regression in seconds.",
+    )
+    parser.add_argument(
+        "--step-delta",
+        type=float,
+        default=0.1,
+        help="Per-joint regression step size in radians.",
+    )
+    parser.add_argument(
+        "--step-settle-duration",
+        type=float,
+        default=1.0,
+        help="Hold time after each positive and negative joint step.",
     )
     parser.add_argument(
         "--realtime-rate",
         type=float,
         default=1.0,
-        help="Target simulator realtime rate.",
+        help="Target simulator realtime rate; zero runs as fast as possible.",
     )
     parser.add_argument(
         "--meshcat-port",
@@ -143,292 +125,178 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--initial-penetration-limit",
         type=float,
+        help="Fail if a filtered initial penetration exceeds this depth.",
+    )
+    parser.add_argument(
+        "--keep-known-invalid-self-collisions",
+        action="store_true",
         help=(
-            "Fail before simulation if an active robot penetration exceeds "
-            "this depth in meters."
+            "Do not filter the seven documented whole-mesh proxy "
+            "false positives."
         ),
+    )
+    parser.add_argument(
+        "--control-log",
+        type=Path,
+        default=Path("zerith_online_control.csv"),
+        help="Controller-frequency CSV output path.",
+    )
+    parser.add_argument(
+        "--record-html",
+        type=Path,
+        default=Path("zerith_online_control.html"),
+        help="Static Meshcat recording output path.",
     )
     return parser.parse_args()
 
 
-def _find_package_xml(scene_dmd: Path) -> Path:
-    """Find the nearest package.xml containing a scene DMD."""
-    for directory in scene_dmd.parents:
-        package_xml = directory / "package.xml"
-        if package_xml.is_file():
-            return package_xml
-    raise FileNotFoundError(
-        f"Could not find package.xml above {scene_dmd}. "
-        "Pass --scene-package-xml explicitly."
+def _policy_steps(duration: float, policy_period: float) -> int:
+    """Convert a duration to an exact positive number of policy steps."""
+    if duration <= 0.0:
+        raise ValueError("Test durations must be positive")
+    steps = round(duration / policy_period)
+    if steps < 1 or not np.isclose(
+        steps * policy_period,
+        duration,
+        atol=1e-12,
+    ):
+        raise ValueError(
+            f"Duration {duration} must be an integer multiple of "
+            f"policy period {policy_period}"
+        )
+    return steps
+
+
+def _run_zero_actions(env: ZerithOnlineEnv, count: int) -> dict:
+    """Advance the environment with a held arm target and open gripper."""
+    observation = None
+    for _ in range(count):
+        observation, _, done, _ = env.step(
+            np.r_[np.zeros(7), 1.0]
+        )
+        if done:
+            raise RuntimeError(
+                "Episode ended before regression test completed"
+            )
+    assert observation is not None
+    return observation
+
+
+def _saturation_ratio(samples) -> float:
+    """Return the fraction of arm actuator samples that were saturated."""
+    if not samples:
+        return 0.0
+    saturated = np.vstack([sample.saturated[:7] for sample in samples])
+    return float(np.mean(saturated))
+
+
+def main() -> None:
+    """Run online hold and step policies through the reset/step interface."""
+    args = _parse_args()
+    hold_steps = _policy_steps(args.hold_duration, args.policy_period)
+    settle_steps = _policy_steps(
+        args.step_settle_duration,
+        args.policy_period,
+    )
+    episode_duration = (
+        args.hold_duration
+        + 2.0
+        * len(LEFT_ARM_SERVO_CONFIGS)
+        * (args.policy_period + args.step_settle_duration)
+        + args.policy_period
     )
 
+    meshcat = Meshcat(args.meshcat_port)
+    env = ZerithOnlineEnv(
+        scene_dmd=args.scene_dmd,
+        scene_package_xml=args.scene_package_xml,
+        robot_model_dir=args.robot_model_dir,
+        target_model_name=args.target_model_name,
+        robot_xyz=args.robot_xyz,
+        robot_yaw_deg=args.robot_yaw_deg,
+        q_home=args.q_home,
+        physics_dt=args.time_step,
+        controller_dt=args.control_period,
+        policy_dt=args.policy_period,
+        episode_duration=episode_duration,
+        max_joint_delta=abs(args.step_delta),
+        realtime_rate=args.realtime_rate,
+        meshcat=meshcat,
+        filter_known_invalid_self_collisions=(
+            not args.keep_known_invalid_self_collisions
+        ),
+    )
 
-def _register_package_xml(parser: Parser, package_xml: Path) -> None:
-    """Register a ROS-style package.xml in a Drake parser."""
-    root = ET.parse(package_xml).getroot()
-    name = root.findtext("name")
-    if name is None:
-        raise ValueError(f"Missing <name> in {package_xml}")
-    parser.package_map().Add(name.strip(), str(package_xml.parent))
-
-
-def _add_sliders(meshcat: Meshcat, plant, zerith, plant_context) -> None:
-    """Add desired-position sliders for each controlled joint."""
-    positions = plant.GetPositions(plant_context)
-    lower_limits = plant.GetPositionLowerLimits()
-    upper_limits = plant.GetPositionUpperLimits()
-
-    for config in JOINT_CONFIGS:
-        joint = plant.GetJointByName(config.name, zerith)
-        position_index = joint.position_start()
-        meshcat.AddSlider(
-            config.name,
-            min=lower_limits[position_index],
-            max=upper_limits[position_index],
-            step=config.slider_step,
-            value=positions[position_index],
-        )
-    meshcat.AddButton("Stop simulation", "Escape")
-
-
-def _set_initial_positions(plant, zerith, plant_context) -> None:
-    """Set the initial controlled-joint positions before simulation starts."""
-    positions = plant.GetPositions(plant_context).copy()
-    for config in JOINT_CONFIGS:
-        joint = plant.GetJointByName(config.name, zerith)
-        positions[joint.position_start()] = config.initial_position
-    plant.SetPositions(plant_context, positions)
-
-
-def _lock_uncontrolled_joints(plant, zerith, plant_context) -> list[str]:
-    """Lock every movable Zerith joint not controlled by this experiment."""
-    controlled_names = {config.name for config in JOINT_CONFIGS}
-    locked_names = []
-    for joint_index in plant.GetJointIndices(zerith):
-        joint = plant.get_joint(joint_index)
-        if joint.num_velocities() == 0 or joint.name() in controlled_names:
-            continue
-        joint.Lock(plant_context)
-        locked_names.append(joint.name())
-    return locked_names
-
-
-def _calc_pd_actuation(meshcat: Meshcat, plant, zerith, plant_context) -> np.ndarray:
-    """Calculate a saturated full-plant actuation vector from slider targets."""
-    positions = plant.GetPositions(plant_context)
-    velocities = plant.GetVelocities(plant_context)
-    actuation = np.zeros(plant.num_actuated_dofs())
-
-    for config in JOINT_CONFIGS:
-        joint = plant.GetJointByName(config.name, zerith)
-        actuator = plant.GetJointActuatorByName(f"{config.name}_actuator", zerith)
-        desired_position = meshcat.GetSliderValue(config.name)
-        position = positions[joint.position_start()]
-        velocity = velocities[joint.velocity_start()]
-        effort = config.kp * (desired_position - position) - config.kd * velocity
-        actuation[actuator.input_start()] = np.clip(
-            effort,
-            -config.effort_limit,
-            config.effort_limit,
-        )
-
-    return actuation
-
-
-def _find_robot_penetrations(
-    plant,
-    scene_graph,
-    root_context,
-    zerith,
-) -> list[Penetration]:
-    """Return active penetrations involving Zerith after collision filtering."""
-    robot_geometry_ids = set()
-    for body_index in plant.GetBodyIndices(zerith):
-        body = plant.get_body(body_index)
-        robot_geometry_ids.update(plant.GetCollisionGeometriesForBody(body))
-
-    scene_graph_context = scene_graph.GetMyContextFromRoot(root_context)
-    query_object = scene_graph.get_query_output_port().Eval(scene_graph_context)
-    inspector = query_object.inspector()
-    penetrations = []
-    for pair in query_object.ComputePointPairPenetration():
-        if (
-            pair.id_A not in robot_geometry_ids
-            and pair.id_B not in robot_geometry_ids
-        ):
-            continue
-        penetrations.append(
-            Penetration(
-                depth=pair.depth,
-                frame_a=inspector.GetName(inspector.GetFrameId(pair.id_A)),
-                frame_b=inspector.GetName(inspector.GetFrameId(pair.id_B)),
-            )
-        )
-    return sorted(penetrations, key=lambda item: item.depth, reverse=True)
-
-
-def _report_initial_penetrations(
-    penetrations: list[Penetration],
-    penetration_limit: float | None,
-) -> None:
-    """Print active initial penetrations and enforce an optional depth limit."""
-    print(f"Initial active robot penetration pairs: {len(penetrations)}")
+    meshcat.StartRecording()
+    observation = env.reset()
+    penetrations = env.robot_penetrations()
+    print(f"Meshcat URL: {meshcat.web_url()}")
+    print(
+        "Frequencies: "
+        f"physics={1.0 / env.physics_dt:.0f} Hz, "
+        f"servo={1.0 / env.controller_dt:.0f} Hz, "
+        f"policy={1.0 / env.policy_dt:.0f} Hz"
+    )
+    print(
+        "Initial active filtered robot penetration pairs: "
+        f"{len(penetrations)}"
+    )
     for penetration in penetrations:
         print(
             f"  {penetration.depth:.6f} m: "
             f"{penetration.frame_a} <-> {penetration.frame_b}"
         )
-
     if (
-        penetration_limit is not None
+        args.initial_penetration_limit is not None
         and penetrations
-        and penetrations[0].depth > penetration_limit
+        and penetrations[0].depth > args.initial_penetration_limit
     ):
         raise ValueError(
             f"Maximum initial penetration {penetrations[0].depth:.6f} m "
-            f"exceeds limit {penetration_limit:.6f} m"
+            f"exceeds limit {args.initial_penetration_limit:.6f} m"
         )
 
-
-def main() -> None:
-    """Build and run the contact-aware left-arm simulation."""
-    args = _parse_args()
-    if args.time_step <= 0.0:
-        raise ValueError("--time-step must be positive")
-    if args.control_period < args.time_step:
-        raise ValueError("--control-period must be at least --time-step")
-
-    scene_dmd = args.scene_dmd.resolve()
-    package_xml = (
-        args.scene_package_xml.resolve()
-        if args.scene_package_xml is not None
-        else _find_package_xml(scene_dmd)
+    hold_log_start = len(env.control_log)
+    observation = _run_zero_actions(env, hold_steps)
+    hold_samples = env.control_log[hold_log_start:]
+    hold_error = np.abs(observation["q_left"] - env.q_home)
+    print("q_home hold test completed")
+    print(f"  max final joint error: {np.max(hold_error):.6f} rad")
+    print(
+        "  arm torque saturation ratio: "
+        f"{_saturation_ratio(hold_samples):.6f}"
     )
-    robot_model_dir = args.robot_model_dir.resolve()
-    robot_urdf = robot_model_dir / ZERITH_URDF_RELATIVE_PATH
 
-    if not scene_dmd.is_file():
-        raise FileNotFoundError(f"Scene DMD does not exist: {scene_dmd}")
-    if not package_xml.is_file():
-        raise FileNotFoundError(f"Scene package.xml does not exist: {package_xml}")
-    if not robot_urdf.is_file():
-        raise FileNotFoundError(
-            f"Zerith URDF does not exist: {robot_urdf}\n"
-            "Run `python scripts/convert_zerith_for_drake.py`."
+    for joint_index, config in enumerate(LEFT_ARM_SERVO_CONFIGS):
+        positive_action = np.r_[np.zeros(7), 1.0]
+        positive_action[joint_index] = args.step_delta
+        observation, _, _, positive_info = env.step(positive_action)
+        observation = _run_zero_actions(env, settle_steps)
+        positive_error = (
+            positive_info["desired_q_left"][joint_index]
+            - observation["q_left"][joint_index]
         )
 
-    meshcat = Meshcat(args.meshcat_port)
-    meshcat.Delete()
-    builder = DiagramBuilder()
-    plant, scene_graph = AddMultibodyPlantSceneGraph(
-        builder,
-        time_step=args.time_step,
-    )
-    parser = Parser(plant)
-    parser.SetAutoRenaming(True)
-    _register_package_xml(parser, package_xml)
-    parser.package_map().Add(ZERITH_PACKAGE_NAME, str(robot_model_dir))
-
-    directives = LoadModelDirectives(str(scene_dmd))
-    ProcessModelDirectives(directives, parser)
-    model_instances = parser.AddModels(str(robot_urdf))
-    if len(model_instances) != 1:
-        raise RuntimeError(f"Expected one Zerith model, got {len(model_instances)}")
-    zerith = model_instances[0]
-
-    collision_geometry_count = sum(
-        len(plant.GetCollisionGeometriesForBody(plant.get_body(body_index)))
-        for body_index in plant.GetBodyIndices(zerith)
-    )
-    if collision_geometry_count != 37:
-        raise ValueError(
-            f"Expected 37 Zerith collision geometries, got {collision_geometry_count}"
+        negative_action = np.r_[np.zeros(7), 1.0]
+        negative_action[joint_index] = -args.step_delta
+        observation, _, _, negative_info = env.step(negative_action)
+        observation = _run_zero_actions(env, settle_steps)
+        return_error = (
+            negative_info["desired_q_left"][joint_index]
+            - observation["q_left"][joint_index]
+        )
+        print(
+            f"{config.name}: "
+            f"step_error={positive_error:.6f} rad, "
+            f"return_error={return_error:.6f} rad"
         )
 
-    base_frame = plant.GetFrameByName("dipan_link", zerith)
-    plant.WeldFrames(
-        plant.world_frame(),
-        base_frame,
-        RigidTransform(
-            RollPitchYaw(0.0, 0.0, np.deg2rad(args.robot_yaw_deg)),
-            args.robot_xyz,
-        ),
-    )
-
-    for config in JOINT_CONFIGS:
-        joint = plant.GetJointByName(config.name, zerith)
-        plant.AddJointActuator(
-            f"{config.name}_actuator",
-            joint,
-            effort_limit=config.effort_limit,
-        )
-
-    plant.Finalize()
-    MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat)
-    collision_params = MeshcatVisualizerParams()
-    collision_params.prefix = "collision"
-    collision_params.role = Role.kProximity
-    collision_params.visible_by_default = False
-    MeshcatVisualizer.AddToBuilder(
-        builder,
-        scene_graph,
-        meshcat,
-        collision_params,
-    )
-
-    diagram = builder.Build()
-    context = diagram.CreateDefaultContext()
-    plant_context = plant.GetMyMutableContextFromRoot(context)
-    _set_initial_positions(plant, zerith, plant_context)
-    locked_joints = _lock_uncontrolled_joints(plant, zerith, plant_context)
-    _add_sliders(meshcat, plant, zerith, plant_context)
-    initial_penetrations = _find_robot_penetrations(
-        plant,
-        scene_graph,
-        context,
-        zerith,
-    )
-    _report_initial_penetrations(
-        initial_penetrations,
-        args.initial_penetration_limit,
-    )
-
-    actuation_port = plant.get_actuation_input_port()
-    actuation_port.FixValue(
-        plant_context,
-        _calc_pd_actuation(meshcat, plant, zerith, plant_context),
-    )
-
-    simulator = Simulator(diagram, context)
-    simulator.set_target_realtime_rate(args.realtime_rate)
-    simulator.Initialize()
-
-    print(f"Meshcat URL: {meshcat.web_url()}")
-    print(f"Scene: {scene_dmd}")
-    print(f"Zerith URDF: {robot_urdf}")
-    print(f"Zerith collision geometries: {collision_geometry_count}")
-    print(f"Controlled joints: {len(JOINT_CONFIGS)}")
-    print(f"Locked Zerith joints: {len(locked_joints)}")
-    print("The sliders are desired positions, not direct joint positions.")
-    print("Use the collision tree checkbox to inspect proximity geometry.")
-    print("Press Escape or Ctrl+C to stop.")
-
-    try:
-        while meshcat.GetButtonClicks("Stop simulation") < 1:
-            actuation = _calc_pd_actuation(
-                meshcat,
-                plant,
-                zerith,
-                plant_context,
-            )
-            actuation_port.FixValue(plant_context, actuation)
-            simulator.AdvanceTo(context.get_time() + args.control_period)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        for config in JOINT_CONFIGS:
-            meshcat.DeleteSlider(config.name)
-        meshcat.DeleteButton("Stop simulation")
+    env.write_control_log(args.control_log)
+    meshcat.StopRecording()
+    meshcat.PublishRecording()
+    args.record_html.write_text(meshcat.StaticHtml())
+    print(f"Control log: {args.control_log.resolve()}")
+    print(f"Meshcat recording: {args.record_html.resolve()}")
 
 
 if __name__ == "__main__":

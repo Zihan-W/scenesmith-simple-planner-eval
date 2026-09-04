@@ -1,0 +1,691 @@
+"""Online fixed-base Zerith control environment built on Drake.
+
+The environment exposes a small Gym-like reset / step API. A policy updates
+an eight-dimensional action at policy_dt while a gravity-compensated
+joint-space PD servo runs at controller_dt and the Drake plant advances at
+physics_dt.
+"""
+
+import csv
+import dataclasses
+import xml.etree.ElementTree as ET
+
+from pathlib import Path
+from typing import Any, Sequence
+
+import numpy as np
+
+from pydrake.all import (
+    AddMultibodyPlantSceneGraph,
+    CollisionFilterDeclaration,
+    DiagramBuilder,
+    GeometrySet,
+    LoadModelDirectives,
+    Meshcat,
+    MeshcatVisualizer,
+    MeshcatVisualizerParams,
+    Parser,
+    ProcessModelDirectives,
+    RigidTransform,
+    Role,
+    RollPitchYaw,
+    Simulator,
+)
+
+ZERITH_PACKAGE_NAME = "zerith_drake"
+ZERITH_URDF_RELATIVE_PATH = Path("urdf/zerith_drake.urdf")
+
+
+@dataclasses.dataclass(frozen=True)
+class JointServoConfig:
+    """PD gains and torque limit for a single controlled joint."""
+
+    name: str
+    kp: float
+    kd: float
+    effort_limit: float
+
+
+LEFT_ARM_SERVO_CONFIGS = (
+    JointServoConfig("left_shoulder_pitch_joint", 80.0, 8.0, 36.0),
+    JointServoConfig("left_shoulder_roll_joint", 80.0, 8.0, 36.0),
+    JointServoConfig("left_shoulder_yaw_joint", 20.0, 3.5, 27.0),
+    JointServoConfig("left_elbow_joint", 60.0, 6.0, 27.0),
+    JointServoConfig("left_wrist_roll_joint", 2.0, 0.1, 9.0),
+    JointServoConfig("left_wrist_yaw_joint", 2.0, 0.2, 9.0),
+    JointServoConfig("left_wrist_pitch_joint", 2.0, 0.2, 9.0),
+)
+LEFT_GRIPPER_SERVO_CONFIGS = (
+    JointServoConfig("left_jaw_left_finger_joint", 100.0, 4.0, 25.0),
+    JointServoConfig("left_jaw_right_finger_joint", 100.0, 4.0, 25.0),
+)
+ALL_SERVO_CONFIGS = LEFT_ARM_SERVO_CONFIGS + LEFT_GRIPPER_SERVO_CONFIGS
+
+# These pairs are known false positives caused by the current whole-mesh
+# convex collision proxies. Keep the list narrow so unrelated robot contact
+# and every robot-environment contact remain active.
+KNOWN_INVALID_SELF_COLLISION_PAIRS = (
+    ("left_wrist_roll_link", "left_wrist_pitch_link"),
+    ("right_wrist_roll_link", "right_wrist_pitch_link"),
+    ("left_jaw_left_finger_link", "left_end_effector_link"),
+    ("left_jaw_right_finger_link", "left_end_effector_link"),
+    ("left_jaw_left_finger_link", "left_jaw_right_finger_link"),
+    ("right_jaw_left_finger_link", "right_end_effector_link"),
+    ("right_jaw_right_finger_link", "right_end_effector_link"),
+)
+
+
+@dataclasses.dataclass(frozen=True)
+class ControlSample:
+    """One low-level servo sample recorded at controller frequency."""
+
+    time: float
+    q: np.ndarray
+    q_desired: np.ndarray
+    gravity_torque: np.ndarray
+    pd_torque: np.ndarray
+    raw_torque: np.ndarray
+    applied_torque: np.ndarray
+    saturated: np.ndarray
+
+
+@dataclasses.dataclass(frozen=True)
+class Penetration:
+    """One active penetration pair involving the Zerith model."""
+
+    depth: float
+    frame_a: str
+    frame_b: str
+
+
+def find_package_xml(scene_dmd: Path) -> Path:
+    """Find the nearest package.xml containing a scene DMD."""
+    for directory in scene_dmd.parents:
+        package_xml = directory / "package.xml"
+        if package_xml.is_file():
+            return package_xml
+    raise FileNotFoundError(
+        f"Could not find package.xml above {scene_dmd}. "
+        "Pass scene_package_xml explicitly."
+    )
+
+
+def _register_package_xml(parser: Parser, package_xml: Path) -> None:
+    """Register a ROS-style package.xml in a Drake parser."""
+    root = ET.parse(package_xml).getroot()
+    name = root.findtext("name")
+    if name is None:
+        raise ValueError(f"Missing <name> in {package_xml}")
+    parser.package_map().Add(name.strip(), str(package_xml.parent))
+
+
+def _pose_vector(transform: RigidTransform) -> np.ndarray:
+    """Return pose as [x, y, z, qw, qx, qy, qz]."""
+    return np.concatenate(
+        (
+            transform.translation(),
+            transform.rotation().ToQuaternion().wxyz(),
+        )
+    )
+
+
+def _validate_period_ratio(
+    long_period: float,
+    short_period: float,
+    names: str,
+) -> int:
+    """Validate an integer timing ratio and return its rounded value."""
+    if long_period <= 0.0 or short_period <= 0.0:
+        raise ValueError(f"{names} periods must be positive")
+    ratio = long_period / short_period
+    rounded_ratio = round(ratio)
+    if rounded_ratio < 1 or not np.isclose(ratio, rounded_ratio, atol=1e-12):
+        raise ValueError(f"{names} must have an integer ratio, got {ratio}")
+    return rounded_ratio
+
+
+class ZerithOnlineEnv:
+    """Fixed-base online control environment for Zerith's left arm.
+
+    The action is [delta_q_left[7], gripper_command]. Joint deltas are in
+    radians and accumulate on the previously held target. The gripper command
+    is absolute and normalized: -1 is closed and +1 is fully open.
+
+    Observation poses use [x, y, z, qw, qx, qy, qz] and spatial velocity uses
+    [wx, wy, wz, vx, vy, vz].
+    """
+
+    def __init__(
+        self,
+        *,
+        scene_dmd: Path,
+        robot_model_dir: Path,
+        target_model_name: str,
+        scene_package_xml: Path | None = None,
+        target_body_name: str = "base_link",
+        robot_xyz: Sequence[float] = (3.05, 3.07, 0.1815),
+        robot_yaw_deg: float = 180.0,
+        q_home: Sequence[float] | None = None,
+        physics_dt: float = 0.001,
+        controller_dt: float = 0.005,
+        policy_dt: float = 0.1,
+        episode_duration: float = 30.0,
+        max_joint_delta: float = 0.1,
+        realtime_rate: float = 0.0,
+        meshcat: Meshcat | None = None,
+        filter_known_invalid_self_collisions: bool = True,
+    ):
+        """Build the Drake diagram and initialize immutable model metadata."""
+        self._scene_dmd = Path(scene_dmd).resolve()
+        self._robot_model_dir = Path(robot_model_dir).resolve()
+        self._scene_package_xml = (
+            Path(scene_package_xml).resolve()
+            if scene_package_xml is not None
+            else find_package_xml(self._scene_dmd)
+        )
+        self._robot_urdf = (
+            self._robot_model_dir / ZERITH_URDF_RELATIVE_PATH
+        )
+        if not self._scene_dmd.is_file():
+            raise FileNotFoundError(
+                f"Scene DMD does not exist: {self._scene_dmd}"
+            )
+        if not self._scene_package_xml.is_file():
+            raise FileNotFoundError(
+                f"Scene package.xml does not exist: {self._scene_package_xml}"
+            )
+        if not self._robot_urdf.is_file():
+            raise FileNotFoundError(
+                f"Zerith URDF does not exist: {self._robot_urdf}\n"
+                "Run python scripts/convert_zerith_for_drake.py."
+            )
+
+        self.physics_dt = float(physics_dt)
+        self.controller_dt = float(controller_dt)
+        self.policy_dt = float(policy_dt)
+        self.episode_duration = float(episode_duration)
+        self.max_joint_delta = float(max_joint_delta)
+        self.realtime_rate = float(realtime_rate)
+        if self.episode_duration <= 0.0:
+            raise ValueError("episode_duration must be positive")
+        if self.max_joint_delta <= 0.0:
+            raise ValueError("max_joint_delta must be positive")
+        self._physics_steps_per_control = _validate_period_ratio(
+            self.controller_dt,
+            self.physics_dt,
+            "controller_dt / physics_dt",
+        )
+        self._control_steps_per_policy = _validate_period_ratio(
+            self.policy_dt,
+            self.controller_dt,
+            "policy_dt / controller_dt",
+        )
+
+        if q_home is None:
+            q_home = np.zeros(len(LEFT_ARM_SERVO_CONFIGS))
+        self._q_home = np.asarray(q_home, dtype=float)
+        if self._q_home.shape != (len(LEFT_ARM_SERVO_CONFIGS),):
+            raise ValueError(
+                "q_home must contain exactly seven left-arm joint positions"
+            )
+
+        self.meshcat = meshcat
+        if self.meshcat is not None:
+            self.meshcat.Delete()
+
+        builder = DiagramBuilder()
+        self.plant, self.scene_graph = AddMultibodyPlantSceneGraph(
+            builder,
+            time_step=self.physics_dt,
+        )
+        parser = Parser(self.plant)
+        parser.SetAutoRenaming(True)
+        _register_package_xml(parser, self._scene_package_xml)
+        parser.package_map().Add(
+            ZERITH_PACKAGE_NAME,
+            str(self._robot_model_dir),
+        )
+        directives = LoadModelDirectives(str(self._scene_dmd))
+        ProcessModelDirectives(directives, parser)
+        model_instances = parser.AddModels(str(self._robot_urdf))
+        if len(model_instances) != 1:
+            raise RuntimeError(
+                f"Expected one Zerith model, got {len(model_instances)}"
+            )
+        self._zerith = model_instances[0]
+        self._target_instance = self.plant.GetModelInstanceByName(
+            target_model_name
+        )
+        self._target_body = self.plant.GetBodyByName(
+            target_body_name,
+            self._target_instance,
+        )
+        self._end_effector_body = self.plant.GetBodyByName(
+            "left_end_effector_link",
+            self._zerith,
+        )
+
+        base_frame = self.plant.GetFrameByName("dipan_link", self._zerith)
+        self.plant.WeldFrames(
+            self.plant.world_frame(),
+            base_frame,
+            RigidTransform(
+                RollPitchYaw(0.0, 0.0, np.deg2rad(robot_yaw_deg)),
+                np.asarray(robot_xyz, dtype=float),
+            ),
+        )
+
+        self._actuators = []
+        for config in ALL_SERVO_CONFIGS:
+            joint = self.plant.GetJointByName(config.name, self._zerith)
+            self._actuators.append(
+                self.plant.AddJointActuator(
+                    f"{config.name}_actuator",
+                    joint,
+                    effort_limit=config.effort_limit,
+                )
+            )
+
+        self.plant.Finalize()
+        self._arm_joints = tuple(
+            self.plant.GetJointByName(config.name, self._zerith)
+            for config in LEFT_ARM_SERVO_CONFIGS
+        )
+        self._gripper_joints = tuple(
+            self.plant.GetJointByName(config.name, self._zerith)
+            for config in LEFT_GRIPPER_SERVO_CONFIGS
+        )
+        self._all_joints = self._arm_joints + self._gripper_joints
+        self._arm_position_lower_limits = np.array(
+            [joint.position_lower_limits()[0] for joint in self._arm_joints]
+        )
+        self._arm_position_upper_limits = np.array(
+            [joint.position_upper_limits()[0] for joint in self._arm_joints]
+        )
+        if np.any(self._q_home < self._arm_position_lower_limits) or np.any(
+            self._q_home > self._arm_position_upper_limits
+        ):
+            raise ValueError("q_home violates a left-arm joint position limit")
+
+        if filter_known_invalid_self_collisions:
+            self._apply_known_invalid_self_collision_filters()
+
+        if self.meshcat is not None:
+            MeshcatVisualizer.AddToBuilder(
+                builder,
+                self.scene_graph,
+                self.meshcat,
+            )
+            collision_params = MeshcatVisualizerParams()
+            collision_params.prefix = "collision"
+            collision_params.role = Role.kProximity
+            collision_params.visible_by_default = False
+            MeshcatVisualizer.AddToBuilder(
+                builder,
+                self.scene_graph,
+                self.meshcat,
+                collision_params,
+            )
+
+        self.diagram = builder.Build()
+        self._simulator: Simulator | None = None
+        self._desired_q_left = self._q_home.copy()
+        self._desired_gripper_width = 0.08
+        self._done = False
+        self._control_log: list[ControlSample] = []
+        self._last_action_clipped = False
+
+    @property
+    def control_log(self) -> tuple[ControlSample, ...]:
+        """Return low-level controller samples recorded this episode."""
+        return tuple(self._control_log)
+
+    @property
+    def q_home(self) -> np.ndarray:
+        """Return a copy of the configured seven-joint home posture."""
+        return self._q_home.copy()
+
+    def _apply_known_invalid_self_collision_filters(self) -> None:
+        """Filter only documented whole-mesh proxy false positives."""
+        manager = self.scene_graph.collision_filter_manager()
+        declaration = CollisionFilterDeclaration()
+        for body_name_a, body_name_b in KNOWN_INVALID_SELF_COLLISION_PAIRS:
+            body_a = self.plant.GetBodyByName(body_name_a, self._zerith)
+            body_b = self.plant.GetBodyByName(body_name_b, self._zerith)
+            geometry_a = self.plant.GetCollisionGeometriesForBody(body_a)
+            geometry_b = self.plant.GetCollisionGeometriesForBody(body_b)
+            declaration.ExcludeBetween(
+                GeometrySet(geometry_a),
+                GeometrySet(geometry_b),
+            )
+        manager.Apply(declaration)
+
+    def _plant_context(self):
+        """Return mutable plant context owned by the active simulator."""
+        if self._simulator is None:
+            raise RuntimeError("Call reset() before accessing the environment")
+        return self.plant.GetMyMutableContextFromRoot(
+            self._simulator.get_mutable_context()
+        )
+
+    def _set_initial_configuration(self, plant_context) -> None:
+        """Set episode initial state before Simulator.Initialize()."""
+        positions = self.plant.GetPositions(plant_context).copy()
+        for joint, value in zip(
+            self._arm_joints,
+            self._q_home,
+            strict=True,
+        ):
+            positions[joint.position_start()] = value
+        positions[self._gripper_joints[0].position_start()] = -0.04
+        positions[self._gripper_joints[1].position_start()] = 0.04
+        self.plant.SetPositions(plant_context, positions)
+
+        controlled_names = {config.name for config in ALL_SERVO_CONFIGS}
+        for joint_index in self.plant.GetJointIndices(self._zerith):
+            joint = self.plant.get_joint(joint_index)
+            if joint.num_velocities() == 0 or joint.name() in controlled_names:
+                continue
+            joint.Lock(plant_context)
+
+    def reset(self) -> dict[str, Any]:
+        """Reset the episode and return the initial observation.
+
+        State is assigned only before the new simulator is initialized; no
+        state teleportation occurs inside step.
+        """
+        root_context = self.diagram.CreateDefaultContext()
+        plant_context = self.plant.GetMyMutableContextFromRoot(root_context)
+        self._set_initial_configuration(plant_context)
+        self._desired_q_left = self._q_home.copy()
+        self._desired_gripper_width = 0.08
+        self._done = False
+        self._control_log.clear()
+        self._last_action_clipped = False
+
+        self._simulator = Simulator(self.diagram, root_context)
+        self._simulator.set_target_realtime_rate(self.realtime_rate)
+        self._update_servo()
+        self._simulator.Initialize()
+        self.diagram.ForcedPublish(self._simulator.get_context())
+        return self._observation()
+
+    def _measured_controlled_state(
+        self,
+        plant_context,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return position and velocity vectors for all nine servo joints."""
+        positions = self.plant.GetPositions(plant_context)
+        velocities = self.plant.GetVelocities(plant_context)
+        q = np.array(
+            [positions[joint.position_start()] for joint in self._all_joints]
+        )
+        v = np.array(
+            [velocities[joint.velocity_start()] for joint in self._all_joints]
+        )
+        return q, v
+
+    def _desired_controlled_positions(self) -> np.ndarray:
+        """Return held arm and gripper targets in actuator order."""
+        half_width = 0.5 * self._desired_gripper_width
+        return np.concatenate(
+            (
+                self._desired_q_left,
+                np.array([-half_width, half_width]),
+            )
+        )
+
+    def _update_servo(self) -> None:
+        """Update gravity-compensated PD torque and record one sample."""
+        if self._simulator is None:
+            raise RuntimeError("Call reset() before updating the controller")
+        plant_context = self._plant_context()
+        q, v = self._measured_controlled_state(plant_context)
+        q_desired = self._desired_controlled_positions()
+        gravity_generalized = self.plant.CalcGravityGeneralizedForces(
+            plant_context
+        )
+        gravity_torque = np.array(
+            [
+                -gravity_generalized[joint.velocity_start()]
+                for joint in self._all_joints
+            ]
+        )
+        kp = np.array([config.kp for config in ALL_SERVO_CONFIGS])
+        kd = np.array([config.kd for config in ALL_SERVO_CONFIGS])
+        limits = np.array(
+            [config.effort_limit for config in ALL_SERVO_CONFIGS]
+        )
+        pd_torque = kp * (q_desired - q) - kd * v
+        raw_torque = gravity_torque + pd_torque
+        applied_torque = np.clip(raw_torque, -limits, limits)
+        saturated = ~np.isclose(raw_torque, applied_torque, atol=1e-12)
+
+        actuation = np.zeros(self.plant.num_actuated_dofs())
+        for actuator, torque in zip(
+            self._actuators,
+            applied_torque,
+            strict=True,
+        ):
+            actuation[actuator.input_start()] = torque
+        self.plant.get_actuation_input_port().FixValue(
+            plant_context,
+            actuation,
+        )
+        self._control_log.append(
+            ControlSample(
+                time=float(plant_context.get_time()),
+                q=q.copy(),
+                q_desired=q_desired.copy(),
+                gravity_torque=gravity_torque.copy(),
+                pd_torque=pd_torque.copy(),
+                raw_torque=raw_torque.copy(),
+                applied_torque=applied_torque.copy(),
+                saturated=saturated.copy(),
+            )
+        )
+
+    def _contact_count(self, plant_context) -> int:
+        """Return number of active point and hydroelastic contacts."""
+        results = self.plant.get_contact_results_output_port().Eval(
+            plant_context
+        )
+        return (
+            results.num_point_pair_contacts()
+            + results.num_hydroelastic_contacts()
+        )
+
+    def _observation(self) -> dict[str, Any]:
+        """Build the policy observation from the current Drake context."""
+        plant_context = self._plant_context()
+        q, v = self._measured_controlled_state(plant_context)
+        end_effector_pose = self.plant.EvalBodyPoseInWorld(
+            plant_context,
+            self._end_effector_body,
+        )
+        target_pose = self.plant.EvalBodyPoseInWorld(
+            plant_context,
+            self._target_body,
+        )
+        target_velocity = self.plant.EvalBodySpatialVelocityInWorld(
+            plant_context,
+            self._target_body,
+        )
+        return {
+            "q_left": q[: len(LEFT_ARM_SERVO_CONFIGS)].copy(),
+            "v_left": v[: len(LEFT_ARM_SERVO_CONFIGS)].copy(),
+            "gripper_width": float(q[-1] - q[-2]),
+            "end_effector_pose": _pose_vector(end_effector_pose),
+            "red_box_pose": _pose_vector(target_pose),
+            "red_box_velocity": np.concatenate(
+                (
+                    target_velocity.rotational(),
+                    target_velocity.translational(),
+                )
+            ),
+            "contact_count": self._contact_count(plant_context),
+            "simulation_time": float(plant_context.get_time()),
+        }
+
+    def step(
+        self,
+        action: Sequence[float],
+    ) -> tuple[dict[str, Any], float, bool, dict[str, Any]]:
+        """Hold one policy action while advancing lower-rate simulation.
+
+        Args:
+            action: Seven joint-target increments in radians followed by one
+                absolute normalized gripper command. -1 closes and +1 opens
+                the gripper.
+
+        Returns:
+            (observation, reward, done, info) after policy_dt seconds. Reward
+            is currently zero because task reward belongs to the evaluation
+            layer.
+        """
+        if self._simulator is None:
+            raise RuntimeError("Call reset() before step(action)")
+        if self._done:
+            raise RuntimeError(
+                "Episode is done; call reset() before step(action)"
+            )
+        action_array = np.asarray(action, dtype=float)
+        if action_array.shape != (8,):
+            raise ValueError(
+                f"Expected action shape (8,), got {action_array.shape}"
+            )
+        if not np.all(np.isfinite(action_array)):
+            raise ValueError("Action contains a non-finite value")
+
+        requested_delta = action_array[:7]
+        applied_delta = np.clip(
+            requested_delta,
+            -self.max_joint_delta,
+            self.max_joint_delta,
+        )
+        unclipped_target = self._desired_q_left + applied_delta
+        clipped_target = np.clip(
+            unclipped_target,
+            self._arm_position_lower_limits,
+            self._arm_position_upper_limits,
+        )
+        gripper_command = float(np.clip(action_array[7], -1.0, 1.0))
+        self._last_action_clipped = bool(
+            not np.array_equal(requested_delta, applied_delta)
+            or not np.array_equal(unclipped_target, clipped_target)
+            or gripper_command != action_array[7]
+        )
+        self._desired_q_left = clipped_target
+        self._desired_gripper_width = 0.04 * (gripper_command + 1.0)
+
+        control_updates = 0
+        for _ in range(self._control_steps_per_policy):
+            current_time = self._simulator.get_context().get_time()
+            if current_time >= self.episode_duration:
+                break
+            self._update_servo()
+            next_time = min(
+                current_time + self.controller_dt,
+                self.episode_duration,
+            )
+            self._simulator.AdvanceTo(next_time)
+            control_updates += 1
+
+        observation = self._observation()
+        self._done = bool(
+            observation["simulation_time"]
+            >= self.episode_duration - 1e-12
+        )
+        last_sample = self._control_log[-1]
+        saturated_joint_names = [
+            config.name
+            for config, saturated in zip(
+                ALL_SERVO_CONFIGS,
+                last_sample.saturated,
+                strict=True,
+            )
+            if saturated
+        ]
+        info = {
+            "desired_q_left": self._desired_q_left.copy(),
+            "desired_gripper_width": self._desired_gripper_width,
+            "action_clipped": self._last_action_clipped,
+            "saturated_joint_names": saturated_joint_names,
+            "control_updates": control_updates,
+            "physics_steps_per_control": self._physics_steps_per_control,
+        }
+        return observation, 0.0, self._done, info
+
+    def robot_penetrations(self) -> list[Penetration]:
+        """Return active filtered penetration pairs involving Zerith."""
+        plant_context = self._plant_context()
+        robot_geometry_ids = set()
+        for body_index in self.plant.GetBodyIndices(self._zerith):
+            body = self.plant.get_body(body_index)
+            robot_geometry_ids.update(
+                self.plant.GetCollisionGeometriesForBody(body)
+            )
+
+        query_object = self.plant.get_geometry_query_input_port().Eval(
+            plant_context
+        )
+        inspector = query_object.inspector()
+        penetrations = []
+        for pair in query_object.ComputePointPairPenetration():
+            if (
+                pair.id_A not in robot_geometry_ids
+                and pair.id_B not in robot_geometry_ids
+            ):
+                continue
+            penetrations.append(
+                Penetration(
+                    depth=pair.depth,
+                    frame_a=inspector.GetName(
+                        inspector.GetFrameId(pair.id_A)
+                    ),
+                    frame_b=inspector.GetName(
+                        inspector.GetFrameId(pair.id_B)
+                    ),
+                )
+            )
+        return sorted(
+            penetrations,
+            key=lambda penetration: penetration.depth,
+            reverse=True,
+        )
+
+    def write_control_log(self, output_path: Path) -> None:
+        """Write controller-frequency state and torque diagnostics to CSV."""
+        output_path = Path(output_path)
+        fieldnames = ["time"]
+        quantities = (
+            "q",
+            "q_desired",
+            "gravity_torque",
+            "pd_torque",
+            "raw_torque",
+            "applied_torque",
+            "saturated",
+        )
+        for config in ALL_SERVO_CONFIGS:
+            for quantity in quantities:
+                fieldnames.append(f"{config.name}.{quantity}")
+
+        with output_path.open("w", newline="") as output_file:
+            writer = csv.DictWriter(output_file, fieldnames=fieldnames)
+            writer.writeheader()
+            for sample in self._control_log:
+                row: dict[str, float | bool] = {"time": sample.time}
+                values = {
+                    "q": sample.q,
+                    "q_desired": sample.q_desired,
+                    "gravity_torque": sample.gravity_torque,
+                    "pd_torque": sample.pd_torque,
+                    "raw_torque": sample.raw_torque,
+                    "applied_torque": sample.applied_torque,
+                    "saturated": sample.saturated,
+                }
+                for joint_index, config in enumerate(ALL_SERVO_CONFIGS):
+                    for quantity, vector in values.items():
+                        row[f"{config.name}.{quantity}"] = vector[joint_index]
+                writer.writerow(row)

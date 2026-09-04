@@ -72,15 +72,21 @@ def _parse_args() -> argparse.Namespace:
         "--robot-xyz",
         type=float,
         nargs=3,
-        default=(4.177360808362734, 0.60, 0.1815),
+        default=(3.05, 3.07, 0.1815),
         metavar=("X", "Y", "Z"),
-        help="World position of dipan_link in meters.",
+        help=(
+            "World position of dipan_link in meters "
+            "(default: east of the coffee table)."
+        ),
     )
     parser.add_argument(
         "--robot-yaw-deg",
         type=float,
-        default=90.0,
-        help="World yaw of dipan_link in degrees.",
+        default=180.0,
+        help=(
+            "World yaw of dipan_link in degrees "
+            "(default: facing the coffee table)."
+        ),
     )
     parser.add_argument(
         "--meshcat-port",
