@@ -174,6 +174,13 @@ exactly one `env.step()` per tick. The TAMP handoff synchronizes object poses,
 checks a proposed direct edge through PlanningQuery, and only then sends typed
 online actions. Neither integration is imported by the environment core.
 
+The staged PickLift example waits for measured servo tracking and velocity to
+settle before each Cartesian command. APPROACH remains on the calibrated
+world-frame grasp axis; excessive lateral misalignment, overshoot, or an
+unexpectedly distant target changes the external policy to a failed hold
+state. These are state-machine safety guards, not evidence of a successful
+physical grasp.
+
 ### PlanningQuery
 
 向 TAMP 提供：
@@ -315,3 +322,8 @@ Drake-independent adapter mock and the real Zerith adapter both have contract
 coverage. Retiring the compatibility runtime still requires an equivalent
 replacement regression. Physical APPROACH, CLOSE, LIFT, and stable bilateral
 grasp remain intentionally unvalidated.
+
+An architecture regression scans the generic core for current robot and scene
+identifiers and rejects imports from the Zerith adapter. The deprecated local
+PREGRASP prototype has one exact `.gitignore` entry; it is neither deleted nor
+tracked.

@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
 Last updated: 2026-09-05
-Current phase: Phase 8 — Documentation and API Audit
+Current phase: Phase 7 — Manual PREGRASP Acceptance Gate
 
 ## Product Goal
 
@@ -30,6 +30,10 @@ Current phase: Phase 8 — Documentation and API Audit
 * `72f9d69` Add state-synchronized Cartesian control
 * `55ba5d8` Document BT and TAMP online integrations
 * `0738fdc` Complete generic scenario initialization and diagnostics
+* `1ad0aba` Document generic scenario runtime completion
+* `9ef30dd` Guard staged Cartesian pick motions
+* `2ab2722` Enforce generic environment boundaries
+* `5f71dfc` Ignore deprecated pregrasp prototype
 
 ## Current Validated State
 
@@ -351,6 +355,18 @@ each settled successfully in 5 policy steps at measured position
 `0.00164127 m` strict nonpenetration distance and `0.02628 m` safety
 clearance. The full suite contains 40 passing tests.
 
+### Phase 6D Pick Policy Safety Guards
+
+The external staged policy now waits for the measured joint command to settle
+before issuing another Cartesian increment. APPROACH recomputes longitudinal
+distance from the live target pose but remains on the calibrated approach
+axis. Excessive lateral error, overshoot, or an unexpectedly distant target
+enters a failed hold state instead of closing the gripper. Contract tests cover
+settling, calibrated-axis motion, and rejection without a close command.
+
+This checkpoint only validates policy logic. It has not been executed past
+PREGRASP in the physical Drake scene and makes no PickLift success claim.
+
 ## Phase 8 API Audit
 
 Scenario initialization is now effective rather than declarative. Initial
@@ -365,13 +381,18 @@ unknown names. EpisodeRunner now preserves policy/environment exceptions as
 failures: it writes `failure.json`, the completed portion of `trace.csv`, and
 the current optional Meshcat HTML before re-raising the original exception.
 
-The full suite contains 43 passing tests, including a real Drake target-free
+The full suite contains 48 passing tests, including a real Drake target-free
 scene with an overridden free-body pose and contact parameters. The calibrated
 open-gripper PREGRASP regression was rerun for one episode after these changes:
 it reached PREGRASP in 81 policy steps with 0.884 mrad final joint error,
 20.04 mm minimum safety clearance, zero continuous torque saturation, an
 80 mm open gripper, and 0.020 mm target settling motion. No APPROACH or CLOSE
 command was issued.
+
+Two architecture tests now enforce that the generic core neither contains the
+current robot/scene identifiers nor imports the Zerith adapter. The deprecated
+untracked PREGRASP prototype is preserved locally through one exact ignore
+rule. After the milestone commits, `git status --short` is empty.
 
 ## Phase 0 Reproducible Commands
 
@@ -452,16 +473,15 @@ largest reported step error was `0.013955 rad`.
 * [x] Phase 5: implement EpisodeRunner and DMD finalizer
 * [x] Phase 6: add external policy, BT and TAMP examples
 * [ ] Phase 7: run PickLift integration test
-* [ ] Phase 8: documentation, API audit and clean worktree
+* [x] Phase 8: documentation, API audit and clean worktree
 
 ## Current Blockers
 
 * No trusted rail velocity or force parameters.
 * Robot portability has structural mock coverage but no second real adapter.
 * Physical PickLift has not yet been completed.
-* Removing the deprecated untracked script requires an explicit owner choice.
-* Experimental PickLift policy changes remain uncommitted pending physical
-  validation.
+* PREGRASP needs the requested manual front, side, and top-view acceptance
+  before any physical APPROACH or CLOSE command may run.
 
 ## Next Action
 
