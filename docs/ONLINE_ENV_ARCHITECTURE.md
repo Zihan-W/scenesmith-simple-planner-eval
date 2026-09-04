@@ -1,6 +1,6 @@
 # Online Manipulation Environment Architecture
 
-Status: Accepted migration architecture; public API pending Phase 1 contract
+Status: Accepted migration architecture; public API contract version 0.1
 Source of truth: `docs/ONLINE_ENV_REQUIREMENTS.md`
 
 ## 0. Migration Baseline
@@ -40,6 +40,12 @@ Controller / Drake Plant / SceneGraph
 上层模块可以依赖下层模块；下层模块不得反向依赖具体策略或任务。
 
 ## 2. Public API
+
+Phase 1 exposes the experimental public package `src.online_manipulation`
+with `PUBLIC_API_VERSION = "0.1"`. Version 0.1 is additive: the existing
+`ZerithOnlineEnv` entry points remain supported while the new environment
+delegates to them through an Adapter. Compatibility code may be removed only
+after the real Adapter regression covers the existing PREGRASP behavior.
 
 目标接口：
 
@@ -226,12 +232,12 @@ Task 通过 ContactPolicy 声明允许的接触模式：
 
 Agent 在实现过程中必须记录但不得静默决定：
 
-* 公共 API 的版本与兼容策略；
 * CartesianDeltaAction 的求解方式；
 * ContactPolicy 的具体表示；
-* RobotAdapter contract test 的第二机器人或 mock 方案；
 * DMD finalizer 的通用对象选择规则。
 
 These remain explicit design decisions rather than hidden implementation
-defaults. Phase 1 must record the API compatibility decision and mock Adapter
-strategy before implementation; later phases own the remaining decisions.
+defaults. Phase 1 uses a Drake-independent structural mock for the first
+RobotAdapter contract test. Phase 2 must add a real Zerith Adapter integration
+test before any legacy path can be retired; later phases own the remaining
+decisions.

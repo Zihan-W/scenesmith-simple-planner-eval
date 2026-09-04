@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
-Last updated: 2026-09-04
-Current phase: Phase 1 — Public Contracts
+Last updated: 2026-09-05
+Current phase: Phase 2 — Scenario and Zerith Adapter
 
 ## Product Goal
 
@@ -85,6 +85,29 @@ does not cover this repository.
 * Earlier rail-zero PICK_HOME/PREGRASP results are obsolete.
 * APPROACH, CLOSE, VERIFY_GRASP and LIFT have not been validated.
 
+## Phase 1 Public Contract
+
+The experimental `src.online_manipulation` package now defines versioned,
+Drake-independent public contracts for:
+
+* typed joint, Cartesian, gripper, hold and composite actions;
+* generic robot, object, contact and task observations;
+* scenario, timing, joint, gripper and robot specifications;
+* RobotAdapter, Task, Policy, ContactPolicy and OnlineEnvironment protocols.
+
+Version `0.1` is additive. The legacy `ZerithOnlineEnv` remains the validated
+runtime and must be wrapped by the real Adapter before compatibility code is
+removed. The initial Adapter test uses a structural mock so public contract
+tests run without constructing Drake.
+
+Reproduce the Phase 1 tests from the repository root:
+
+```bash
+.venv/bin/python -B -m unittest discover -s tests -v
+```
+
+Result on 2026-09-05: 8 tests passed.
+
 ## Phase 0 Reproducible Commands
 
 Run from `/root/workspace/scenesmith-simple-planner-eval` after activating the
@@ -157,7 +180,7 @@ largest reported step error was `0.013955 rad`.
 ## Milestones
 
 * [x] Phase 0: audit, regression and checkpoint current work
-* [ ] Phase 1: define public dataclasses, protocols and contract tests
+* [x] Phase 1: define public dataclasses, protocols and contract tests
 * [ ] Phase 2: introduce ScenarioSpec and ZerithRobotAdapter
 * [ ] Phase 3: generalize controller, action and observation
 * [ ] Phase 4: implement Task, ContactPolicy and PlanningQuery
@@ -175,7 +198,7 @@ largest reported step error was `0.013955 rad`.
 
 ## Next Action
 
-Begin Phase 1 by recording the public compatibility policy, defining typed
-spec/action/observation/task/adapter contracts, and adding Drake-independent
-contract tests. Do not rewrite `ZerithOnlineEnv`; the first implementation
-must wrap it.
+Begin Phase 2 by expressing the calibrated Zerith configuration as a
+`RobotSpec`, implementing `ZerithRobotAdapter`, and wrapping the existing
+`ZerithOnlineEnv`. Keep the 3/3 online PREGRASP regression green and do not
+remove or rewrite the legacy implementation.
