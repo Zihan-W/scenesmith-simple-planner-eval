@@ -4,16 +4,23 @@ import unittest
 
 from src.online_manipulation import (
     HoldAction,
+    ObjectObservation,
     Observation,
     OnlineEnvironment,
     OnlineManipulationEnv,
     Pose,
     RobotObservation,
     SpatialVelocity,
+    PickLiftTask,
+    PickLiftTaskConfig,
 )
 
 
-def _observation(time_s: float) -> Observation:
+def _observation(
+    time_s: float,
+    *,
+    target_height_m: float | None = None,
+) -> Observation:
     """Return a minimal normalized observation at one simulation time."""
     pose = Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
     twist = SpatialVelocity((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
@@ -28,7 +35,16 @@ def _observation(time_s: float) -> Observation:
         end_effector_pose=pose,
         end_effector_twist=twist,
     )
-    return Observation(time_s, robot, {}, (), {})
+    objects = {}
+    if target_height_m is not None:
+        objects["target"] = ObjectObservation(
+            Pose(
+                (0.0, 0.0, target_height_m),
+                (1.0, 0.0, 0.0, 0.0),
+            ),
+            twist,
+        )
+    return Observation(time_s, robot, objects, (), {})
 
 
 class _FakeRuntimeBackend:
@@ -43,7 +59,8 @@ class _FakeRuntimeBackend:
         self.actions.clear()
         return _observation(self.time_s), {"backend_reset": True}
 
-    def step(self, action):
+    def step(self, action, contact_policy):
+        del contact_policy
         self.actions.append(action)
         self.time_s += 0.1
         return _observation(self.time_s), self.time_s >= 0.2, {
@@ -59,7 +76,10 @@ class OnlineManipulationEnvTest(unittest.TestCase):
         self.assertIsInstance(env, OnlineEnvironment)
         observation, info = env.reset(seed=17)
         self.assertEqual(observation.time_s, 0.0)
-        self.assertEqual(info, {"backend_reset": True, "seed": 17})
+        self.assertEqual(info["backend_reset"], True)
+        self.assertEqual(info["seed"], 17)
+        self.assertEqual(info["task_reset"], {"task_name": "null"})
+        self.assertEqual(observation.task["task_name"], "null")
 
     def test_step_forwards_typed_action_and_reports_truncation(self) -> None:
         backend = _FakeRuntimeBackend()
@@ -73,6 +93,7 @@ class OnlineManipulationEnvTest(unittest.TestCase):
         self.assertFalse(terminated)
         self.assertFalse(truncated)
         self.assertEqual(info["backend_steps"], 1)
+        self.assertEqual(info["contact_policy"], "free_motion")
 
         _, _, terminated, truncated, _ = env.step(HoldAction())
         self.assertFalse(terminated)
@@ -82,6 +103,50 @@ class OnlineManipulationEnvTest(unittest.TestCase):
         env = OnlineManipulationEnv(_FakeRuntimeBackend())
         with self.assertRaisesRegex(NotImplementedError, "Phase 5"):
             env.write_updated_scenario("unused.dmd.yaml")
+
+    def test_pick_lift_task_terminates_after_required_stable_time(self) -> None:
+        class LiftBackend(_FakeRuntimeBackend):
+            """Expose a target lifted after the first policy step."""
+
+            def reset(self):
+                self.time_s = 0.0
+                self.actions.clear()
+                return _observation(0.0, target_height_m=0.5), {}
+
+            def step(self, action, contact_policy):
+                del contact_policy
+                self.actions.append(action)
+                self.time_s += 0.1
+                return (
+                    _observation(self.time_s, target_height_m=0.6),
+                    False,
+                    {},
+                )
+
+        task = PickLiftTask(
+            PickLiftTaskConfig(
+                target_observation_name="target",
+                gripper_contact_bodies=("robot::left", "robot::right"),
+                target_contact_body="scene::target",
+                required_lift_m=0.08,
+                required_hold_s=0.2,
+            )
+        )
+        env = OnlineManipulationEnv(LiftBackend(), task=task)
+        observation, _ = env.reset(seed=3)
+        self.assertEqual(observation.task["lift_m"], 0.0)
+
+        observation, reward, terminated, _, info = env.step(HoldAction())
+        self.assertFalse(terminated)
+        self.assertEqual(reward, 0.0)
+        self.assertAlmostEqual(observation.task["lift_m"], 0.1)
+        self.assertEqual(info["contact_policy"], "pick_lift_target_contact")
+
+        observation, reward, terminated, _, info = env.step(HoldAction())
+        self.assertTrue(terminated)
+        self.assertEqual(reward, 1.0)
+        self.assertTrue(observation.task["success"])
+        self.assertEqual(info["task"]["reason"], "lift_held")
 
 
 if __name__ == "__main__":

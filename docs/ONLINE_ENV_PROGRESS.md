@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
 Last updated: 2026-09-05
-Current phase: Phase 4 — Task, Contact Policy and Planning Query
+Current phase: Phase 5 — Episode Runner and DMD Finalizer
 
 ## Product Goal
 
@@ -22,6 +22,7 @@ Current phase: Phase 4 — Task, Contact Policy and Planning Query
 * `7e8a210` Validate online Zerith pregrasp execution
 * `d4334fe` Define online manipulation public contracts
 * `a2debf7` Introduce Zerith online environment adapter
+* `8cab195` Add typed online manipulation environment facade
 
 ## Current Validated State
 
@@ -170,6 +171,41 @@ Phase 0 baseline. The regression now also rejects any step that does not
 perform exactly 20 controller updates with 5 physics steps per update; this
 new assertion passed in a separate 1/1 episode run.
 
+## Phase 4 Task, Contact Policy and Planning Query
+
+The environment now delegates reset metadata, task observation, reward,
+termination, success metrics, and allowed-contact selection to a replaceable
+Task. `NullTask` preserves control regressions. `PickLiftTask` evaluates a
+generic observed object's physical vertical displacement and required hold
+duration; it contains no approach/grasp/lift motion state machine.
+
+`PairContactPolicy` denies task contacts by default and matches explicit
+qualified-body pairs independent of order. Whitelisting relaxes only the
+safety-clearance layer, never strict nonpenetration or the Plant's real
+collision filter.
+
+`PlanningQuery` builds a separate RobotDiagram and context from ScenarioSpec,
+RobotAdapter, and TimingConfig. It exposes FK, joint limits, collision pairs,
+configuration validation, dense edge validation, dual clearance, and pose IK.
+World-frame `CartesianDeltaAction` can use this query for one online pose-IK
+solve per action; a missing query or unsupported reference frame fails loudly.
+
+Reproduce all tests:
+
+```bash
+.venv/bin/python -B -m unittest discover -s tests -v
+```
+
+Result on 2026-09-05: 25 tests passed. PlanningQuery is tested with a separate
+non-Zerith one-joint robot and obstacle, covering FK, IK, collision,
+penetration, allowed-contact safety semantics, and a colliding edge.
+
+On the calibrated Zerith scene, the generic query reproduced 1.64127 mm
+minimum nonpenetration distance and validated the 376-sample
+PICK_HOME-to-PREGRASP edge with 26.28 mm minimum safety clearance. Its context
+time remained 0.0 s. A real NullTask PREGRASP episode also passed in 81 policy
+steps with the gripper open.
+
 ## Phase 0 Reproducible Commands
 
 Run from `/root/workspace/scenesmith-simple-planner-eval` after activating the
@@ -245,7 +281,7 @@ largest reported step error was `0.013955 rad`.
 * [x] Phase 1: define public dataclasses, protocols and contract tests
 * [x] Phase 2: introduce ScenarioSpec and ZerithRobotAdapter
 * [x] Phase 3: generalize controller, action and observation
-* [ ] Phase 4: implement Task, ContactPolicy and PlanningQuery
+* [x] Phase 4: implement Task, ContactPolicy and PlanningQuery
 * [ ] Phase 5: implement EpisodeRunner and DMD finalizer
 * [ ] Phase 6: add external policy, BT and TAMP examples
 * [ ] Phase 7: run PickLift integration test
@@ -260,7 +296,6 @@ largest reported step error was `0.013955 rad`.
 
 ## Next Action
 
-Begin Phase 4 by implementing `NullTask`, configurable `ContactPolicy`, and a
-read-only PlanningQuery with independent contexts. Then add PickLift task
-observation/evaluation without putting its state machine into the environment
-core.
+Begin Phase 5 by implementing generic DMD write-back with reload round-trip
+validation, then add deterministic headless EpisodeRunner JSON/CSV/optional
+HTML outputs without embedding a policy or task in Environment.

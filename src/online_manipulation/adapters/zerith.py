@@ -7,7 +7,14 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from pydrake.all import Meshcat, RigidTransform, RollPitchYaw
+from pydrake.all import (
+    AngleAxis,
+    Meshcat,
+    Quaternion,
+    RigidTransform,
+    RollPitchYaw,
+    RotationMatrix,
+)
 
 from src.online_manipulation.actions import (
     CartesianDeltaAction,
@@ -27,6 +34,8 @@ from src.online_manipulation.observations import (
     RobotObservation,
     SpatialVelocity,
 )
+from src.online_manipulation.planning import PlanningQuery
+from src.online_manipulation.protocols import ContactPolicy, Task
 from src.online_manipulation.specs import (
     GripperSpec,
     JointSpec,
@@ -152,9 +161,10 @@ def make_zerith_robot_spec(
         if name not in controlled_names
     }
     root = ET.parse(urdf_path).getroot()
+    model_instance_name = root.attrib["name"]
     return RobotSpec(
         name="zerith_left_arm",
-        model_instance_name=root.attrib["name"],
+        model_instance_name=model_instance_name,
         package_name=ZERITH_PACKAGE_NAME,
         model_path=urdf_path,
         base_link_name=_BASE_LINK_NAME,
@@ -169,6 +179,12 @@ def make_zerith_robot_spec(
             ),
             minimum_width_m=0.0,
             maximum_width_m=GRIPPER_MAX_OPENING,
+        ),
+        safety_exempt_body_pairs=(
+            (
+                f"{model_instance_name}::body_yaw_link",
+                f"{model_instance_name}::left_shoulder_roll_link",
+            ),
         ),
     )
 
@@ -333,12 +349,17 @@ class ZerithRobotAdapter:
 class ZerithLegacyActionTranslator:
     """Translate typed actions to the legacy seven-plus-one array."""
 
-    def __init__(self, spec: RobotSpec):
+    def __init__(
+        self,
+        spec: RobotSpec,
+        planning_query: PlanningQuery | None = None,
+    ):
         """Initialize held targets from the RobotSpec home configuration."""
         gripper = spec.gripper
         if gripper is None:
             raise ValueError("Legacy Zerith translation requires a gripper")
         self._spec = spec
+        self._planning_query = planning_query
         self._gripper = gripper
         self._arm_names = tuple(
             name
@@ -375,7 +396,11 @@ class ZerithLegacyActionTranslator:
         self._desired_arm = desired_arm.copy()
         self._desired_gripper_width = float(info["desired_gripper_width"])
 
-    def translate(self, action: RobotAction) -> np.ndarray:
+    def translate(
+        self,
+        action: RobotAction,
+        contact_policy: ContactPolicy | None = None,
+    ) -> np.ndarray:
         """Return one legacy action without mutating held target state."""
         arm_action: (
             HoldAction
@@ -413,8 +438,9 @@ class ZerithLegacyActionTranslator:
                 requested[self._arm_index(name)] = value
             arm_delta = requested - self._desired_arm
         elif isinstance(arm_action, CartesianDeltaAction):
-            raise NotImplementedError(
-                "CartesianDeltaAction requires the Phase 4 planning query"
+            arm_delta = self._cartesian_arm_delta(
+                arm_action,
+                contact_policy,
             )
         else:
             raise TypeError(f"Unsupported arm action: {type(arm_action)}")
@@ -455,6 +481,95 @@ class ZerithLegacyActionTranslator:
             )
         return self._arm_names.index(name)
 
+    def _cartesian_arm_delta(
+        self,
+        action: CartesianDeltaAction,
+        contact_policy: ContactPolicy | None,
+    ) -> np.ndarray:
+        """Solve one online world-frame Cartesian increment with pose IK."""
+        if self._planning_query is None:
+            raise NotImplementedError(
+                "CartesianDeltaAction requires a configured PlanningQuery"
+            )
+        if action.reference_frame != "world":
+            raise NotImplementedError(
+                "The initial CartesianDeltaAction implementation supports "
+                "only reference_frame='world'"
+            )
+        if action.end_effector_frame != self._spec.end_effector_frame_name:
+            raise ValueError(
+                "CartesianDeltaAction end_effector_frame does not match "
+                "RobotSpec"
+            )
+        finger_targets = self._gripper_joint_targets(
+            self._desired_gripper_width
+        )
+        desired_by_name = dict(zip(self._arm_names, self._desired_arm))
+        desired_by_name.update(finger_targets)
+        q_seed = tuple(
+            desired_by_name[name] for name in self._spec.controlled_joint_names
+        )
+        current_pose = self._planning_query.frame_pose_at(
+            q_seed,
+            self._spec.model_instance_name,
+            action.end_effector_frame,
+        )
+        current_rotation = RotationMatrix(
+            Quaternion(np.asarray(current_pose.quaternion_wxyz))
+        )
+        rotation_vector = np.asarray(action.rotation_vector_rad)
+        angle = float(np.linalg.norm(rotation_vector))
+        delta_rotation = RotationMatrix()
+        if angle > 0.0:
+            delta_rotation = RotationMatrix(
+                AngleAxis(angle, rotation_vector / angle)
+            )
+        target_rotation = delta_rotation @ current_rotation
+        target_pose = Pose(
+            tuple(
+                np.asarray(current_pose.translation_m)
+                + np.asarray(action.translation_m)
+            ),
+            tuple(target_rotation.ToQuaternion().wxyz()),
+        )
+        solve_kwargs = {}
+        if contact_policy is not None:
+            solve_kwargs["contact_policy"] = contact_policy
+        result = self._planning_query.solve_ik(
+            target_pose,
+            frame_name=action.end_effector_frame,
+            seed=q_seed,
+            **solve_kwargs,
+        )
+        if not result.success:
+            raise RuntimeError(
+                "CartesianDeltaAction IK failed: "
+                f"{result.reason}; solver={result.solver_result}"
+            )
+        solution_by_name = dict(
+            zip(
+                self._spec.controlled_joint_names,
+                result.configuration,
+                strict=True,
+            )
+        )
+        return np.asarray(
+            [
+                solution_by_name[name] - self._desired_arm[index]
+                for index, name in enumerate(self._arm_names)
+            ]
+        )
+
+    def _gripper_joint_targets(self, width_m: float) -> dict[str, float]:
+        """Return legacy Zerith finger positions for a physical width."""
+        inward_travel = 0.5 * (
+            self._gripper.maximum_width_m - width_m
+        )
+        return {
+            self._gripper.joint_names[0]: -inward_travel,
+            self._gripper.joint_names[1]: inward_travel,
+        }
+
 
 class LegacyZerithRuntimeBackend:
     """Normalize the validated ZerithOnlineEnv behind the generic facade."""
@@ -464,12 +579,16 @@ class LegacyZerithRuntimeBackend:
         runtime: ZerithOnlineEnv,
         adapter: ZerithRobotAdapter,
         observed_bodies: Sequence[ObservedBodySpec],
+        planning_query: PlanningQuery | None = None,
     ):
         """Store the runtime and explicit generic object observation list."""
         self.runtime = runtime
         self.adapter = adapter
         self.observed_bodies = tuple(observed_bodies)
-        self.action_translator = ZerithLegacyActionTranslator(adapter.spec)
+        self.action_translator = ZerithLegacyActionTranslator(
+            adapter.spec,
+            planning_query=planning_query,
+        )
 
     @property
     def control_log(self):
@@ -490,9 +609,13 @@ class LegacyZerithRuntimeBackend:
     def step(
         self,
         action: RobotAction,
+        contact_policy: ContactPolicy,
     ) -> tuple[Observation, bool, dict]:
         """Translate and execute one typed action for one policy period."""
-        legacy_action = self.action_translator.translate(action)
+        legacy_action = self.action_translator.translate(
+            action,
+            contact_policy,
+        )
         _, _, done, info = self.runtime.step(legacy_action)
         self.action_translator.update_from_runtime_info(info)
         normalized_info = dict(info)
@@ -629,6 +752,8 @@ def make_legacy_zerith_online_environment(
     target_body_name: str = "base_link",
     episode_duration: float = 30.0,
     max_joint_delta: float = 0.1,
+    planning_query: PlanningQuery | None = None,
+    task: Task | None = None,
 ) -> OnlineManipulationEnv:
     """Build the typed Phase 3 facade over the validated legacy runtime."""
     runtime = make_legacy_zerith_environment(
@@ -644,5 +769,6 @@ def make_legacy_zerith_online_environment(
         runtime=runtime,
         adapter=adapter,
         observed_bodies=scenario.observed_bodies,
+        planning_query=planning_query,
     )
-    return OnlineManipulationEnv(backend)
+    return OnlineManipulationEnv(backend, task=task)

@@ -8,7 +8,6 @@ physics_dt.
 
 import csv
 import dataclasses
-import xml.etree.ElementTree as ET
 
 from pathlib import Path
 from typing import Any, Sequence
@@ -31,6 +30,7 @@ from pydrake.all import (
 )
 
 from src.online_manipulation.controller import CoupledInverseDynamicsServo
+from src.online_manipulation.drake_utils import register_package_xml
 from src.online_manipulation.specs import JointSpec
 from src.zerith_robot_config import (
     ROBOT_BASE_XYZ_METERS,
@@ -104,11 +104,7 @@ def find_package_xml(scene_dmd: Path) -> Path:
 
 def _register_package_xml(parser: Parser, package_xml: Path) -> None:
     """Register a ROS-style package.xml in a Drake parser."""
-    root = ET.parse(package_xml).getroot()
-    name = root.findtext("name")
-    if name is None:
-        raise ValueError(f"Missing <name> in {package_xml}")
-    parser.package_map().Add(name.strip(), str(package_xml.parent))
+    register_package_xml(parser, package_xml)
 
 
 def _pose_vector(transform: RigidTransform) -> np.ndarray:

@@ -216,6 +216,7 @@ class RobotSpec:
     end_effector_frame_name: str
     home_positions: tuple[float, ...]
     gripper: GripperSpec | None = None
+    safety_exempt_body_pairs: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         """Validate robot names, mappings, and ordered home positions."""
@@ -254,8 +255,17 @@ class RobotSpec:
             for name, value in self.locked_joint_positions.items()
         ):
             raise ValueError("Locked joints require names and finite values")
+        safety_pairs = tuple(
+            tuple(sorted(pair)) for pair in self.safety_exempt_body_pairs
+        )
+        if any(
+            len(pair) != 2 or not pair[0] or not pair[1]
+            for pair in safety_pairs
+        ):
+            raise ValueError("Safety exemptions require qualified body pairs")
         object.__setattr__(self, "controlled_joints", joints)
         object.__setattr__(self, "home_positions", home)
+        object.__setattr__(self, "safety_exempt_body_pairs", safety_pairs)
 
     @property
     def controlled_joint_names(self) -> tuple[str, ...]:

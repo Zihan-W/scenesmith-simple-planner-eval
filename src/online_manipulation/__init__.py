@@ -9,6 +9,10 @@ from src.online_manipulation.actions import (
     JointPositionAction,
     RobotAction,
 )
+from src.online_manipulation.contact import (
+    FREE_MOTION_CONTACT_POLICY,
+    PairContactPolicy,
+)
 from src.online_manipulation.observations import (
     ContactObservation,
     ObjectObservation,
@@ -16,6 +20,15 @@ from src.online_manipulation.observations import (
     Pose,
     RobotObservation,
     SpatialVelocity,
+)
+from src.online_manipulation.planning import (
+    ClearanceMetrics,
+    CollisionPair,
+    ConfigurationCheck,
+    EdgeCheck,
+    IkResult,
+    PlanningQuery,
+    build_planning_query,
 )
 from src.online_manipulation.environment import OnlineManipulationEnv
 from src.online_manipulation.protocols import (
@@ -35,27 +48,44 @@ from src.online_manipulation.specs import (
     TimingConfig,
     VisualizationConfig,
 )
+from src.online_manipulation.tasks import (
+    NullTask,
+    PickLiftTask,
+    PickLiftTaskConfig,
+)
 
 PUBLIC_API_VERSION = "0.1"
 
 __all__ = [
     "PUBLIC_API_VERSION",
     "CartesianDeltaAction",
+    "ClearanceMetrics",
+    "CollisionPair",
     "CompositeAction",
     "ContactObservation",
     "ContactPolicy",
+    "ConfigurationCheck",
+    "EdgeCheck",
+    "FREE_MOTION_CONTACT_POLICY",
     "GripperAction",
     "GripperSpec",
     "HoldAction",
+    "IkResult",
     "JointDeltaAction",
     "JointPositionAction",
     "JointSpec",
+    "NullTask",
     "ObjectObservation",
     "Observation",
     "ObservedBodySpec",
     "OnlineManipulationEnv",
     "OnlineEnvironment",
+    "PairContactPolicy",
+    "PickLiftTask",
+    "PickLiftTaskConfig",
     "Policy",
+    "PlanningQuery",
+    "build_planning_query",
     "Pose",
     "RobotAction",
     "RobotAdapter",

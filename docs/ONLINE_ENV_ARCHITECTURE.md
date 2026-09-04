@@ -1,6 +1,6 @@
 # Online Manipulation Environment Architecture
 
-Status: Accepted migration architecture; Phase 3 typed facade integrated
+Status: Accepted migration architecture; Phase 4 task and query integrated
 Source of truth: `docs/ONLINE_ENV_REQUIREMENTS.md`
 
 ## 0. Migration Baseline
@@ -152,6 +152,11 @@ defaults.
 * task metrics；
 * finalization metadata。
 
+Phase 4 provides `NullTask` and `PickLiftTask`. PickLift owns only target
+observation identity, allowed gripper-target contacts, reward, success, and
+the lift/hold thresholds. Motion phases remain Policy state and are not part
+of Environment or Task evaluation.
+
 ### Policy
 
 存在于 Environment 外部，只通过 observation、action 和 query API 工作。
@@ -169,6 +174,12 @@ defaults.
 * 独立 planning context。
 
 不得推进真实仿真状态。
+
+`PlanningQuery` owns a separate RobotDiagram context initialized through the
+same RobotAdapter. It provides body/frame FK, joint limits, configuration and
+dense edge checks, dual-layer clearance, and pose IK with independent endpoint
+validation. The current IK is solved once per requested target and then checked
+for collision; it does not run RRT, TOPPRA, or advance simulation.
 
 ### EpisodeRunner
 
@@ -242,6 +253,18 @@ Task 通过 ContactPolicy 声明允许的接触模式：
 
 任务白名单只影响规划和安全检查，不改变动力学 Plant 的真实 collision filter。
 
+The concrete representation is `PairContactPolicy`: unordered qualified-body
+pairs are denied by default and must be explicitly listed. Allowed pairs are
+excluded only from safety-clearance scoring; the nonpenetration layer still
+checks them. Pairs whose relative pose is invariant to the active arm joints
+are likewise excluded only from safety. Zerith's left shoulder-to-torso pair
+is the sole explicit assembly safety exemption in RobotSpec.
+
+`CartesianDeltaAction` initially uses one online pose-IK solve per policy
+command. Translation and rotation-vector increments are expressed in world;
+the delta rotation pre-multiplies the current world orientation. Other
+reference frames fail explicitly until their transform semantics are added.
+
 ## 8. Migration Rule
 
 更换场景：只改 ScenarioSpec。
@@ -263,8 +286,6 @@ Task 通过 ContactPolicy 声明允许的接触模式：
 
 Agent 在实现过程中必须记录但不得静默决定：
 
-* CartesianDeltaAction 的求解方式；
-* ContactPolicy 的具体表示；
 * DMD finalizer 的通用对象选择规则。
 
 These remain explicit design decisions rather than hidden implementation

@@ -2,6 +2,7 @@
 
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 from pydrake.all import AddMultibodyPlantSceneGraph, DiagramBuilder, Parser
@@ -12,6 +13,7 @@ from src.online_manipulation import (
     GripperAction,
     JointDeltaAction,
     JointPositionAction,
+    Pose,
     RobotAdapter,
 )
 from src.online_manipulation.adapters.zerith import (
@@ -153,7 +155,7 @@ class ZerithRobotAdapterTest(unittest.TestCase):
 
     def test_legacy_translation_rejects_unsupported_cartesian_action(self) -> None:
         translator = ZerithLegacyActionTranslator(_adapter().spec)
-        with self.assertRaisesRegex(NotImplementedError, "Phase 4"):
+        with self.assertRaisesRegex(NotImplementedError, "PlanningQuery"):
             translator.translate(
                 CartesianDeltaAction(
                     end_effector_frame="left_end_effector_link",
@@ -162,6 +164,46 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                     rotation_vector_rad=(0.0, 0.0, 0.0),
                 )
             )
+
+    def test_legacy_translation_solves_configured_cartesian_action(self) -> None:
+        class FakePlanningQuery:
+            """Record one Cartesian target and return a named joint result."""
+
+            def __init__(self) -> None:
+                self.target_pose = None
+
+            def frame_pose_at(self, configuration, model_name, frame_name):
+                del configuration, model_name, frame_name
+                return Pose((1.0, 2.0, 3.0), (1.0, 0.0, 0.0, 0.0))
+
+            def solve_ik(self, target_pose, **kwargs):
+                del kwargs
+                self.target_pose = target_pose
+                return SimpleNamespace(
+                    success=True,
+                    reason="success",
+                    solver_result="solution",
+                    configuration=(0.01,) + (0.0,) * 8,
+                )
+
+        query = FakePlanningQuery()
+        translator = ZerithLegacyActionTranslator(
+            _adapter().spec,
+            planning_query=query,
+        )
+        legacy = translator.translate(
+            CartesianDeltaAction(
+                end_effector_frame="left_end_effector_link",
+                reference_frame="world",
+                translation_m=(0.01, -0.02, 0.03),
+                rotation_vector_rad=(0.0, 0.0, 0.0),
+            )
+        )
+        np.testing.assert_allclose(legacy[:7], [0.01, 0, 0, 0, 0, 0, 0])
+        np.testing.assert_allclose(
+            query.target_pose.translation_m,
+            [1.01, 1.98, 3.03],
+        )
 
 
 if __name__ == "__main__":
