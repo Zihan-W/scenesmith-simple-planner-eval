@@ -26,12 +26,16 @@ def _observation(
     *,
     q=(0.0, 0.0),
     v=(0.0, 0.0),
+    q_commanded=None,
     ee_x=0.0,
+    ee_y=0.0,
     target_z=0.5,
     contacts=(),
 ) -> Observation:
     """Build one small policy observation."""
-    pose = Pose((ee_x, 0.0, 0.5), (1.0, 0.0, 0.0, 0.0))
+    if q_commanded is None:
+        q_commanded = q
+    pose = Pose((ee_x, ee_y, 0.5), (1.0, 0.0, 0.0, 0.0))
     twist = SpatialVelocity((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
     target_pose = Pose((0.1, 0.0, target_z), (1.0, 0.0, 0.0, 0.0))
     return Observation(
@@ -40,7 +44,7 @@ def _observation(
             joint_names=("joint_a", "joint_b"),
             q=q,
             v=v,
-            q_commanded=q,
+            q_commanded=q_commanded,
             torque_commanded=(0.0, 0.0),
             torque_applied=(0.0, 0.0),
             torque_saturated=(False, False),
@@ -67,7 +71,7 @@ def _pick_policy() -> PickLiftPolicy:
             target_contact_body="scene::target",
             open_width_m=0.08,
             closed_width_m=0.03,
-            approach_distance_m=0.02,
+            approach_distance_m=0.1,
             lift_distance_m=0.05,
             cartesian_step_m=0.01,
             stable_pregrasp_steps=2,
@@ -108,7 +112,7 @@ class OnlinePoliciesTest(unittest.TestCase):
         approach = policy.act(at_pregrasp)
         self.assertIsInstance(approach, CompositeAction)
         self.assertIsInstance(approach.arm, CartesianDeltaAction)
-        close = policy.act(_observation(q=(0.1, 0.2), ee_x=0.02))
+        close = policy.act(_observation(q=(0.1, 0.2), ee_x=0.098))
         self.assertIsInstance(close, GripperAction)
         self.assertEqual(policy.stage, "close")
 
@@ -116,26 +120,66 @@ class OnlinePoliciesTest(unittest.TestCase):
             ContactObservation("robot::left", "scene::target", 0.001),
             ContactObservation("robot::right", "scene::target", 0.001),
         )
-        policy.act(_observation(q=(0.1, 0.2), ee_x=0.02, contacts=contacts))
+        policy.act(_observation(q=(0.1, 0.2), ee_x=0.098, contacts=contacts))
         transition = policy.act(
-            _observation(q=(0.1, 0.2), ee_x=0.02, contacts=contacts)
+            _observation(q=(0.1, 0.2), ee_x=0.098, contacts=contacts)
         )
         self.assertIsInstance(transition, HoldAction)
         self.assertEqual(policy.stage, "lift")
 
-        lift = policy.act(_observation(q=(0.1, 0.2), ee_x=0.02))
+        lift = policy.act(_observation(q=(0.1, 0.2), ee_x=0.098))
         self.assertIsInstance(lift, CompositeAction)
         self.assertIsInstance(lift.arm, CartesianDeltaAction)
         self.assertEqual(lift.gripper, GripperAction(0.03))
         hold = policy.act(
             _observation(
                 q=(0.1, 0.2),
-                ee_x=0.02,
+                ee_x=0.098,
                 target_z=0.55,
             )
         )
         self.assertIsInstance(hold, HoldAction)
         self.assertEqual(policy.stage, "hold")
+
+    def test_cartesian_step_waits_for_servo_target_to_settle(self):
+        policy = _pick_policy()
+        at_pregrasp = _observation(q=(0.1, 0.2))
+        policy.reset(at_pregrasp, {})
+        policy.act(at_pregrasp)
+        policy.act(at_pregrasp)
+
+        waiting = _observation(
+            q=(0.1, 0.2),
+            q_commanded=(0.2, 0.2),
+        )
+        self.assertIsInstance(policy.act(waiting), HoldAction)
+        self.assertEqual(policy.stage, "approach")
+
+    def test_approach_rejects_lateral_misalignment_without_closing(self):
+        policy = _pick_policy()
+        at_pregrasp = _observation(q=(0.1, 0.2))
+        policy.reset(at_pregrasp, {})
+        policy.act(at_pregrasp)
+        policy.act(at_pregrasp)
+
+        misaligned = _observation(
+            q=(0.1, 0.2),
+            ee_x=0.098,
+            ee_y=0.02,
+        )
+        self.assertIsInstance(policy.act(misaligned), HoldAction)
+        self.assertEqual(policy.stage, "failed")
+
+    def test_approach_uses_only_the_calibrated_axis(self):
+        policy = _pick_policy()
+        at_pregrasp = _observation(q=(0.1, 0.2))
+        policy.reset(at_pregrasp, {})
+        policy.act(at_pregrasp)
+        policy.act(at_pregrasp)
+
+        action = policy.act(at_pregrasp)
+        self.assertIsInstance(action, CompositeAction)
+        self.assertEqual(action.arm.translation_m, (0.01, 0.0, 0.0))
 
 
 if __name__ == "__main__":

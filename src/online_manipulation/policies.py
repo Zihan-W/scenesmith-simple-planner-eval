@@ -92,6 +92,9 @@ class PickLiftPolicyConfig:
     cartesian_step_m: float = 0.003
     joint_position_tolerance: float = 0.02
     joint_velocity_tolerance: float = 0.05
+    cartesian_tracking_tolerance: float = 0.01
+    cartesian_velocity_tolerance: float = 0.2
+    maximum_alignment_error_m: float = 0.01
     stable_pregrasp_steps: int = 5
     stable_contact_steps: int = 3
     maximum_close_steps: int = 100
@@ -115,8 +118,16 @@ class PickLiftPolicyConfig:
         norm = float(np.linalg.norm(axis))
         if norm <= 0.0:
             raise ValueError("approach_axis_world must be nonzero")
-        if len(contacts) != 2 or any(not name for name in contacts):
-            raise ValueError("Exactly two finger contact bodies are required")
+        if (
+            len(contacts) != 2
+            or len(set(contacts)) != 2
+            or any(not name for name in contacts)
+        ):
+            raise ValueError(
+                "Exactly two distinct finger contact bodies are required"
+            )
+        if not self.target_contact_body:
+            raise ValueError("target_contact_body must be nonempty")
         positive = (
             self.open_width_m,
             self.approach_distance_m,
@@ -124,6 +135,9 @@ class PickLiftPolicyConfig:
             self.cartesian_step_m,
             self.joint_position_tolerance,
             self.joint_velocity_tolerance,
+            self.cartesian_tracking_tolerance,
+            self.cartesian_velocity_tolerance,
+            self.maximum_alignment_error_m,
         )
         if not all(math.isfinite(value) and value > 0.0 for value in positive):
             raise ValueError("PickLiftPolicy thresholds must be positive")
@@ -169,7 +183,6 @@ class PickLiftPolicy:
         self._stage = self._PREGRASP
         self._stable_steps = 0
         self._close_steps = 0
-        self._approach_start = np.zeros(3)
         self._lift_start_target_z = 0.0
 
     @property
@@ -193,10 +206,6 @@ class PickLiftPolicy:
         self._stage = self._PREGRASP
         self._stable_steps = 0
         self._close_steps = 0
-        self._approach_start = np.asarray(
-            observation.robot.end_effector_pose.translation_m,
-            dtype=float,
-        )
         self._lift_start_target_z = self._target_z(observation)
 
     def act(self, observation: Observation) -> RobotAction:
@@ -248,10 +257,6 @@ class PickLiftPolicy:
             self._stable_steps = 0
         if self._stable_steps >= self.config.stable_pregrasp_steps:
             self._stage = self._APPROACH
-            self._approach_start = np.asarray(
-                observation.robot.end_effector_pose.translation_m,
-                dtype=float,
-            )
             return HoldAction()
         return CompositeAction(
             arm=JointPositionAction(
@@ -263,13 +268,35 @@ class PickLiftPolicy:
 
     def _act_approach(self, observation: Observation) -> RobotAction:
         """Move toward the target in bounded Cartesian increments."""
+        if not self._ready_for_cartesian_step(observation):
+            return HoldAction()
         axis = np.asarray(self.config.approach_axis_world)
         current = np.asarray(
             observation.robot.end_effector_pose.translation_m,
             dtype=float,
         )
-        progress = float(axis @ (current - self._approach_start))
-        remaining = self.config.approach_distance_m - progress
+        target = np.asarray(
+            observation.objects[
+                self.config.target_observation_name
+            ].pose.translation_m,
+            dtype=float,
+        )
+        offset = target - current
+        remaining = float(axis @ offset)
+        perpendicular_error = float(
+            np.linalg.norm(offset - axis * remaining)
+        )
+        maximum_remaining = (
+            self.config.approach_distance_m
+            + 2.0 * self.config.cartesian_step_m
+        )
+        if (
+            perpendicular_error > self.config.maximum_alignment_error_m
+            or remaining < -self.config.cartesian_step_m
+            or remaining > maximum_remaining
+        ):
+            self._stage = self._FAILED
+            return HoldAction()
         if remaining <= 0.5 * self.config.cartesian_step_m:
             self._stage = self._CLOSE
             self._close_steps = 0
@@ -304,6 +331,8 @@ class PickLiftPolicy:
 
     def _act_lift(self, observation: Observation) -> RobotAction:
         """Lift in bounded world-Z increments while retaining gripper force."""
+        if not self._ready_for_cartesian_step(observation):
+            return HoldAction()
         lifted = self._target_z(observation) - self._lift_start_target_z
         remaining = self.config.lift_distance_m - lifted
         if remaining <= 0.5 * self.config.cartesian_step_m:
@@ -318,6 +347,30 @@ class PickLiftPolicy:
                 rotation_vector_rad=(0.0, 0.0, 0.0),
             ),
             gripper=GripperAction(self.config.closed_width_m),
+        )
+
+    def _ready_for_cartesian_step(
+        self,
+        observation: Observation,
+    ) -> bool:
+        """Require the previous servo target to settle before another step."""
+        joint_indices = tuple(
+            observation.robot.joint_names.index(name)
+            for name in self.config.arm_joint_names
+        )
+        tracking_error = max(
+            abs(
+                observation.robot.q[index]
+                - observation.robot.q_commanded[index]
+            )
+            for index in joint_indices
+        )
+        speed = max(
+            abs(observation.robot.v[index]) for index in joint_indices
+        )
+        return (
+            tracking_error <= self.config.cartesian_tracking_tolerance
+            and speed <= self.config.cartesian_velocity_tolerance
         )
 
     def _has_bilateral_target_contact(
