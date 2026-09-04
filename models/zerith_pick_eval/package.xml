@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>zerith_pick_eval</name>
+  <version>0.1.0</version>
+  <description>Task assets for the Zerith small-box pick evaluation.</description>
+  <maintainer email="noreply@example.com">SceneSmith</maintainer>
+  <license>MIT</license>
+</package>
