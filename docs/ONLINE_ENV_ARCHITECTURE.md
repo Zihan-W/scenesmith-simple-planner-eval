@@ -1,6 +1,6 @@
 # Online Manipulation Environment Architecture
 
-Status: Accepted migration architecture; public API contract version 0.1
+Status: Accepted migration architecture; Phase 2 Adapter integrated
 Source of truth: `docs/ONLINE_ENV_REQUIREMENTS.md`
 
 ## 0. Migration Baseline
@@ -112,6 +112,20 @@ env.write_updated_scenario(output_path)
 * home configuration。
 
 第一个实现为 `ZerithRobotAdapter`。
+
+The Phase 2 Zerith implementation reads position and velocity limits from the
+generated URDF and combines them with the already validated servo gains and
+effective effort limits. Its controlled order contains the seven left-arm
+joints followed by the two gripper joints. The rail and every other movable
+joint are explicit locked-joint entries; the rail value is 0.4 m for the
+current pick task.
+
+`make_legacy_zerith_environment()` is the temporary compatibility boundary.
+It constructs the unchanged `ZerithOnlineEnv` from `ScenarioSpec`,
+`TimingConfig`, and `ZerithRobotAdapter`. For this legacy-only function, the
+first `ScenarioSpec.package_xmls` entry is the scene package and later entries
+are additional packages. Target model identity remains an explicit argument
+until Task owns it in Phase 4.
 
 ### Controller
 

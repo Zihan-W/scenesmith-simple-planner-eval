@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
 Last updated: 2026-09-05
-Current phase: Phase 2 — Scenario and Zerith Adapter
+Current phase: Phase 3 — Generic Control, Action and Observation
 
 ## Product Goal
 
@@ -20,6 +20,7 @@ Current phase: Phase 2 — Scenario and Zerith Adapter
 * `ab551a2` Stabilize Zerith pick target calibration
 * `d5d6dc2` Validate fixed-rail Zerith pregrasp
 * `7e8a210` Validate online Zerith pregrasp execution
+* `d4334fe` Define online manipulation public contracts
 
 ## Current Validated State
 
@@ -108,6 +109,34 @@ Reproduce the Phase 1 tests from the repository root:
 
 Result on 2026-09-05: 8 tests passed.
 
+## Phase 2 Scenario and Zerith Adapter
+
+`ZerithRobotAdapter` now owns the generated model path and package mapping,
+base weld, nine controlled joint specifications, locked-joint state, gripper
+width mapping, and public robot-observation conversion. The fixed rail is an
+explicit locked joint at 0.4 m; it is not presented as a controllable joint.
+
+The existing PREGRASP entry point now constructs the unchanged legacy runtime
+through `ScenarioSpec`, `TimingConfig`, and the compatibility Adapter. Target
+identity remains an explicit compatibility argument and has not entered the
+generic environment contracts.
+
+Reproduce the contract and real-model integration tests:
+
+```bash
+.venv/bin/python -B -m unittest discover -s tests -v
+```
+
+Result on 2026-09-05: 11 tests passed, including real Drake model loading,
+base welding, actuator creation, locked-joint initialization, gripper mapping,
+and public observation conversion.
+
+Reproduce the full compatibility regression with the Phase 0 command under
+`Phase 0 Reproducible Commands`. Result on 2026-09-05: 3/3 episodes reached
+PREGRASP in 81 policy steps. All previously recorded metrics were reproduced
+exactly, including zero continuous torque saturation, 20.04 mm minimum safety
+clearance, 0.884 mrad final maximum joint error, and an open 80 mm gripper.
+
 ## Phase 0 Reproducible Commands
 
 Run from `/root/workspace/scenesmith-simple-planner-eval` after activating the
@@ -181,7 +210,7 @@ largest reported step error was `0.013955 rad`.
 
 * [x] Phase 0: audit, regression and checkpoint current work
 * [x] Phase 1: define public dataclasses, protocols and contract tests
-* [ ] Phase 2: introduce ScenarioSpec and ZerithRobotAdapter
+* [x] Phase 2: introduce ScenarioSpec and ZerithRobotAdapter
 * [ ] Phase 3: generalize controller, action and observation
 * [ ] Phase 4: implement Task, ContactPolicy and PlanningQuery
 * [ ] Phase 5: implement EpisodeRunner and DMD finalizer
@@ -198,7 +227,7 @@ largest reported step error was `0.013955 rad`.
 
 ## Next Action
 
-Begin Phase 2 by expressing the calibrated Zerith configuration as a
-`RobotSpec`, implementing `ZerithRobotAdapter`, and wrapping the existing
-`ZerithOnlineEnv`. Keep the 3/3 online PREGRASP regression green and do not
-remove or rewrite the legacy implementation.
+Begin Phase 3 by implementing the generic `OnlineManipulationEnv` facade,
+typed-action translation, and normalized observation conversion around the
+legacy runtime. Preserve exact 1000/200/10 Hz scheduling and keep the 3/3
+PREGRASP regression green.

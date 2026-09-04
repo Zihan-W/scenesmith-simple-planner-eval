@@ -9,8 +9,6 @@ from pathlib import Path
 
 import numpy as np
 
-from pydrake.all import Meshcat
-
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
@@ -19,7 +17,17 @@ from src.zerith_grasp_geometry import (
     ROBOT_BASE_XYZ_METERS,
     ROBOT_BASE_YAW_DEG,
 )
-from src.zerith_online_env import LEFT_ARM_SERVO_CONFIGS, ZerithOnlineEnv
+from src.online_manipulation.adapters.zerith import (
+    ZerithRobotAdapter,
+    make_legacy_zerith_environment,
+    make_zerith_robot_spec,
+)
+from src.online_manipulation.specs import (
+    ScenarioSpec,
+    TimingConfig,
+    VisualizationConfig,
+)
+from src.zerith_online_env import LEFT_ARM_SERVO_CONFIGS
 from src.zerith_pick_workspace import (
     PickWorkspaceEvaluator,
     edge_workspace_metrics,
@@ -512,28 +520,41 @@ def main() -> None:
             "validation"
         )
 
-    meshcat = Meshcat(args.meshcat_port) if args.meshcat else None
-    env = ZerithOnlineEnv(
-        scene_dmd=scene_dmd,
-        scene_package_xml=scene_package_xml,
-        additional_package_xmls=[eval_package_xml],
+    robot_spec = make_zerith_robot_spec(
         robot_model_dir=robot_model_dir,
-        target_model_name="living_room_box_0",
         robot_xyz=ROBOT_BASE_XYZ_METERS,
         robot_yaw_deg=ROBOT_BASE_YAW_DEG,
         rail_position=args.rail_position,
-        q_home=q_pick_home,
+        q_home_left=q_pick_home,
+    )
+    adapter = ZerithRobotAdapter(robot_spec)
+    scenario = ScenarioSpec(
+        dmd_path=scene_dmd,
+        package_xmls=(scene_package_xml, eval_package_xml),
+        visualization=VisualizationConfig(
+            enabled=args.meshcat,
+            port=args.meshcat_port,
+            record_html_path=args.record_html,
+            realtime_rate=args.realtime_rate,
+        ),
+    )
+    timing = TimingConfig(
         physics_dt=args.physics_dt,
         controller_dt=args.controller_dt,
         policy_dt=args.policy_dt,
+    )
+    env = make_legacy_zerith_environment(
+        scenario=scenario,
+        adapter=adapter,
+        timing=timing,
+        target_model_name="living_room_box_0",
         episode_duration=(
             args.maximum_policy_steps + args.required_stable_steps + 1
         )
         * args.policy_dt,
         max_joint_delta=args.maximum_joint_step,
-        realtime_rate=args.realtime_rate,
-        meshcat=meshcat,
     )
+    meshcat = env.meshcat
     if meshcat is not None:
         print(f"Meshcat URL: {meshcat.web_url()}")
         meshcat.StartRecording()
