@@ -34,6 +34,7 @@ from pydrake.all import (
 
 ZERITH_PACKAGE_NAME = "zerith_drake"
 ZERITH_URDF_RELATIVE_PATH = Path("urdf/zerith_drake.urdf")
+GRIPPER_MAX_OPENING = 0.08
 
 
 @dataclasses.dataclass(frozen=True)
@@ -330,7 +331,7 @@ class ZerithOnlineEnv:
         self.diagram = builder.Build()
         self._simulator: Simulator | None = None
         self._desired_q_left = self._q_home.copy()
-        self._desired_gripper_width = 0.08
+        self._desired_gripper_width = GRIPPER_MAX_OPENING
         self._done = False
         self._control_log: list[ControlSample] = []
         self._last_action_clipped = False
@@ -377,8 +378,10 @@ class ZerithOnlineEnv:
             strict=True,
         ):
             positions[joint.position_start()] = value
-        positions[self._gripper_joints[0].position_start()] = -0.04
-        positions[self._gripper_joints[1].position_start()] = 0.04
+        # The Zerith finger joints are open at zero. Moving the left finger
+        # negative and the right finger positive closes the gripper.
+        positions[self._gripper_joints[0].position_start()] = 0.0
+        positions[self._gripper_joints[1].position_start()] = 0.0
         self.plant.SetPositions(plant_context, positions)
 
         controlled_names = {config.name for config in ALL_SERVO_CONFIGS}
@@ -398,7 +401,7 @@ class ZerithOnlineEnv:
         plant_context = self.plant.GetMyMutableContextFromRoot(root_context)
         self._set_initial_configuration(plant_context)
         self._desired_q_left = self._q_home.copy()
-        self._desired_gripper_width = 0.08
+        self._desired_gripper_width = GRIPPER_MAX_OPENING
         self._done = False
         self._control_log.clear()
         self._last_action_clipped = False
@@ -427,11 +430,13 @@ class ZerithOnlineEnv:
 
     def _desired_controlled_positions(self) -> np.ndarray:
         """Return held arm and gripper targets in actuator order."""
-        half_width = 0.5 * self._desired_gripper_width
+        inward_travel = 0.5 * (
+            GRIPPER_MAX_OPENING - self._desired_gripper_width
+        )
         return np.concatenate(
             (
                 self._desired_q_left,
-                np.array([-half_width, half_width]),
+                np.array([-inward_travel, inward_travel]),
             )
         )
 
@@ -514,7 +519,9 @@ class ZerithOnlineEnv:
         return {
             "q_left": q[: len(LEFT_ARM_SERVO_CONFIGS)].copy(),
             "v_left": v[: len(LEFT_ARM_SERVO_CONFIGS)].copy(),
-            "gripper_width": float(q[-1] - q[-2]),
+            "gripper_width": float(
+                GRIPPER_MAX_OPENING - (q[-1] - q[-2])
+            ),
             "end_effector_pose": _pose_vector(end_effector_pose),
             "red_box_pose": _pose_vector(target_pose),
             "red_box_velocity": np.concatenate(
@@ -576,7 +583,9 @@ class ZerithOnlineEnv:
             or gripper_command != action_array[7]
         )
         self._desired_q_left = clipped_target
-        self._desired_gripper_width = 0.04 * (gripper_command + 1.0)
+        self._desired_gripper_width = (
+            0.5 * GRIPPER_MAX_OPENING * (gripper_command + 1.0)
+        )
 
         control_updates = 0
         for _ in range(self._control_steps_per_policy):
