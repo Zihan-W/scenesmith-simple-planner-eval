@@ -22,7 +22,7 @@ from src.zerith_grasp_geometry import (
     ROBOT_BASE_YAW_DEG,
 )
 from src.zerith_pregrasp_collision import (
-    apply_pregrasp_planning_filters,
+    apply_safety_clearance_filters,
     build_pregrasp_planning_model,
     raw_scene_distance_records,
     robot_clearance_records,
@@ -34,6 +34,8 @@ EVAL_PACKAGE_XML = (
 ZERITH_MODEL_DIR = REPOSITORY_ROOT / "models" / "zerith_drake"
 TARGET_BODY = "living_room_box_0::base_link"
 COFFEE_TABLE_BODY = "living_room_coffee_table_0::base_link"
+TORSO_BODY_NAME = "body_yaw_link"
+LEFT_SHOULDER_BODY_NAME = "left_shoulder_roll_link"
 
 # A deterministic configuration from the earlier unconstrained PREGRASP solve.
 # At the default fixed base pose, it places the left wrist and other left-arm
@@ -95,7 +97,7 @@ def _contains_body_pair(record: dict, body_a: str, body_b: str) -> bool:
 
 
 def main() -> None:
-    """Execute three collision-scope regressions and write diagnostics."""
+    """Execute collision-scope regressions and write diagnostics."""
     args = _parse_args()
     if args.minimum_distance < 0.0:
         raise ValueError("minimum-distance must be nonnegative")
@@ -110,18 +112,19 @@ def main() -> None:
         robot_xyz=ROBOT_BASE_XYZ_METERS,
         robot_yaw_deg=ROBOT_BASE_YAW_DEG,
     )
-    q_home = model.q_scene.copy()
-    q_home[model.arm_indices] = 0.0
+    q_zero = model.q_scene.copy()
+    q_zero[model.arm_indices] = 0.0
 
     raw_near_pairs = raw_scene_distance_records(
         model,
-        q_home,
+        q_zero,
         args.minimum_distance,
     )
     robot_pairs_before_filters = robot_clearance_records(
         model,
-        q_home,
+        q_zero,
         args.minimum_distance,
+        layer="safety",
     )
     target_support_pairs = [
         record
@@ -133,41 +136,73 @@ def main() -> None:
             "Expected the red box to touch the coffee table at q_home"
         )
 
-    filters = apply_pregrasp_planning_filters(model)
-    q_home_collision_free = (
-        model.collision_checker.CheckContextConfigCollisionFree(
-            model.collision_checker_context,
-            q_home,
+    filters = apply_safety_clearance_filters(
+        model,
+        influence_distance=(
+            args.minimum_distance + args.influence_distance_offset
+        ),
+    )
+    torso = model.plant.GetBodyByName(TORSO_BODY_NAME, model.zerith)
+    left_shoulder = model.plant.GetBodyByName(
+        LEFT_SHOULDER_BODY_NAME,
+        model.zerith,
+    )
+    shoulder_torso_safety_filtered = (
+        model.safety_checker.IsCollisionFilteredBetween(
+            torso.index(),
+            left_shoulder.index(),
         )
     )
-    if not q_home_collision_free:
+    shoulder_torso_nonpenetration_filtered = (
+        model.nonpenetration_checker.IsCollisionFilteredBetween(
+            torso.index(),
+            left_shoulder.index(),
+        )
+    )
+    if not shoulder_torso_safety_filtered:
         raise AssertionError(
-            "q_home should pass the planning collision checker after named "
-            "invariant-pair filters"
+            "Left shoulder-to-torso pair must be filtered from the safety "
+            "clearance layer"
+        )
+    if shoulder_torso_nonpenetration_filtered:
+        raise AssertionError(
+            "Left shoulder-to-torso pair must remain active in the "
+            "nonpenetration layer"
+        )
+    q_zero_collision_free = (
+        model.nonpenetration_checker.CheckContextConfigCollisionFree(
+            model.nonpenetration_checker_context,
+            q_zero,
+        )
+    )
+    if not q_zero_collision_free:
+        raise AssertionError(
+            "q_zero should pass the nonpenetration collision checker"
         )
 
     collision_constraint = MinimumDistanceLowerBoundConstraint(
-        collision_checker=model.collision_checker,
-        collision_checker_context=model.collision_checker_context,
+        collision_checker=model.safety_checker,
+        collision_checker_context=model.safety_checker_context,
         bound=args.minimum_distance,
         influence_distance_offset=args.influence_distance_offset,
     )
-    q_home_constraint_satisfied = collision_constraint.CheckSatisfied(
-        q_home,
+    q_zero_constraint_satisfied = collision_constraint.CheckSatisfied(
+        q_zero,
         1e-9,
     )
-    if not q_home_constraint_satisfied:
+    if not q_zero_constraint_satisfied:
         raise AssertionError(
             "Environment support contacts incorrectly made the robot-scoped "
             "minimum-distance constraint infeasible at q_home"
         )
 
-    q_table_collision = q_home.copy()
+    q_table_collision = q_zero.copy()
     q_table_collision[model.arm_indices] = KNOWN_TABLE_COLLISION_Q_LEFT
     bad_pose_clearances = robot_clearance_records(
         model,
         q_table_collision,
         0.2,
+        layer="nonpenetration",
     )
     wrist_table_penetrations = [
         record
@@ -181,8 +216,8 @@ def main() -> None:
             "Known bad pose should retain a left-wrist-to-table penetration"
         )
     bad_pose_collision_free = (
-        model.collision_checker.CheckContextConfigCollisionFree(
-            model.collision_checker_context,
+        model.nonpenetration_checker.CheckContextConfigCollisionFree(
+            model.nonpenetration_checker_context,
             q_table_collision,
         )
     )
@@ -200,10 +235,10 @@ def main() -> None:
     output = {
         "passed": True,
         "minimum_distance_m": args.minimum_distance,
-        "raw_q_home_pair_category_counts": dict(
+        "raw_q_zero_pair_category_counts": dict(
             Counter(record["category"] for record in raw_near_pairs)
         ),
-        "raw_q_home_pairs_below_minimum": raw_near_pairs,
+        "raw_q_zero_pairs_below_minimum": raw_near_pairs,
         "robot_pairs_before_planning_filters": robot_pairs_before_filters,
         "planning_collision_filters": [
             {
@@ -214,9 +249,10 @@ def main() -> None:
             for item in filters
         ],
         "regressions": {
-            "target_support_contact_present_and_q_home_valid": True,
+            "target_support_contact_present_and_q_zero_valid": True,
             "known_left_wrist_table_collision_detected": True,
             "environment_contacts_do_not_violate_ik_constraint": True,
+            "left_shoulder_torso_filtered_only_from_safety_layer": True,
         },
         "target_support_pairs": target_support_pairs,
         "known_bad_pose_wrist_table_penetrations": (
@@ -225,9 +261,10 @@ def main() -> None:
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
-    print("PASS: target support contact does not invalidate q_home")
+    print("PASS: target support contact does not invalidate q_zero")
     print("PASS: known left-wrist/table collision remains active")
     print("PASS: environment contacts do not enter the IK distance constraint")
+    print("PASS: left shoulder/torso is filtered only from the safety layer")
     print(f"Diagnostics: {output_path}")
 
 

@@ -9,6 +9,7 @@ simulation.
 """
 
 import argparse
+import json
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -109,11 +110,54 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--rail-position",
+        type=float,
+        default=0.0,
+        help="Initial daogui_joint position in meters.",
+    )
+    parser.add_argument(
+        "--q-left",
+        type=float,
+        nargs=7,
+        default=(0.0,) * 7,
+        metavar=("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"),
+        help="Initial seven-joint left-arm posture in radians.",
+    )
+    parser.add_argument(
+        "--configuration-json",
+        type=Path,
+        help=(
+            "JSON containing a saved q_pick_home or q_pregrasp vector. "
+            "When supplied, this overrides --q-left."
+        ),
+    )
+    parser.add_argument(
+        "--configuration-key",
+        choices=("q_pick_home", "q_pregrasp"),
+        default="q_pregrasp",
+        help="Seven-joint vector to load from --configuration-json.",
+    )
+    parser.add_argument(
         "--meshcat-port",
         type=int,
         help="Meshcat port; Drake selects an available port when omitted.",
     )
     return parser.parse_args()
+
+
+def _load_q_left(args: argparse.Namespace) -> np.ndarray:
+    """Return the requested initial seven-joint left-arm posture."""
+    if args.configuration_json is None:
+        return np.asarray(args.q_left, dtype=float)
+    configuration_json = args.configuration_json.resolve()
+    payload = json.loads(configuration_json.read_text(encoding="utf-8"))
+    q_left = np.asarray(payload[args.configuration_key], dtype=float)
+    if q_left.shape != (7,) or not np.all(np.isfinite(q_left)):
+        raise ValueError(
+            f"{configuration_json} contains an invalid "
+            f"{args.configuration_key}"
+        )
+    return q_left
 
 
 def _find_package_xml(scene_dmd: Path) -> Path:
@@ -202,6 +246,7 @@ def main() -> None:
     )
     robot_model_dir = args.robot_model_dir.resolve()
     robot_urdf = robot_model_dir / ZERITH_URDF_RELATIVE_PATH
+    q_left = _load_q_left(args)
 
     if not scene_dmd.is_file():
         raise FileNotFoundError(f"Scene DMD does not exist: {scene_dmd}")
@@ -260,6 +305,26 @@ def main() -> None:
     MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat)
     diagram = builder.Build()
     context = diagram.CreateDefaultContext()
+    plant_context = plant.GetMyMutableContextFromRoot(context)
+    positions = plant.GetPositions(plant_context).copy()
+    rail = plant.GetJointByName(RAIL_JOINTS[0], zerith)
+    if not (
+        rail.position_lower_limits()[0]
+        <= args.rail_position
+        <= rail.position_upper_limits()[0]
+    ):
+        raise ValueError("rail-position is outside the URDF joint limits")
+    positions[rail.position_start()] = args.rail_position
+    for joint_name, value in zip(LEFT_ARM_JOINTS, q_left, strict=True):
+        joint = plant.GetJointByName(joint_name, zerith)
+        if not (
+            joint.position_lower_limits()[0]
+            <= value
+            <= joint.position_upper_limits()[0]
+        ):
+            raise ValueError(f"{joint_name} value is outside its joint limits")
+        positions[joint.position_start()] = value
+    plant.SetPositions(plant_context, positions)
     diagram.ForcedPublish(context)
 
     print(f"Meshcat URL: {meshcat.web_url()}")
@@ -267,12 +332,17 @@ def main() -> None:
     print(f"Zerith URDF: {robot_urdf}")
     print(f"Zerith base frame: dipan_link at XYZ {tuple(args.robot_xyz)}")
     print(f"Zerith yaw: {args.robot_yaw_deg} degrees")
+    if args.configuration_json is not None:
+        print(
+            "Loaded posture: "
+            f"{args.configuration_key} from "
+            f"{args.configuration_json.resolve()}"
+        )
     print("Active end effector: left_end_effector_link")
     print(
         "Active joints: "
         f"{', '.join(RAIL_JOINTS + LEFT_ARM_JOINTS + LEFT_GRIPPER_JOINTS)}"
     )
-    rail = plant.GetJointByName(RAIL_JOINTS[0], zerith)
     print(
         "Rail calibration status: "
         f"range={rail.position_lower_limits()[0]:.3f} to "

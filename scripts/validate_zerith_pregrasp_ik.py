@@ -25,13 +25,17 @@ sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from src.zerith_grasp_geometry import (
     BOX_SIZE_METERS,
+    PICK_RAIL_POSITION_METERS,
     PREGRASP_DISTANCE_METERS,
     ROBOT_BASE_XYZ_METERS,
     ROBOT_BASE_YAW_DEG,
 )
+from src.zerith_pick_workspace import LEFT_WRIST_GRIPPER_BODY_NAMES
 from src.zerith_pregrasp_collision import (
-    apply_pregrasp_planning_filters,
+    apply_safety_clearance_filters,
     build_pregrasp_planning_model,
+    configuration_clearance_metrics,
+    edge_clearance_metrics,
     raw_scene_distance_records,
     robot_clearance_records,
 )
@@ -44,6 +48,7 @@ EVAL_PACKAGE_XML = (
 ZERITH_MODEL_DIR = REPOSITORY_ROOT / "models" / "zerith_drake"
 DEFAULT_APPROACH_TILTS_DEG = (0.0, 15.0, 30.0, 60.0, 90.0)
 DEFAULT_YAW_OFFSETS_DEG = (0.0, -20.0, 20.0, -45.0, 45.0)
+PREFERRED_ELBOW_BEND_DEG = 60.0
 
 
 def _parse_args() -> argparse.Namespace:
@@ -86,21 +91,57 @@ def _parse_args() -> argparse.Namespace:
         default=ROBOT_BASE_YAW_DEG,
     )
     parser.add_argument(
+        "--rail-position",
+        type=float,
+        default=PICK_RAIL_POSITION_METERS,
+        help="Fixed daogui_joint position in meters.",
+    )
+    parser.add_argument(
         "--pregrasp-distance",
         type=float,
         default=PREGRASP_DISTANCE_METERS,
     )
-    parser.add_argument("--position-tolerance", type=float, default=0.015)
+    parser.add_argument("--position-tolerance", type=float, default=0.01)
+    parser.add_argument(
+        "--position-cost-weight",
+        type=float,
+        default=10000.0,
+        help="Quadratic cost weight for centering within the pose tolerance.",
+    )
     parser.add_argument(
         "--orientation-tolerance-deg",
         type=float,
-        default=8.0,
+        default=5.0,
     )
     parser.add_argument(
-        "--minimum-distance",
+        "--orientation-cost-weight",
         type=float,
-        default=0.002,
-        help="Required robot clearance in meters (default: 0.002).",
+        default=100.0,
+        help="Cost weight for aligning within the orientation tolerance.",
+    )
+    parser.add_argument(
+        "--safety-objective-clearance",
+        type=float,
+        default=0.007,
+        help="IK safety-layer target in meters (default: 0.007).",
+    )
+    parser.add_argument(
+        "--minimum-target-gap",
+        type=float,
+        default=0.05,
+        help="Minimum collision-surface gap to the target at PREGRASP.",
+    )
+    parser.add_argument(
+        "--maximum-target-gap",
+        type=float,
+        default=0.10,
+        help="Maximum collision-surface gap to the target at PREGRASP.",
+    )
+    parser.add_argument(
+        "--safety-acceptance-clearance",
+        type=float,
+        default=0.005,
+        help="Independent safety-layer threshold (default: 0.005).",
     )
     parser.add_argument(
         "--influence-distance-offset",
@@ -127,12 +168,21 @@ def _parse_args() -> argparse.Namespace:
         nargs=7,
         default=(0.0,) * 7,
         metavar=("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"),
+        help=(
+            "Compatibility fallback for q_safe_home when "
+            "--safe-home-json is omitted."
+        ),
+    )
+    parser.add_argument(
+        "--safe-home-json",
+        type=Path,
+        help="Output from search_zerith_safe_home.py.",
     )
     parser.add_argument(
         "--q-current",
         type=float,
         nargs=7,
-        help="Current left-arm posture; defaults to q_home.",
+        help="Current left-arm posture; defaults to q_safe_home.",
     )
     parser.add_argument("--num-random-seeds", type=int, default=4)
     parser.add_argument("--random-seed", type=int, default=4)
@@ -140,6 +190,15 @@ def _parse_args() -> argparse.Namespace:
         "--exhaustive",
         action="store_true",
         help="Evaluate every candidate/seed pair after finding a solution.",
+    )
+    parser.add_argument(
+        "--edge-sample-step",
+        type=float,
+        default=0.005,
+        help=(
+            "Maximum joint change between q_safe_home-to-PREGRASP edge "
+            "samples in radians (default: 0.005)."
+        ),
     )
     parser.add_argument(
         "--output-json",
@@ -155,14 +214,34 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise ValueError("pregrasp-distance must be positive")
     if args.position_tolerance <= 0.0:
         raise ValueError("position-tolerance must be positive")
+    if args.position_cost_weight <= 0.0:
+        raise ValueError("position-cost-weight must be positive")
     if args.orientation_tolerance_deg <= 0.0:
         raise ValueError("orientation-tolerance-deg must be positive")
-    if args.minimum_distance < 0.0:
-        raise ValueError("minimum-distance must be nonnegative")
+    if args.orientation_cost_weight <= 0.0:
+        raise ValueError("orientation-cost-weight must be positive")
+    if args.safety_acceptance_clearance <= 0.0:
+        raise ValueError("safety-acceptance-clearance must be positive")
+    if args.minimum_target_gap < 0.0:
+        raise ValueError("minimum-target-gap must be nonnegative")
+    if args.maximum_target_gap <= args.minimum_target_gap:
+        raise ValueError(
+            "maximum-target-gap must exceed minimum-target-gap"
+        )
+    if (
+        args.safety_objective_clearance
+        < args.safety_acceptance_clearance
+    ):
+        raise ValueError(
+            "safety-objective-clearance must be at least "
+            "safety-acceptance-clearance"
+        )
     if args.influence_distance_offset <= 0.0:
         raise ValueError("influence-distance-offset must be positive")
     if args.num_random_seeds < 0:
         raise ValueError("num-random-seeds must be nonnegative")
+    if args.edge_sample_step <= 0.0:
+        raise ValueError("edge-sample-step must be positive")
     if not args.approach_tilt_deg or not args.yaw_offset_deg:
         raise ValueError("At least one approach tilt and yaw offset is required")
     for tilt in args.approach_tilt_deg:
@@ -171,26 +250,71 @@ def _validate_args(args: argparse.Namespace) -> None:
 
 
 def _target_collision_pose(plant, context, target_body):
-    """Return target Box dimensions and collision-frame world pose."""
+    """Return the tiled target Box bounds and their world-center pose."""
     geometry_ids = plant.GetCollisionGeometriesForBody(target_body)
-    if len(geometry_ids) != 1:
-        raise ValueError(
-            "Expected the pick target to have exactly one collision geometry, "
-            f"found {len(geometry_ids)}"
-        )
+    if not geometry_ids:
+        raise ValueError("Pick target has no collision geometry")
     query = plant.get_geometry_query_input_port().Eval(context)
     inspector = query.inspector()
-    geometry_id = geometry_ids[0]
-    shape = inspector.GetShape(geometry_id)
-    if not isinstance(shape, Box):
-        raise TypeError(f"Expected target collision Box, got {type(shape)}")
-    dimensions = np.array([shape.width(), shape.depth(), shape.height()])
+    body_points = []
+    for geometry_id in geometry_ids:
+        shape = inspector.GetShape(geometry_id)
+        if not isinstance(shape, Box):
+            raise TypeError(
+                f"Expected target collision Box, got {type(shape)}"
+            )
+        half_size = 0.5 * np.array(
+            [shape.width(), shape.depth(), shape.height()]
+        )
+        X_BG = inspector.GetPoseInFrame(geometry_id)
+        body_points.extend(
+            X_BG.multiply(np.array([x, y, z]))
+            for x in (-half_size[0], half_size[0])
+            for y in (-half_size[1], half_size[1])
+            for z in (-half_size[2], half_size[2])
+        )
+    body_points = np.asarray(body_points)
+    bounds_min = body_points.min(axis=0)
+    bounds_max = body_points.max(axis=0)
+    dimensions = bounds_max - bounds_min
     if not np.allclose(dimensions, BOX_SIZE_METERS, atol=1e-12):
         raise ValueError(
             f"Expected target dimensions {BOX_SIZE_METERS}, got {dimensions}"
         )
+    center_body = 0.5 * (bounds_min + bounds_max)
+    if not np.allclose(center_body, np.zeros(3), atol=1e-12):
+        raise ValueError(
+            "Expected tiled target collision geometry centered on base_link"
+        )
     X_WB = plant.EvalBodyPoseInWorld(context, target_body)
-    return dimensions, X_WB, X_WB @ inspector.GetPoseInFrame(geometry_id)
+    return dimensions, X_WB, X_WB @ RigidTransform(center_body)
+
+
+def _minimum_wrist_gripper_target_distance(
+    plant,
+    context,
+    zerith,
+    target_body,
+) -> float:
+    """Return the unfiltered collision-surface gap to the pick target."""
+    query = plant.get_geometry_query_input_port().Eval(context)
+    target_geometry_ids = plant.GetCollisionGeometriesForBody(target_body)
+    distances = []
+    for body_name in LEFT_WRIST_GRIPPER_BODY_NAMES:
+        body = plant.GetBodyByName(body_name, zerith)
+        for robot_geometry_id in plant.GetCollisionGeometriesForBody(body):
+            for target_geometry_id in target_geometry_ids:
+                distances.append(
+                    query.ComputeSignedDistancePairClosestPoints(
+                        robot_geometry_id,
+                        target_geometry_id,
+                    ).distance
+                )
+    if not distances:
+        raise ValueError(
+            "Wrist, gripper, and target must provide collision geometry"
+        )
+    return float(min(distances))
 
 
 def _candidate_pregrasp_poses(
@@ -255,7 +379,7 @@ def _candidate_pregrasp_poses(
 
 
 def _initial_guesses(
-    q_home: np.ndarray,
+    q_safe_home: np.ndarray,
     q_current: np.ndarray,
     lower: np.ndarray,
     upper: np.ndarray,
@@ -263,8 +387,8 @@ def _initial_guesses(
     random_seed: int,
 ) -> list[tuple[str, np.ndarray]]:
     """Construct deterministic home, current, and random arm seeds."""
-    guesses = [("q_home", q_home)]
-    if not np.allclose(q_current, q_home, atol=1e-12):
+    guesses = [("q_safe_home", q_safe_home)]
+    if not np.allclose(q_current, q_safe_home, atol=1e-12):
         guesses.append(("q_current", q_current))
     rng = np.random.default_rng(random_seed)
     for index in range(num_random_seeds):
@@ -276,17 +400,21 @@ def _solve_candidate(
     *,
     plant,
     context,
-    collision_checker,
-    collision_checker_context,
+    nonpenetration_checker,
+    nonpenetration_checker_context,
+    safety_checker,
+    safety_checker_context,
     grasp_frame,
     desired_pose: RigidTransform,
     q_scene: np.ndarray,
     arm_indices: np.ndarray,
-    q_home: np.ndarray,
+    q_safe_home: np.ndarray,
     q_seed: np.ndarray,
     position_tolerance: float,
+    position_cost_weight: float,
     orientation_tolerance_rad: float,
-    minimum_distance: float,
+    orientation_cost_weight: float,
+    safety_objective_clearance: float,
     influence_distance_offset: float,
 ):
     """Solve one collision-constrained IK candidate and initial guess."""
@@ -307,16 +435,37 @@ def _solve_candidate(
         R_BbarB=RotationMatrix(),
         theta_bound=orientation_tolerance_rad,
     )
-    collision_constraint = MinimumDistanceLowerBoundConstraint(
-        collision_checker=collision_checker,
-        collision_checker_context=collision_checker_context,
-        bound=minimum_distance,
+    ik.AddPositionCost(
+        frameA=plant.world_frame(),
+        p_AP=desired_position,
+        frameB=grasp_frame,
+        p_BQ=np.zeros(3),
+        C=np.asfortranarray(position_cost_weight * np.eye(3)),
+    )
+    ik.AddOrientationCost(
+        frameAbar=plant.world_frame(),
+        R_AbarA=desired_pose.rotation(),
+        frameBbar=grasp_frame,
+        R_BbarB=RotationMatrix(),
+        c=orientation_cost_weight,
+    )
+    nonpenetration_constraint = MinimumDistanceLowerBoundConstraint(
+        collision_checker=nonpenetration_checker,
+        collision_checker_context=nonpenetration_checker_context,
+        bound=0.0,
+        influence_distance_offset=influence_distance_offset,
+    )
+    safety_constraint = MinimumDistanceLowerBoundConstraint(
+        collision_checker=safety_checker,
+        collision_checker_context=safety_checker_context,
+        bound=safety_objective_clearance,
         influence_distance_offset=influence_distance_offset,
     )
 
     program = ik.prog()
     q = ik.q()
-    program.AddConstraint(collision_constraint, q)
+    program.AddConstraint(nonpenetration_constraint, q)
+    program.AddConstraint(safety_constraint, q)
     fixed_indices = np.setdiff1d(
         np.arange(plant.num_positions()),
         arm_indices,
@@ -328,7 +477,7 @@ def _solve_candidate(
     )
     program.AddQuadraticErrorCost(
         np.eye(len(arm_indices)),
-        q_home,
+        q_safe_home,
         q[arm_indices],
     )
     q_initial = q_scene.copy()
@@ -343,7 +492,7 @@ def _configuration_diagnostics(
     model,
     q: np.ndarray,
     desired_pose: RigidTransform,
-    minimum_distance: float,
+    safety_acceptance_clearance: float,
     diagnostic_distance: float,
 ) -> tuple[dict, RigidTransform | None]:
     """Measure pose, limits, and nearest robot collision at one result."""
@@ -361,29 +510,25 @@ def _configuration_diagnostics(
     orientation_error = (
         desired_pose.rotation().inverse() @ actual_pose.rotation()
     ).ToAngleAxis().angle()
-    clearances = robot_clearance_records(
+    clearance_metrics = configuration_clearance_metrics(
         model,
         q,
         diagnostic_distance,
-    )
-    nearest = clearances[0] if clearances else None
-    minimum_measured_distance = (
-        nearest["distance_m"] if nearest is not None else diagnostic_distance
     )
     q_left = q[model.arm_indices]
     joint_limit_margins = np.minimum(
         q_left - model.arm_lower_limits,
         model.arm_upper_limits - q_left,
     )
-    collision_free = model.collision_checker.CheckContextConfigCollisionFree(
-        model.collision_checker_context,
-        q,
+    collision_free = (
+        model.nonpenetration_checker.CheckContextConfigCollisionFree(
+            model.nonpenetration_checker_context,
+            q,
+        )
     )
     return {
         "configuration_finite": True,
-        "minimum_robot_distance_m": minimum_measured_distance,
-        "minimum_robot_distance_is_lower_bound": nearest is None,
-        "nearest_robot_pair": nearest,
+        **clearance_metrics,
         "position_error_norm_m": float(np.linalg.norm(position_error)),
         "max_absolute_position_error_m": float(
             np.max(np.abs(position_error))
@@ -391,11 +536,28 @@ def _configuration_diagnostics(
         "orientation_error_deg": float(np.rad2deg(orientation_error)),
         "minimum_joint_limit_margin": float(np.min(joint_limit_margins)),
         "joint_limit_margins": joint_limit_margins.tolist(),
-        "collision_free": bool(collision_free),
-        "minimum_distance_satisfied": bool(
-            minimum_measured_distance >= minimum_distance - 1e-5
+        "nonpenetration_collision_free": bool(collision_free),
+        "nonpenetration_satisfied": bool(
+            clearance_metrics["minimum_nonpenetration_distance"] >= 0.0
+        ),
+        "safety_acceptance_satisfied": bool(
+            clearance_metrics["minimum_safety_clearance"]
+            >= safety_acceptance_clearance
         ),
     }, actual_pose
+
+
+def _load_q_safe_home(args: argparse.Namespace) -> np.ndarray:
+    """Load q_safe_home, preserving --q-home as a compatibility fallback."""
+    if args.safe_home_json is None:
+        return np.asarray(args.q_home, dtype=float)
+    payload = json.loads(
+        args.safe_home_json.resolve().read_text(encoding="utf-8")
+    )
+    q_safe_home = np.asarray(payload["q_safe_home"], dtype=float)
+    if q_safe_home.shape != (7,) or not np.all(np.isfinite(q_safe_home)):
+        raise ValueError("safe-home-json contains an invalid q_safe_home")
+    return q_safe_home
 
 
 def main() -> None:
@@ -415,6 +577,7 @@ def main() -> None:
         robot_model_dir=robot_model_dir,
         robot_xyz=robot_xyz,
         robot_yaw_deg=args.robot_yaw_deg,
+        rail_position=args.rail_position,
     )
     plant = model.plant
     plant_context = model.plant_context
@@ -423,41 +586,62 @@ def main() -> None:
     lower_limits = model.arm_lower_limits
     upper_limits = model.arm_upper_limits
     q_scene = model.q_scene.copy()
-    q_home = np.asarray(args.q_home, dtype=float)
+    q_safe_home = _load_q_safe_home(args)
     q_current = (
         np.asarray(args.q_current, dtype=float)
         if args.q_current is not None
-        else q_home.copy()
+        else q_safe_home.copy()
     )
-    for name, values in (("q_home", q_home), ("q_current", q_current)):
+    for name, values in (
+        ("q_safe_home", q_safe_home),
+        ("q_current", q_current),
+    ):
         if np.any(values < lower_limits) or np.any(values > upper_limits):
             raise ValueError(f"{name} violates left-arm joint limits")
     q_scene[arm_indices] = q_current
     plant.SetPositions(plant_context, q_scene)
-    q_home_scene = q_scene.copy()
-    q_home_scene[arm_indices] = q_home
-    raw_q_home_distances = raw_scene_distance_records(
+    q_safe_home_scene = q_scene.copy()
+    q_safe_home_scene[arm_indices] = q_safe_home
+    raw_q_safe_home_distances = raw_scene_distance_records(
         model,
-        q_home_scene,
-        args.minimum_distance,
+        q_safe_home_scene,
+        args.safety_objective_clearance,
     )
-    unfiltered_q_home_robot_distances = robot_clearance_records(
+    unfiltered_q_safe_home_safety_distances = robot_clearance_records(
         model,
-        q_home_scene,
-        args.minimum_distance,
+        q_safe_home_scene,
+        args.safety_objective_clearance,
+        layer="safety",
     )
-    planning_filters = apply_pregrasp_planning_filters(model)
-    filtered_q_home_robot_distances = robot_clearance_records(
+    planning_filters = apply_safety_clearance_filters(
         model,
-        q_home_scene,
-        args.minimum_distance,
+        influence_distance=(
+            args.safety_objective_clearance
+            + args.influence_distance_offset
+        ),
+    )
+    diagnostic_distance = max(
+        0.05,
+        args.safety_objective_clearance
+        + args.influence_distance_offset,
+    )
+    q_safe_home_metrics = configuration_clearance_metrics(
+        model,
+        q_safe_home_scene,
+        diagnostic_distance,
     )
     print(
-        "q_home distances below minimum: "
-        f"scene={len(raw_q_home_distances)}, "
-        f"robot_before_filters={len(unfiltered_q_home_robot_distances)}, "
-        f"robot_after_filters={len(filtered_q_home_robot_distances)}"
+        "q_safe_home clearances: "
+        "nonpenetration="
+        f"{q_safe_home_metrics['minimum_nonpenetration_distance']:.6f} m, "
+        f"safety={q_safe_home_metrics['minimum_safety_clearance']:.6f} m"
     )
+    if (
+        q_safe_home_metrics["minimum_nonpenetration_distance"] < 0.0
+        or q_safe_home_metrics["minimum_safety_clearance"]
+        < args.safety_acceptance_clearance
+    ):
+        raise ValueError("q_safe_home does not satisfy both collision layers")
 
     target_instance = plant.GetModelInstanceByName(args.target_model_name)
     target_body = plant.GetBodyByName(TARGET_BODY_NAME, target_instance)
@@ -475,7 +659,7 @@ def main() -> None:
         args.yaw_offset_deg,
     )
     seeds = _initial_guesses(
-        q_home,
+        q_safe_home,
         q_current,
         lower_limits,
         upper_limits,
@@ -484,31 +668,35 @@ def main() -> None:
     )
 
     attempts = []
-    solution = None
+    valid_solutions = []
     orientation_tolerance_rad = np.deg2rad(
         args.orientation_tolerance_deg
     )
-    validation_distance = (
-        args.minimum_distance + args.influence_distance_offset
-    )
+    validation_distance = diagnostic_distance
     for candidate in candidates:
         for seed_name, q_seed in seeds:
             result, q_variables = _solve_candidate(
                 plant=plant,
                 context=plant_context,
-                collision_checker=model.collision_checker,
-                collision_checker_context=(
-                    model.collision_checker_context
+                nonpenetration_checker=model.nonpenetration_checker,
+                nonpenetration_checker_context=(
+                    model.nonpenetration_checker_context
                 ),
+                safety_checker=model.safety_checker,
+                safety_checker_context=model.safety_checker_context,
                 grasp_frame=grasp_frame,
                 desired_pose=candidate["pose"],
                 q_scene=q_scene,
                 arm_indices=arm_indices,
-                q_home=q_home,
+                q_safe_home=q_safe_home,
                 q_seed=q_seed,
                 position_tolerance=args.position_tolerance,
+                position_cost_weight=args.position_cost_weight,
                 orientation_tolerance_rad=orientation_tolerance_rad,
-                minimum_distance=args.minimum_distance,
+                orientation_cost_weight=args.orientation_cost_weight,
+                safety_objective_clearance=(
+                    args.safety_objective_clearance
+                ),
                 influence_distance_offset=args.influence_distance_offset,
             )
             attempt = {
@@ -522,13 +710,30 @@ def main() -> None:
                 model=model,
                 q=q_result,
                 desired_pose=candidate["pose"],
-                minimum_distance=args.minimum_distance,
+                safety_acceptance_clearance=(
+                    args.safety_acceptance_clearance
+                ),
                 diagnostic_distance=max(validation_distance, 0.05),
             )
             attempt.update(diagnostics)
-            attempts.append(attempt)
+            if diagnostics.get("configuration_finite", False):
+                target_gap = _minimum_wrist_gripper_target_distance(
+                    plant,
+                    plant_context,
+                    model.zerith,
+                    target_body,
+                )
+                attempt["minimum_wrist_gripper_target_distance_m"] = (
+                    target_gap
+                )
+                attempt["target_gap_satisfied"] = bool(
+                    args.minimum_target_gap
+                    <= target_gap
+                    <= args.maximum_target_gap
+                )
             if not result.is_success():
-                nearest = attempt.get("nearest_robot_pair")
+                attempts.append(attempt)
+                nearest = attempt.get("nearest_safety_pair")
                 nearest_text = (
                     f"{nearest['body_a']} <-> {nearest['body_b']}"
                     if nearest is not None
@@ -537,8 +742,9 @@ def main() -> None:
                 print(
                     f"{candidate['name']} / {seed_name}: "
                     f"{attempt['solver_result']}, "
-                    f"min_robot_distance="
-                    f"{attempt.get('minimum_robot_distance_m')}, "
+                    "nonpenetration="
+                    f"{attempt.get('minimum_nonpenetration_distance')}, "
+                    f"safety={attempt.get('minimum_safety_clearance')}, "
                     f"nearest={nearest_text}, "
                     f"position_error="
                     f"{attempt.get('position_error_norm_m')}, "
@@ -548,24 +754,80 @@ def main() -> None:
                 continue
 
             q_solution = q_result
-            independently_valid = bool(
-                diagnostics["collision_free"]
-                and diagnostics["minimum_distance_satisfied"]
+            endpoint_valid = bool(
+                diagnostics["nonpenetration_collision_free"]
+                and diagnostics["nonpenetration_satisfied"]
+                and diagnostics["safety_acceptance_satisfied"]
+                and attempt["target_gap_satisfied"]
             )
-            attempt["independent_collision_check"] = independently_valid
+            edge_metrics = edge_clearance_metrics(
+                model,
+                q_safe_home_scene,
+                q_solution,
+                validation_distance,
+                max_joint_step=args.edge_sample_step,
+            )
+            edge_valid = bool(
+                edge_metrics["minimum_nonpenetration_distance"] >= 0.0
+                and edge_metrics["minimum_safety_clearance"]
+                >= args.safety_acceptance_clearance
+            )
+            endpoint_and_direct_edge_valid = endpoint_valid and edge_valid
+            attempt["q_safe_home_to_pregrasp_edge"] = edge_metrics
+            attempt["endpoint_valid"] = endpoint_valid
+            attempt["direct_interpolation_valid"] = edge_valid
+            attempt["endpoint_and_direct_edge_valid"] = (
+                endpoint_and_direct_edge_valid
+            )
+            attempts.append(attempt)
             print(
                 f"{candidate['name']} / {seed_name}: solved, "
-                "minimum_distance="
-                f"{diagnostics['minimum_robot_distance_m']:.6f} m, "
-                f"independent_check={independently_valid}"
+                "endpoint_safety="
+                f"{diagnostics['minimum_safety_clearance']:.6f} m, "
+                "edge_safety="
+                f"{edge_metrics['minimum_safety_clearance']:.6f} m, "
+                f"endpoint_valid={endpoint_valid}, "
+                f"direct_edge_valid={edge_valid}"
             )
-            if independently_valid:
+            if endpoint_valid:
+                q_left = q_solution[arm_indices]
+                joint_spans = upper_limits - lower_limits
+                joint_limit_margins = np.minimum(
+                    q_left - lower_limits,
+                    upper_limits - q_left,
+                )
+                normalized_joint_limit_margins = (
+                    joint_limit_margins / joint_spans
+                )
+                elbow_bend_deg = float(np.rad2deg(abs(q_left[3])))
+                wrist_midpoints = 0.5 * (
+                    lower_limits[4:] + upper_limits[4:]
+                )
                 candidate_solution = {
                     "candidate": candidate["name"],
                     "approach_tilt_deg": candidate["tilt_deg"],
                     "yaw_offset_deg": candidate["yaw_offset_deg"],
                     "seed": seed_name,
-                    "q_left": q_solution[arm_indices].tolist(),
+                    "q_left": q_left.tolist(),
+                    "distance_from_q_safe_home": float(
+                        np.linalg.norm(q_left - q_safe_home)
+                    ),
+                    "minimum_joint_limit_margin": diagnostics[
+                        "minimum_joint_limit_margin"
+                    ],
+                    "minimum_normalized_joint_limit_margin": float(
+                        np.min(normalized_joint_limit_margins)
+                    ),
+                    "elbow_bend_abs_deg": elbow_bend_deg,
+                    "preferred_elbow_bend_deg": (
+                        PREFERRED_ELBOW_BEND_DEG
+                    ),
+                    "elbow_preference_error_deg": abs(
+                        elbow_bend_deg - PREFERRED_ELBOW_BEND_DEG
+                    ),
+                    "wrist_deviation_from_midpoint_rad": float(
+                        np.linalg.norm(q_left[4:] - wrist_midpoints)
+                    ),
                     "desired_pregrasp_pose": {
                         "translation_xyz_m": (
                             candidate["pose"].translation().tolist()
@@ -580,21 +842,75 @@ def main() -> None:
                             actual_pose.rotation().matrix().tolist()
                         ),
                     },
-                    "minimum_measured_distance_m": diagnostics[
-                        "minimum_robot_distance_m"
+                    "position_error_norm_m": diagnostics[
+                        "position_error_norm_m"
                     ],
-                    "nearby_robot_clearances": robot_clearance_records(
+                    "max_absolute_position_error_m": diagnostics[
+                        "max_absolute_position_error_m"
+                    ],
+                    "orientation_error_deg": diagnostics[
+                        "orientation_error_deg"
+                    ],
+                    "grasp_axes_world": {
+                        "approach": candidate["pose"]
+                        .rotation()
+                        .matrix()[:, 0]
+                        .tolist(),
+                        "closing": candidate["pose"]
+                        .rotation()
+                        .matrix()[:, 1]
+                        .tolist(),
+                        "up": candidate["pose"]
+                        .rotation()
+                        .matrix()[:, 2]
+                        .tolist(),
+                    },
+                    "minimum_wrist_gripper_target_distance_m": (
+                        target_gap
+                    ),
+                    "minimum_nonpenetration_distance": diagnostics[
+                        "minimum_nonpenetration_distance"
+                    ],
+                    "minimum_safety_clearance": diagnostics[
+                        "minimum_safety_clearance"
+                    ],
+                    "q_safe_home_to_pregrasp_edge": edge_metrics,
+                    "direct_interpolation_valid": edge_valid,
+                    "nearby_nonpenetration_clearances": (
+                        robot_clearance_records(
+                            model,
+                            q_solution,
+                            validation_distance,
+                            layer="nonpenetration",
+                        )
+                    ),
+                    "nearby_safety_clearances": robot_clearance_records(
                         model,
                         q_solution,
                         validation_distance,
+                        layer="safety",
                     ),
                 }
-                if solution is None:
-                    solution = candidate_solution
+                valid_solutions.append(candidate_solution)
                 if not args.exhaustive:
                     break
-        if solution is not None and not args.exhaustive:
+        if valid_solutions and not args.exhaustive:
             break
+
+    valid_solutions.sort(
+        key=lambda item: (
+            -int(item["direct_interpolation_valid"]),
+            item["elbow_preference_error_deg"],
+            item["wrist_deviation_from_midpoint_rad"],
+            -item["minimum_normalized_joint_limit_margin"],
+            -item["q_safe_home_to_pregrasp_edge"][
+                "minimum_safety_clearance"
+            ],
+            -item["minimum_safety_clearance"],
+            item["distance_from_q_safe_home"],
+        )
+    )
+    solution = valid_solutions[0] if valid_solutions else None
 
     output_path = (
         args.output_json.resolve()
@@ -603,23 +919,61 @@ def main() -> None:
     )
     output = {
         "search_succeeded": solution is not None,
+        "calibration_status": (
+            "fixed_rail_pregrasp_candidate_validated"
+        ),
+        "daogui_joint_position_m": float(
+            q_scene[
+                plant.GetJointByName(
+                    "daogui_joint",
+                    model.zerith,
+                ).position_start()
+            ]
+        ),
         "robot_base_xyz_m": robot_xyz.tolist(),
         "robot_base_yaw_deg": args.robot_yaw_deg,
         "target_model_name": args.target_model_name,
         "target_dimensions_m": dimensions.tolist(),
         "target_collision_center_xyz_m": X_WC.translation().tolist(),
         "position_tolerance_m": args.position_tolerance,
+        "position_cost_weight": args.position_cost_weight,
         "orientation_tolerance_deg": args.orientation_tolerance_deg,
-        "minimum_distance_m": args.minimum_distance,
+        "orientation_cost_weight": args.orientation_cost_weight,
+        "minimum_target_gap_m": args.minimum_target_gap,
+        "maximum_target_gap_m": args.maximum_target_gap,
+        "nonpenetration_bound_m": 0.0,
+        "safety_objective_clearance_m": (
+            args.safety_objective_clearance
+        ),
+        "safety_acceptance_clearance_m": (
+            args.safety_acceptance_clearance
+        ),
         "influence_distance_offset_m": args.influence_distance_offset,
+        "edge_sample_step_rad": args.edge_sample_step,
+        "solution_ranking_order": [
+            "direct_interpolation_valid",
+            "elbow_bend_closest_to_60_deg",
+            "minimum_wrist_midpoint_deviation",
+            "maximum_normalized_joint_limit_margin",
+            "maximum_edge_safety_clearance",
+            "maximum_endpoint_safety_clearance",
+            "minimum_distance_from_q_safe_home",
+        ],
         "non_arm_positions_fixed": int(
             plant.num_positions() - len(arm_indices)
         ),
-        "collision_constraint_scope": (
-            "SceneGraphCollisionChecker with Zerith as the only robot model "
-            "instance"
-        ),
-        "planning_collision_filters": [
+        "collision_constraint_scope": {
+            "nonpenetration": (
+                "All real Zerith collision candidates retained by the "
+                "dynamics model, with no added planning filters"
+            ),
+            "safety": (
+                "Zerith-environment and non-assembly Zerith self-collision "
+                "pairs; active-arm-invariant pairs and the explicit "
+                "left-shoulder-to-torso whitelist are excluded"
+            ),
+        },
+        "safety_clearance_filters": [
             {
                 "body_a": item.body_a,
                 "body_b": item.body_b,
@@ -627,13 +981,14 @@ def main() -> None:
             }
             for item in planning_filters
         ],
-        "q_home_distance_diagnostics": {
-            "raw_scene_pairs_below_minimum": raw_q_home_distances,
-            "robot_pairs_before_planning_filters": (
-                unfiltered_q_home_robot_distances
+        "q_safe_home": q_safe_home.tolist(),
+        "q_safe_home_distance_diagnostics": {
+            "clearance_metrics": q_safe_home_metrics,
+            "raw_scene_pairs_below_safety_objective": (
+                raw_q_safe_home_distances
             ),
-            "robot_pairs_after_planning_filters": (
-                filtered_q_home_robot_distances
+            "robot_pairs_before_safety_filters": (
+                unfiltered_q_safe_home_safety_distances
             ),
         },
         "moving_left_arm_body_count": len(
@@ -643,6 +998,8 @@ def main() -> None:
         "seed_count": len(seeds),
         "maximum_attempt_count": len(candidates) * len(seeds),
         "attempt_count": len(attempts),
+        "valid_solution_count": len(valid_solutions),
+        "valid_solutions": valid_solutions,
         "exhaustive": args.exhaustive,
         "attempts": attempts,
         "solution": solution,
@@ -661,8 +1018,12 @@ def main() -> None:
     print(f"Seed: {solution['seed']}")
     print(f"q_left: {solution['q_left']}")
     print(
-        "Independent minimum distance: "
-        f"{solution['minimum_measured_distance_m']:.6f} m"
+        "Selected clearances: "
+        "nonpenetration="
+        f"{solution['minimum_nonpenetration_distance']:.6f} m, "
+        f"safety={solution['minimum_safety_clearance']:.6f} m, "
+        "edge_safety="
+        f"{solution['q_safe_home_to_pregrasp_edge']['minimum_safety_clearance']:.6f} m"
     )
     print(f"Diagnostics: {output_path}")
 
