@@ -252,10 +252,10 @@
         <color rgba="1 1 1 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="left_wrist_roll_body">
+      <origin xyz="0.071 0.0 -0.002" rpy="0.0 1.5707963267948966 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/left_wrist_roll_link.obj" />
+        <cylinder radius="0.031" length="0.096" />
       </geometry>
     </collision>
   </link>
@@ -281,10 +281,10 @@
         <color rgba="1 1 1 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="left_wrist_yaw_body">
+      <origin xyz="0.0 0.0 -0.00025" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/left_wrist_yaw_link.obj" />
+        <cylinder radius="0.025" length="0.065" />
       </geometry>
     </collision>
   </link>
@@ -310,10 +310,22 @@
         <color rgba="0.66667 0.69804 0.76863 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="left_wrist_pitch_bracket">
+      <origin xyz="0.005 0.0295 0.0" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/left_wrist_pitch_link.obj" />
+        <box size="0.045 0.009 0.03" />
+      </geometry>
+    </collision>
+    <collision name="left_wrist_pitch_body">
+      <origin xyz="0.05 0.0 0.005" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.034 0.06 0.05" />
+      </geometry>
+    </collision>
+    <collision name="left_wrist_pitch_palm">
+      <origin xyz="0.099 0.0 0.005" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.018 0.145 0.04" />
       </geometry>
     </collision>
   </link>
@@ -339,10 +351,22 @@
         <color rgba="0.49804 0.49804 0.49804 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="left_jaw_left_finger_base">
+      <origin xyz="0.024 0.0545 0.0" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/left_jaw_left_finger_link.obj" />
+        <box size="0.018 0.027 0.055" />
+      </geometry>
+    </collision>
+    <collision name="left_jaw_left_finger_middle">
+      <origin xyz="0.0455 0.047 -0.0045" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.025 0.013 0.035" />
+      </geometry>
+    </collision>
+    <collision name="left_jaw_left_finger_tip">
+      <origin xyz="0.0765 0.0425 -0.0015" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.035 0.004 0.014" />
       </geometry>
     </collision>
   </link>
@@ -368,10 +392,22 @@
         <color rgba="0.49804 0.49804 0.49804 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="left_jaw_right_finger_base">
+      <origin xyz="0.024 -0.0545 0.0" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/left_jaw_right_finger_link.obj" />
+        <box size="0.018 0.027 0.055" />
+      </geometry>
+    </collision>
+    <collision name="left_jaw_right_finger_middle">
+      <origin xyz="0.0455 -0.047 -0.0045" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.025 0.013 0.035" />
+      </geometry>
+    </collision>
+    <collision name="left_jaw_right_finger_tip">
+      <origin xyz="0.0765 -0.0425 -0.0015" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.035 0.004 0.014" />
       </geometry>
     </collision>
   </link>
@@ -425,10 +461,22 @@
         <color rgba="0.68627 0.68627 0.68627 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="left_end_effector_center">
+      <origin xyz="-0.029 0.0 0.0" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/left_end_effector_link.obj" />
+        <box size="0.0015 0.069 0.008" />
+      </geometry>
+    </collision>
+    <collision name="left_end_effector_left_mount">
+      <origin xyz="-0.029 0.055 0.0" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.0015 0.029 0.008" />
+      </geometry>
+    </collision>
+    <collision name="left_end_effector_right_mount">
+      <origin xyz="-0.029 -0.055 0.0" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.0015 0.029 0.008" />
       </geometry>
     </collision>
   </link>
@@ -569,10 +617,10 @@
         <color rgba="1 1 1 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="right_wrist_roll_body">
+      <origin xyz="0.071 0.0 -0.002" rpy="0.0 1.5707963267948966 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/right_wrist_roll_link.obj" />
+        <cylinder radius="0.031" length="0.096" />
       </geometry>
     </collision>
   </link>
@@ -598,10 +646,10 @@
         <color rgba="1 1 1 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="right_wrist_yaw_body">
+      <origin xyz="0.0 0.0 -0.00025" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/right_wrist_yaw_link.obj" />
+        <cylinder radius="0.025" length="0.065" />
       </geometry>
     </collision>
   </link>
@@ -627,10 +675,22 @@
         <color rgba="0.66667 0.69804 0.76863 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="right_wrist_pitch_bracket">
+      <origin xyz="0.005 -0.0295 0.0" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/right_wrist_pitch_link.obj" />
+        <box size="0.045 0.009 0.03" />
+      </geometry>
+    </collision>
+    <collision name="right_wrist_pitch_body">
+      <origin xyz="0.05 0.0 0.005" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.034 0.06 0.05" />
+      </geometry>
+    </collision>
+    <collision name="right_wrist_pitch_palm">
+      <origin xyz="0.099 0.0 0.005" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.018 0.145 0.04" />
       </geometry>
     </collision>
   </link>
@@ -656,10 +716,22 @@
         <color rgba="0.49804 0.49804 0.49804 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="right_jaw_left_finger_base">
+      <origin xyz="0.024 0.0545 0.0" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/right_jaw_left_finger_link.obj" />
+        <box size="0.018 0.027 0.055" />
+      </geometry>
+    </collision>
+    <collision name="right_jaw_left_finger_middle">
+      <origin xyz="0.0455 0.047 -0.0045" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.025 0.013 0.035" />
+      </geometry>
+    </collision>
+    <collision name="right_jaw_left_finger_tip">
+      <origin xyz="0.0765 0.0425 -0.0015" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.035 0.004 0.014" />
       </geometry>
     </collision>
   </link>
@@ -685,10 +757,22 @@
         <color rgba="0.49804 0.49804 0.49804 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="right_jaw_right_finger_base">
+      <origin xyz="0.024 -0.0545 0.0" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/right_jaw_right_finger_link.obj" />
+        <box size="0.018 0.027 0.055" />
+      </geometry>
+    </collision>
+    <collision name="right_jaw_right_finger_middle">
+      <origin xyz="0.0455 -0.047 -0.0045" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.025 0.013 0.035" />
+      </geometry>
+    </collision>
+    <collision name="right_jaw_right_finger_tip">
+      <origin xyz="0.0765 -0.0425 -0.0015" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.035 0.004 0.014" />
       </geometry>
     </collision>
   </link>
@@ -742,10 +826,22 @@
         <color rgba="0.68627 0.68627 0.68627 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+    <collision name="right_end_effector_center">
+      <origin xyz="-0.029 0.0 0.0" rpy="0.0 0.0 0.0" />
       <geometry>
-        <mesh filename="package://zerith_drake/meshes/right_end_effector_link.obj" />
+        <box size="0.0015 0.069 0.008" />
+      </geometry>
+    </collision>
+    <collision name="right_end_effector_left_mount">
+      <origin xyz="-0.029 0.055 0.0" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.0015 0.029 0.008" />
+      </geometry>
+    </collision>
+    <collision name="right_end_effector_right_mount">
+      <origin xyz="-0.029 -0.055 0.0" rpy="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.0015 0.029 0.008" />
       </geometry>
     </collision>
   </link>

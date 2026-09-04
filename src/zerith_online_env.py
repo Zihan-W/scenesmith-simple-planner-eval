@@ -17,9 +17,7 @@ import numpy as np
 
 from pydrake.all import (
     AddMultibodyPlantSceneGraph,
-    CollisionFilterDeclaration,
     DiagramBuilder,
-    GeometrySet,
     LoadModelDirectives,
     Meshcat,
     MeshcatVisualizer,
@@ -61,20 +59,6 @@ LEFT_GRIPPER_SERVO_CONFIGS = (
     JointServoConfig("left_jaw_right_finger_joint", 100.0, 4.0, 25.0),
 )
 ALL_SERVO_CONFIGS = LEFT_ARM_SERVO_CONFIGS + LEFT_GRIPPER_SERVO_CONFIGS
-
-# These pairs are known false positives caused by the current whole-mesh
-# convex collision proxies. Keep the list narrow so unrelated robot contact
-# and every robot-environment contact remain active.
-KNOWN_INVALID_SELF_COLLISION_PAIRS = (
-    ("left_wrist_roll_link", "left_wrist_pitch_link"),
-    ("right_wrist_roll_link", "right_wrist_pitch_link"),
-    ("left_jaw_left_finger_link", "left_end_effector_link"),
-    ("left_jaw_right_finger_link", "left_end_effector_link"),
-    ("left_jaw_left_finger_link", "left_jaw_right_finger_link"),
-    ("right_jaw_left_finger_link", "right_end_effector_link"),
-    ("right_jaw_right_finger_link", "right_end_effector_link"),
-)
-
 
 @dataclasses.dataclass(frozen=True)
 class ControlSample:
@@ -174,7 +158,6 @@ class ZerithOnlineEnv:
         max_joint_delta: float = 0.1,
         realtime_rate: float = 0.0,
         meshcat: Meshcat | None = None,
-        filter_known_invalid_self_collisions: bool = True,
     ):
         """Build the Drake diagram and initialize immutable model metadata."""
         self._scene_dmd = Path(scene_dmd).resolve()
@@ -308,9 +291,6 @@ class ZerithOnlineEnv:
         ):
             raise ValueError("q_home violates a left-arm joint position limit")
 
-        if filter_known_invalid_self_collisions:
-            self._apply_known_invalid_self_collision_filters()
-
         if self.meshcat is not None:
             MeshcatVisualizer.AddToBuilder(
                 builder,
@@ -345,21 +325,6 @@ class ZerithOnlineEnv:
     def q_home(self) -> np.ndarray:
         """Return a copy of the configured seven-joint home posture."""
         return self._q_home.copy()
-
-    def _apply_known_invalid_self_collision_filters(self) -> None:
-        """Filter only documented whole-mesh proxy false positives."""
-        manager = self.scene_graph.collision_filter_manager()
-        declaration = CollisionFilterDeclaration()
-        for body_name_a, body_name_b in KNOWN_INVALID_SELF_COLLISION_PAIRS:
-            body_a = self.plant.GetBodyByName(body_name_a, self._zerith)
-            body_b = self.plant.GetBodyByName(body_name_b, self._zerith)
-            geometry_a = self.plant.GetCollisionGeometriesForBody(body_a)
-            geometry_b = self.plant.GetCollisionGeometriesForBody(body_b)
-            declaration.ExcludeBetween(
-                GeometrySet(geometry_a),
-                GeometrySet(geometry_b),
-            )
-        manager.Apply(declaration)
 
     def _plant_context(self):
         """Return mutable plant context owned by the active simulator."""

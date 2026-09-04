@@ -125,15 +125,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--initial-penetration-limit",
         type=float,
-        help="Fail if a filtered initial penetration exceeds this depth.",
-    )
-    parser.add_argument(
-        "--keep-known-invalid-self-collisions",
-        action="store_true",
-        help=(
-            "Do not filter the seven documented whole-mesh proxy "
-            "false positives."
-        ),
+        help="Fail if an active initial penetration exceeds this depth.",
     )
     parser.add_argument(
         "--control-log",
@@ -222,9 +214,6 @@ def main() -> None:
         max_joint_delta=abs(args.step_delta),
         realtime_rate=args.realtime_rate,
         meshcat=meshcat,
-        filter_known_invalid_self_collisions=(
-            not args.keep_known_invalid_self_collisions
-        ),
     )
 
     meshcat.StartRecording()
@@ -238,7 +227,7 @@ def main() -> None:
         f"policy={1.0 / env.policy_dt:.0f} Hz"
     )
     print(
-        "Initial active filtered robot penetration pairs: "
+        "Initial active robot penetration pairs: "
         f"{len(penetrations)}"
     )
     for penetration in penetrations:

@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import math
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
@@ -23,8 +24,9 @@ OUTPUT_PACKAGE_NAME = "zerith_drake"
 OUTPUT_URDF_NAME = "zerith_drake.urdf"
 EXPECTED_MESH_COUNT = 35
 EXPECTED_SOURCE_MESH_REFERENCE_COUNT = 70
-EXPECTED_OUTPUT_MESH_REFERENCE_COUNT = 69
-CONVERTER_VERSION = 2
+EXPECTED_OUTPUT_MESH_REFERENCE_COUNT = 57
+EXPECTED_COLLISION_GEOMETRY_COUNT = 53
+CONVERTER_VERSION = 3
 DIPAN_COLLISION_BOXES = (
     {
         "name": "dipan_lower_base",
@@ -42,6 +44,130 @@ DIPAN_COLLISION_BOXES = (
         "size": (0.1880, 0.1960, 0.0350),
     },
 )
+
+
+def _arm_collision_proxies(
+    side: str,
+) -> dict[str, tuple[dict[str, object], ...]]:
+    """Return primitive wrist and gripper proxies for one arm."""
+    if side not in ("left", "right"):
+        raise ValueError(f"Unexpected arm side: {side}")
+
+    pitch_bracket_y = 0.0295 if side == "left" else -0.0295
+    return {
+        f"{side}_wrist_roll_link": (
+            {
+                "name": f"{side}_wrist_roll_body",
+                "type": "cylinder",
+                "xyz": (0.071, 0.0, -0.002),
+                "rpy": (0.0, math.pi / 2.0, 0.0),
+                "radius": 0.031,
+                "length": 0.096,
+            },
+        ),
+        f"{side}_wrist_yaw_link": (
+            {
+                "name": f"{side}_wrist_yaw_body",
+                "type": "cylinder",
+                "xyz": (0.0, 0.0, -0.00025),
+                "rpy": (0.0, 0.0, 0.0),
+                "radius": 0.025,
+                "length": 0.065,
+            },
+        ),
+        f"{side}_wrist_pitch_link": (
+            {
+                "name": f"{side}_wrist_pitch_bracket",
+                "type": "box",
+                "xyz": (0.005, pitch_bracket_y, 0.0),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.045, 0.009, 0.03),
+            },
+            {
+                "name": f"{side}_wrist_pitch_body",
+                "type": "box",
+                "xyz": (0.05, 0.0, 0.005),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.034, 0.06, 0.05),
+            },
+            {
+                "name": f"{side}_wrist_pitch_palm",
+                "type": "box",
+                "xyz": (0.099, 0.0, 0.005),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.018, 0.145, 0.04),
+            },
+        ),
+        f"{side}_jaw_left_finger_link": (
+            {
+                "name": f"{side}_jaw_left_finger_base",
+                "type": "box",
+                "xyz": (0.024, 0.0545, 0.0),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.018, 0.027, 0.055),
+            },
+            {
+                "name": f"{side}_jaw_left_finger_middle",
+                "type": "box",
+                "xyz": (0.0455, 0.047, -0.0045),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.025, 0.013, 0.035),
+            },
+            {
+                "name": f"{side}_jaw_left_finger_tip",
+                "type": "box",
+                "xyz": (0.0765, 0.0425, -0.0015),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.035, 0.004, 0.014),
+            },
+        ),
+        f"{side}_jaw_right_finger_link": (
+            {
+                "name": f"{side}_jaw_right_finger_base",
+                "type": "box",
+                "xyz": (0.024, -0.0545, 0.0),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.018, 0.027, 0.055),
+            },
+            {
+                "name": f"{side}_jaw_right_finger_middle",
+                "type": "box",
+                "xyz": (0.0455, -0.047, -0.0045),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.025, 0.013, 0.035),
+            },
+            {
+                "name": f"{side}_jaw_right_finger_tip",
+                "type": "box",
+                "xyz": (0.0765, -0.0425, -0.0015),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.035, 0.004, 0.014),
+            },
+        ),
+        f"{side}_end_effector_link": (
+            {
+                "name": f"{side}_end_effector_center",
+                "type": "box",
+                "xyz": (-0.029, 0.0, 0.0),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.0015, 0.069, 0.008),
+            },
+            {
+                "name": f"{side}_end_effector_left_mount",
+                "type": "box",
+                "xyz": (-0.029, 0.055, 0.0),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.0015, 0.029, 0.008),
+            },
+            {
+                "name": f"{side}_end_effector_right_mount",
+                "type": "box",
+                "xyz": (-0.029, -0.055, 0.0),
+                "rpy": (0.0, 0.0, 0.0),
+                "size": (0.0015, 0.029, 0.008),
+            },
+        ),
+    }
 
 
 def _parse_args() -> argparse.Namespace:
@@ -144,6 +270,7 @@ def _rewrite_urdf(
     left_wrist_limit.set("effort", "9")
     left_wrist_limit.set("velocity", "16.747")
     _replace_dipan_collision(tree.getroot())
+    _replace_wrist_and_gripper_collisions(tree.getroot())
 
     output_urdf.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(tree, space="  ")
@@ -186,6 +313,69 @@ def _replace_dipan_collision(root: ET.Element) -> None:
         )
 
 
+def _replace_wrist_and_gripper_collisions(root: ET.Element) -> None:
+    """Replace whole-mesh wrist and gripper hulls with primitives."""
+    for side in ("left", "right"):
+        for link_name, proxy_specs in _arm_collision_proxies(side).items():
+            link = root.find(f"./link[@name='{link_name}']")
+            if link is None:
+                raise ValueError(f"Missing {link_name}")
+
+            collisions = link.findall("collision")
+            if len(collisions) != 1:
+                raise ValueError(
+                    f"Expected one source {link_name} collision, "
+                    f"found {len(collisions)}"
+                )
+            link.remove(collisions[0])
+
+            for proxy_spec in proxy_specs:
+                _append_collision_proxy(link, proxy_spec)
+
+
+def _append_collision_proxy(
+    link: ET.Element,
+    proxy_spec: dict[str, object],
+) -> None:
+    """Append one box or cylinder collision proxy to a link."""
+    collision = ET.SubElement(
+        link,
+        "collision",
+        {"name": str(proxy_spec["name"])},
+    )
+    ET.SubElement(
+        collision,
+        "origin",
+        {
+            "xyz": " ".join(str(value) for value in proxy_spec["xyz"]),
+            "rpy": " ".join(str(value) for value in proxy_spec["rpy"]),
+        },
+    )
+    geometry = ET.SubElement(collision, "geometry")
+    geometry_type = proxy_spec["type"]
+    if geometry_type == "box":
+        ET.SubElement(
+            geometry,
+            "box",
+            {
+                "size": " ".join(
+                    str(value) for value in proxy_spec["size"]
+                )
+            },
+        )
+    elif geometry_type == "cylinder":
+        ET.SubElement(
+            geometry,
+            "cylinder",
+            {
+                "radius": str(proxy_spec["radius"]),
+                "length": str(proxy_spec["length"]),
+            },
+        )
+    else:
+        raise ValueError(f"Unsupported collision proxy type: {geometry_type}")
+
+
 def _package_xml_contents() -> str:
     """Return the deterministic ROS package metadata."""
     return """<?xml version="1.0"?>
@@ -215,13 +405,14 @@ def _manifest_contents(source_commit: str) -> str:
     manifest = {
         "converter_version": CONVERTER_VERSION,
         "dipan_collision_proxy": "three_boxes",
-        "expected_collision_geometry_count": 37,
+        "expected_collision_geometry_count": EXPECTED_COLLISION_GEOMETRY_COUNT,
         "mesh_count": EXPECTED_MESH_COUNT,
         "output_mesh_reference_count": EXPECTED_OUTPUT_MESH_REFERENCE_COUNT,
         "output_format": "obj",
         "source_mesh_reference_count": EXPECTED_SOURCE_MESH_REFERENCE_COUNT,
         "source_commit": source_commit,
         "source_repository": "https://github.com/inFpZero/Zerith_Model.git",
+        "wrist_gripper_collision_proxy": "primitive_boxes_and_cylinders",
     }
     return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
 
@@ -261,14 +452,40 @@ def _check_generated_package(
         if output_urdf.read_bytes() != expected_urdf.read_bytes():
             raise ValueError(f"Derived URDF has drifted: {output_urdf}")
 
-    output_mesh_references = ET.parse(output_urdf).getroot().findall(
-        "./link/*/geometry/mesh"
-    )
+    output_root = ET.parse(output_urdf).getroot()
+    output_mesh_references = output_root.findall("./link/*/geometry/mesh")
     if len(output_mesh_references) != EXPECTED_OUTPUT_MESH_REFERENCE_COUNT:
         raise ValueError(
             f"Expected {EXPECTED_OUTPUT_MESH_REFERENCE_COUNT} output mesh "
             f"references, found {len(output_mesh_references)}"
         )
+
+    output_collisions = output_root.findall("./link/collision")
+    if len(output_collisions) != EXPECTED_COLLISION_GEOMETRY_COUNT:
+        raise ValueError(
+            f"Expected {EXPECTED_COLLISION_GEOMETRY_COUNT} collision "
+            f"geometries, found {len(output_collisions)}"
+        )
+    for side in ("left", "right"):
+        for link_name, proxy_specs in _arm_collision_proxies(side).items():
+            link = output_root.find(f"./link[@name='{link_name}']")
+            if link is None:
+                raise ValueError(f"Missing generated {link_name}")
+            collisions = link.findall("collision")
+            expected_names = [str(spec["name"]) for spec in proxy_specs]
+            actual_names = [collision.attrib.get("name") for collision in collisions]
+            if actual_names != expected_names:
+                raise ValueError(
+                    f"Unexpected collision proxies for {link_name}: "
+                    f"{actual_names}"
+                )
+            if any(
+                collision.find("./geometry/mesh") is not None
+                for collision in collisions
+            ):
+                raise ValueError(
+                    f"Generated {link_name} still has a mesh collision"
+                )
 
     if package_xml.read_text(encoding="utf-8") != _package_xml_contents():
         raise ValueError(f"package.xml has drifted: {package_xml}")
@@ -292,6 +509,7 @@ def _check_generated_package(
     print(f"OBJ meshes: {len(output_meshes)}")
     print(f"Source URDF mesh references: {EXPECTED_SOURCE_MESH_REFERENCE_COUNT}")
     print(f"Generated URDF mesh references: {EXPECTED_OUTPUT_MESH_REFERENCE_COUNT}")
+    print(f"Collision geometries: {EXPECTED_COLLISION_GEOMETRY_COUNT}")
 
 
 def main() -> None:

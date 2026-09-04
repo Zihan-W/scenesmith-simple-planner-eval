@@ -46,9 +46,20 @@ python scripts/convert_zerith_for_drake.py --check
 
 The generated OBJ files are deterministic derivatives of the upstream STL
 files and are intentionally excluded from Git. The generated URDF and
-conversion manifest are committed for review. The current model uses three box
-proxies for `dipan_link`; most other links still use whole-mesh convex proxies
-and require further validation before contact-dynamics evaluation.
+conversion manifest are committed for review. Visual geometry keeps the full
+OBJ meshes. Collision geometry uses three boxes for `dipan_link` and primitive
+box/cylinder assemblies for both wrists, palms, and fingers; other links still
+use whole-mesh convex proxies.
+
+Validate both wrists near their joint limits and each gripper in open,
+half-open, and closed configurations without custom collision filters:
+
+```bash
+python scripts/validate_zerith_collision_proxies.py
+```
+
+Use the `collision` tree in Meshcat after launching a Zerith visualizer to
+compare proximity geometry with the visual OBJ meshes.
 
 Inspect left-arm kinematics in a SceneSmith scene:
 
