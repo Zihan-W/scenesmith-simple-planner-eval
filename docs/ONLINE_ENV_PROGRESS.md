@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
 Last updated: 2026-09-05
-Current phase: Phase 3 — Generic Control, Action and Observation
+Current phase: Phase 4 — Task, Contact Policy and Planning Query
 
 ## Product Goal
 
@@ -21,6 +21,7 @@ Current phase: Phase 3 — Generic Control, Action and Observation
 * `d5d6dc2` Validate fixed-rail Zerith pregrasp
 * `7e8a210` Validate online Zerith pregrasp execution
 * `d4334fe` Define online manipulation public contracts
+* `a2debf7` Introduce Zerith online environment adapter
 
 ## Current Validated State
 
@@ -137,6 +138,38 @@ PREGRASP in 81 policy steps. All previously recorded metrics were reproduced
 exactly, including zero continuous torque saturation, 20.04 mm minimum safety
 clearance, 0.884 mrad final maximum joint error, and an open 80 mm gripper.
 
+## Phase 3 Generic Control, Action and Observation
+
+The new `OnlineManipulationEnv` facade now exposes Gym-style five-value steps,
+typed actions, generic object observations, contact penetration observations,
+and explicit time-limit truncation. The environment core contains no Zerith,
+red-box, table, or current-scene names.
+
+The Zerith compatibility backend translates named joint commands and physical
+gripper width to the legacy runtime. `CartesianDeltaAction` raises an explicit
+`NotImplementedError` until Phase 4 connects it to planning/IK; no fallback or
+offline trajectory is used.
+
+`CoupledInverseDynamicsServo` is independent of joint count and names. The
+Adapter's ordered `JointSpec` values supply limits, gains, and actuator
+mapping. Direct legacy construction still derives the identical defaults.
+
+Reproduce unit and real-model tests:
+
+```bash
+.venv/bin/python -B -m unittest discover -s tests -v
+```
+
+Result on 2026-09-05: 18 tests passed. The suite includes typed facade,
+truncation, action translation, and a real Drake torque-limiting test.
+
+The full PREGRASP command was also rerun through typed actions and normalized
+observations. Result: 3/3 episodes reached PREGRASP in 81 policy steps. All
+eight tracked dynamics and safety metrics were bit-for-bit identical to the
+Phase 0 baseline. The regression now also rejects any step that does not
+perform exactly 20 controller updates with 5 physics steps per update; this
+new assertion passed in a separate 1/1 episode run.
+
 ## Phase 0 Reproducible Commands
 
 Run from `/root/workspace/scenesmith-simple-planner-eval` after activating the
@@ -211,7 +244,7 @@ largest reported step error was `0.013955 rad`.
 * [x] Phase 0: audit, regression and checkpoint current work
 * [x] Phase 1: define public dataclasses, protocols and contract tests
 * [x] Phase 2: introduce ScenarioSpec and ZerithRobotAdapter
-* [ ] Phase 3: generalize controller, action and observation
+* [x] Phase 3: generalize controller, action and observation
 * [ ] Phase 4: implement Task, ContactPolicy and PlanningQuery
 * [ ] Phase 5: implement EpisodeRunner and DMD finalizer
 * [ ] Phase 6: add external policy, BT and TAMP examples
@@ -227,7 +260,7 @@ largest reported step error was `0.013955 rad`.
 
 ## Next Action
 
-Begin Phase 3 by implementing the generic `OnlineManipulationEnv` facade,
-typed-action translation, and normalized observation conversion around the
-legacy runtime. Preserve exact 1000/200/10 Hz scheduling and keep the 3/3
-PREGRASP regression green.
+Begin Phase 4 by implementing `NullTask`, configurable `ContactPolicy`, and a
+read-only PlanningQuery with independent contexts. Then add PickLift task
+observation/evaluation without putting its state machine into the environment
+core.

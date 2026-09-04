@@ -22,7 +22,6 @@ from pydrake.all import (
     Meshcat,
     MeshcatVisualizer,
     MeshcatVisualizerParams,
-    MultibodyForces,
     Parser,
     ProcessModelDirectives,
     RigidTransform,
@@ -31,6 +30,8 @@ from pydrake.all import (
     Simulator,
 )
 
+from src.online_manipulation.controller import CoupledInverseDynamicsServo
+from src.online_manipulation.specs import JointSpec
 from src.zerith_robot_config import (
     ROBOT_BASE_XYZ_METERS,
     ROBOT_BASE_YAW_DEG,
@@ -166,6 +167,7 @@ class ZerithOnlineEnv:
         max_joint_delta: float = 0.1,
         realtime_rate: float = 0.0,
         meshcat: Meshcat | None = None,
+        servo_joint_specs: Sequence[JointSpec] | None = None,
     ):
         """Build the Drake diagram and initialize immutable model metadata."""
         self._scene_dmd = Path(scene_dmd).resolve()
@@ -229,6 +231,17 @@ class ZerithOnlineEnv:
                 "q_home must contain exactly seven left-arm joint positions"
             )
         self._rail_position = float(rail_position)
+        self._servo_joint_specs = (
+            tuple(servo_joint_specs)
+            if servo_joint_specs is not None
+            else None
+        )
+        if self._servo_joint_specs is not None and tuple(
+            spec.name for spec in self._servo_joint_specs
+        ) != tuple(config.name for config in ALL_SERVO_CONFIGS):
+            raise ValueError(
+                "servo_joint_specs must match validated Zerith servo order"
+            )
 
         self.meshcat = meshcat
         if self.meshcat is not None:
@@ -279,13 +292,18 @@ class ZerithOnlineEnv:
         )
 
         self._actuators = []
-        for config in ALL_SERVO_CONFIGS:
+        for index, config in enumerate(ALL_SERVO_CONFIGS):
             joint = self.plant.GetJointByName(config.name, self._zerith)
+            effort_limit = (
+                self._servo_joint_specs[index].effort_limit
+                if self._servo_joint_specs is not None
+                else config.effort_limit
+            )
             self._actuators.append(
                 self.plant.AddJointActuator(
                     f"{config.name}_actuator",
                     joint,
-                    effort_limit=config.effort_limit,
+                    effort_limit=effort_limit,
                 )
             )
 
@@ -299,6 +317,41 @@ class ZerithOnlineEnv:
             for config in LEFT_GRIPPER_SERVO_CONFIGS
         )
         self._all_joints = self._arm_joints + self._gripper_joints
+        if self._servo_joint_specs is None:
+            gripper_names = {
+                config.name for config in LEFT_GRIPPER_SERVO_CONFIGS
+            }
+            self._servo_joint_specs = tuple(
+                JointSpec(
+                    name=config.name,
+                    joint_type=(
+                        "prismatic"
+                        if config.name in gripper_names
+                        else "revolute"
+                    ),
+                    position_lower=float(
+                        joint.position_lower_limits()[0]
+                    ),
+                    position_upper=float(
+                        joint.position_upper_limits()[0]
+                    ),
+                    velocity_limit=float(joint.velocity_upper_limits()[0]),
+                    effort_limit=config.effort_limit,
+                    kp=config.kp,
+                    kd=config.kd,
+                )
+                for config, joint in zip(
+                    ALL_SERVO_CONFIGS,
+                    self._all_joints,
+                    strict=True,
+                )
+            )
+        self._servo = CoupledInverseDynamicsServo(
+            plant=self.plant,
+            joints=self._all_joints,
+            actuators=self._actuators,
+            joint_specs=self._servo_joint_specs,
+        )
         self._rail_joint = self.plant.GetJointByName(
             "daogui_joint",
             self._zerith,
@@ -354,6 +407,34 @@ class ZerithOnlineEnv:
     def q_home(self) -> np.ndarray:
         """Return a copy of the configured seven-joint home posture."""
         return self._q_home.copy()
+
+    @property
+    def physics_steps_per_control(self) -> int:
+        """Return the exact physics-step count per controller update."""
+        return self._physics_steps_per_control
+
+    @property
+    def robot_model_instance(self):
+        """Return the Zerith model instance for compatibility adapters."""
+        return self._zerith
+
+    @property
+    def plant_context(self):
+        """Return the active mutable Plant context."""
+        return self._plant_context()
+
+    @property
+    def controller_state(self) -> dict[str, np.ndarray]:
+        """Return current targets and latest torque-limit telemetry."""
+        if not self._control_log:
+            raise RuntimeError("Call reset() before reading controller state")
+        sample = self._control_log[-1]
+        return {
+            "q_commanded": sample.q_desired.copy(),
+            "torque_commanded": sample.raw_torque.copy(),
+            "torque_applied": sample.applied_torque.copy(),
+            "torque_saturated": sample.saturated.copy(),
+        }
 
     def _plant_context(self):
         """Return mutable plant context owned by the active simulator."""
@@ -440,69 +521,25 @@ class ZerithOnlineEnv:
         if self._simulator is None:
             raise RuntimeError("Call reset() before updating the controller")
         plant_context = self._plant_context()
-        q, v = self._measured_controlled_state(plant_context)
         q_desired = self._desired_controlled_positions()
-        gravity_generalized = self.plant.CalcGravityGeneralizedForces(
-            plant_context
-        )
-        gravity_torque = np.array(
-            [
-                -gravity_generalized[joint.velocity_start()]
-                for joint in self._all_joints
-            ]
-        )
-        kp = np.array([config.kp for config in ALL_SERVO_CONFIGS])
-        kd = np.array([config.kd for config in ALL_SERVO_CONFIGS])
-        limits = np.array(
-            [config.effort_limit for config in ALL_SERVO_CONFIGS]
-        )
-        desired_acceleration = np.zeros(self.plant.num_velocities())
-        for index, joint in enumerate(self._all_joints):
-            desired_acceleration[joint.velocity_start()] = (
-                kp[index] * (q_desired[index] - q[index])
-                - kd[index] * v[index]
-            )
-        force_elements = MultibodyForces(self.plant)
-        self.plant.CalcForceElementsContribution(
+        output = self._servo.compute(
             plant_context,
-            force_elements,
+            q_desired,
         )
-        generalized_force = self.plant.CalcInverseDynamics(
-            plant_context,
-            desired_acceleration,
-            force_elements,
-        )
-        raw_torque = np.array(
-            [
-                generalized_force[joint.velocity_start()]
-                for joint in self._all_joints
-            ]
-        )
-        pd_torque = raw_torque - gravity_torque
-        applied_torque = np.clip(raw_torque, -limits, limits)
-        saturated = ~np.isclose(raw_torque, applied_torque, atol=1e-12)
-
-        actuation = np.zeros(self.plant.num_actuated_dofs())
-        for actuator, torque in zip(
-            self._actuators,
-            applied_torque,
-            strict=True,
-        ):
-            actuation[actuator.input_start()] = torque
         self.plant.get_actuation_input_port().FixValue(
             plant_context,
-            actuation,
+            output.actuation,
         )
         self._control_log.append(
             ControlSample(
                 time=float(plant_context.get_time()),
-                q=q.copy(),
-                q_desired=q_desired.copy(),
-                gravity_torque=gravity_torque.copy(),
-                pd_torque=pd_torque.copy(),
-                raw_torque=raw_torque.copy(),
-                applied_torque=applied_torque.copy(),
-                saturated=saturated.copy(),
+                q=output.q.copy(),
+                q_desired=output.q_desired.copy(),
+                gravity_torque=output.gravity_torque.copy(),
+                pd_torque=output.pd_torque.copy(),
+                raw_torque=output.raw_torque.copy(),
+                applied_torque=output.applied_torque.copy(),
+                saturated=output.saturated.copy(),
             )
         )
 

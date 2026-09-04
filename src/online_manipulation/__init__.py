@@ -17,6 +17,7 @@ from src.online_manipulation.observations import (
     RobotObservation,
     SpatialVelocity,
 )
+from src.online_manipulation.environment import OnlineManipulationEnv
 from src.online_manipulation.protocols import (
     ContactPolicy,
     OnlineEnvironment,
@@ -28,6 +29,7 @@ from src.online_manipulation.protocols import (
 from src.online_manipulation.specs import (
     GripperSpec,
     JointSpec,
+    ObservedBodySpec,
     RobotSpec,
     ScenarioSpec,
     TimingConfig,
@@ -50,6 +52,8 @@ __all__ = [
     "JointSpec",
     "ObjectObservation",
     "Observation",
+    "ObservedBodySpec",
+    "OnlineManipulationEnv",
     "OnlineEnvironment",
     "Policy",
     "Pose",

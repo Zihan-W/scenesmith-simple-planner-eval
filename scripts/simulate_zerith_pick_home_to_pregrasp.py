@@ -19,10 +19,16 @@ from src.zerith_grasp_geometry import (
 )
 from src.online_manipulation.adapters.zerith import (
     ZerithRobotAdapter,
-    make_legacy_zerith_environment,
+    make_legacy_zerith_online_environment,
     make_zerith_robot_spec,
 )
+from src.online_manipulation.actions import (
+    CompositeAction,
+    GripperAction,
+    JointDeltaAction,
+)
 from src.online_manipulation.specs import (
+    ObservedBodySpec,
     ScenarioSpec,
     TimingConfig,
     VisualizationConfig,
@@ -43,6 +49,7 @@ EVAL_PACKAGE_XML = (
     REPOSITORY_ROOT / "models" / "zerith_pick_eval" / "package.xml"
 )
 ZERITH_MODEL_DIR = REPOSITORY_ROOT / "models" / "zerith_drake"
+TARGET_OBSERVATION_NAME = "pick_target"
 
 
 def _parse_args() -> argparse.Namespace:
@@ -243,13 +250,15 @@ def _grasp_frame_error(model, q_left, q_goal) -> dict:
 
 def _run_episode(env, model, workspace, q_pregrasp, args) -> dict:
     """Execute one observation-driven online PREGRASP episode."""
-    observation = env.reset()
-    initial_red_box_pose = observation["red_box_pose"].copy()
-    desired_q = env.q_home
+    observation, _ = env.reset()
+    initial_target_translation = np.asarray(
+        observation.objects[TARGET_OBSERVATION_NAME].pose.translation_m
+    )
+    desired_q = np.asarray(observation.robot.q[:7])
     stable_steps = 0
     trace = []
     for step_index in range(args.maximum_policy_steps):
-        q_current = observation["q_left"]
+        q_current = np.asarray(observation.robot.q[:7])
         collision, workspace_metrics = _runtime_metrics(
             model,
             workspace,
@@ -281,7 +290,7 @@ def _run_episode(env, model, workspace, q_pregrasp, args) -> dict:
 
         goal_error = q_pregrasp - q_current
         maximum_goal_error = float(np.max(np.abs(goal_error)))
-        maximum_speed = float(np.max(np.abs(observation["v_left"])))
+        maximum_speed = float(np.max(np.abs(observation.robot.v[:7])))
         if (
             maximum_goal_error <= args.joint_goal_tolerance
             and maximum_speed <= args.velocity_goal_tolerance
@@ -315,7 +324,7 @@ def _run_episode(env, model, workspace, q_pregrasp, args) -> dict:
                 "steps": step_index,
                 "q_left": q_current.tolist(),
                 "desired_q_left": desired_q.tolist(),
-                "gripper_width_m": observation["gripper_width"],
+                "gripper_width_m": observation.robot.gripper_width_m,
                 "grasp_frame_error": _grasp_frame_error(
                     model,
                     q_current,
@@ -335,8 +344,12 @@ def _run_episode(env, model, workspace, q_pregrasp, args) -> dict:
                 ),
                 "red_box_translation_m": float(
                     np.linalg.norm(
-                        observation["red_box_pose"][:3]
-                        - initial_red_box_pose[:3]
+                        np.asarray(
+                            observation.objects[
+                                TARGET_OBSERVATION_NAME
+                            ].pose.translation_m
+                        )
+                        - initial_target_translation
                     )
                 ),
                 "final_clearance_metrics": collision,
@@ -390,13 +403,32 @@ def _run_episode(env, model, workspace, q_pregrasp, args) -> dict:
             }
 
         desired_q_before_action = desired_q.copy()
-        log_start = len(env.control_log)
-        action = np.r_[q_command - desired_q, 1.0]
-        observation, _, _, info = env.step(action)
+        log_start = len(env.backend.control_log)
+        action = CompositeAction(
+            arm=JointDeltaAction(
+                tuple(config.name for config in LEFT_ARM_SERVO_CONFIGS),
+                tuple(q_command - desired_q),
+            ),
+            gripper=GripperAction(width_m=0.08),
+        )
+        observation, _, _, _, info = env.step(action)
+        expected_control_updates = round(args.policy_dt / args.controller_dt)
+        expected_physics_steps = round(args.controller_dt / args.physics_dt)
+        if (
+            info["control_updates"] != expected_control_updates
+            or info["physics_steps_per_control"] != expected_physics_steps
+        ):
+            return {
+                "success": False,
+                "reason": "multirate_schedule_contract_violated",
+                "steps": step_index + 1,
+                "info": info,
+                "trace": trace,
+            }
         desired_q = info["desired_q_left"]
-        new_control_samples = env.control_log[log_start:]
+        new_control_samples = env.backend.control_log[log_start:]
         saturation_run = _maximum_saturation_run(
-            env.control_log,
+            env.backend.control_log,
             args.controller_dt,
         )
         saturation_counts = {
@@ -408,15 +440,19 @@ def _run_episode(env, model, workspace, q_pregrasp, args) -> dict:
         trace.append(
             {
                 "step": step_index,
-                "simulation_time_s": observation["simulation_time"],
+                "simulation_time_s": observation.time_s,
                 "command_result": command_result,
+                "control_updates": info["control_updates"],
+                "physics_steps_per_control": info[
+                    "physics_steps_per_control"
+                ],
                 "q_left_before_action": q_current.tolist(),
                 "desired_q_left_before_action": (
                     desired_q_before_action.tolist()
                 ),
                 "commanded_q_left": q_command.tolist(),
-                "q_left_after_action": observation["q_left"].tolist(),
-                "v_left_after_action": observation["v_left"].tolist(),
+                "q_left_after_action": list(observation.robot.q[:7]),
+                "v_left_after_action": list(observation.robot.v[:7]),
                 "maximum_joint_goal_error_rad": maximum_goal_error,
                 "maximum_tracking_error_rad": tracking_error,
                 "minimum_nonpenetration_distance": collision[
@@ -441,13 +477,13 @@ def _run_episode(env, model, workspace, q_pregrasp, args) -> dict:
                 "steps": step_index + 1,
                 "trace": trace,
             }
-        penetrations = env.robot_penetrations()
+        penetrations = env.backend.robot_penetrations()
         if penetrations:
             return {
                 "success": False,
                 "reason": "dynamics_robot_penetration",
                 "steps": step_index + 1,
-                "q_left": observation["q_left"].tolist(),
+                "q_left": list(observation.robot.q[:7]),
                 "desired_q_left": desired_q.tolist(),
                 "penetrations": [vars(item) for item in penetrations],
                 "trace": trace,
@@ -531,6 +567,13 @@ def main() -> None:
     scenario = ScenarioSpec(
         dmd_path=scene_dmd,
         package_xmls=(scene_package_xml, eval_package_xml),
+        observed_bodies=(
+            ObservedBodySpec(
+                observation_name=TARGET_OBSERVATION_NAME,
+                model_instance_name="living_room_box_0",
+                body_name="base_link",
+            ),
+        ),
         visualization=VisualizationConfig(
             enabled=args.meshcat,
             port=args.meshcat_port,
@@ -543,7 +586,7 @@ def main() -> None:
         controller_dt=args.controller_dt,
         policy_dt=args.policy_dt,
     )
-    env = make_legacy_zerith_environment(
+    env = make_legacy_zerith_online_environment(
         scenario=scenario,
         adapter=adapter,
         timing=timing,
@@ -554,7 +597,7 @@ def main() -> None:
         * args.policy_dt,
         max_joint_delta=args.maximum_joint_step,
     )
-    meshcat = env.meshcat
+    meshcat = env.backend.runtime.meshcat
     if meshcat is not None:
         print(f"Meshcat URL: {meshcat.web_url()}")
         meshcat.StartRecording()

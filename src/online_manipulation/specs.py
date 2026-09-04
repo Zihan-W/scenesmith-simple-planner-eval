@@ -72,6 +72,26 @@ class VisualizationConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class ObservedBodySpec:
+    """Name one Drake body exposed in the generic object observation map."""
+
+    observation_name: str
+    model_instance_name: str
+    body_name: str
+
+    def __post_init__(self) -> None:
+        """Require stable nonempty public and Drake identifiers."""
+        if not all(
+            (
+                self.observation_name,
+                self.model_instance_name,
+                self.body_name,
+            )
+        ):
+            raise ValueError("Observed body names must be nonempty")
+
+
+@dataclasses.dataclass(frozen=True)
 class ScenarioSpec:
     """Scene paths and runtime options independent of any robot or task."""
 
@@ -80,6 +100,7 @@ class ScenarioSpec:
     initial_object_poses: Mapping[str, Pose] = dataclasses.field(
         default_factory=dict
     )
+    observed_bodies: tuple[ObservedBodySpec, ...] = ()
     contact_parameters: Mapping[str, float] = dataclasses.field(
         default_factory=dict
     )
@@ -96,6 +117,13 @@ class ScenarioSpec:
             "package_xmls",
             tuple(Path(path) for path in self.package_xmls),
         )
+        observed_bodies = tuple(self.observed_bodies)
+        observation_names = tuple(
+            body.observation_name for body in observed_bodies
+        )
+        if len(set(observation_names)) != len(observation_names):
+            raise ValueError("Observed body names must be unique")
+        object.__setattr__(self, "observed_bodies", observed_bodies)
         if self.output_directory is not None:
             object.__setattr__(
                 self,

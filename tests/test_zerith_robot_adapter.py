@@ -6,8 +6,16 @@ from pathlib import Path
 import numpy as np
 from pydrake.all import AddMultibodyPlantSceneGraph, DiagramBuilder, Parser
 
-from src.online_manipulation import RobotAdapter
+from src.online_manipulation import (
+    CartesianDeltaAction,
+    CompositeAction,
+    GripperAction,
+    JointDeltaAction,
+    JointPositionAction,
+    RobotAdapter,
+)
 from src.online_manipulation.adapters.zerith import (
+    ZerithLegacyActionTranslator,
     ZerithRobotAdapter,
     make_zerith_robot_spec,
 )
@@ -117,6 +125,43 @@ class ZerithRobotAdapterTest(unittest.TestCase):
             ),
             1.0,
         )
+
+    def test_legacy_translation_preserves_named_action_semantics(self) -> None:
+        translator = ZerithLegacyActionTranslator(_adapter().spec)
+        arm_names = tuple(
+            config.name for config in ALL_SERVO_CONFIGS[:7]
+        )
+        action = CompositeAction(
+            arm=JointDeltaAction((arm_names[2],), (0.025,)),
+            gripper=GripperAction(width_m=0.04),
+        )
+        legacy = translator.translate(action)
+        np.testing.assert_allclose(legacy[:7], [0, 0, 0.025, 0, 0, 0, 0])
+        self.assertAlmostEqual(legacy[7], 0.0)
+
+        translator.update_from_runtime_info(
+            {
+                "desired_q_left": np.full(7, 0.1),
+                "desired_gripper_width": 0.04,
+            }
+        )
+        position = translator.translate(
+            JointPositionAction((arm_names[0],), (0.12,))
+        )
+        np.testing.assert_allclose(position[:7], [0.02, 0, 0, 0, 0, 0, 0])
+        self.assertAlmostEqual(position[7], 0.0)
+
+    def test_legacy_translation_rejects_unsupported_cartesian_action(self) -> None:
+        translator = ZerithLegacyActionTranslator(_adapter().spec)
+        with self.assertRaisesRegex(NotImplementedError, "Phase 4"):
+            translator.translate(
+                CartesianDeltaAction(
+                    end_effector_frame="left_end_effector_link",
+                    reference_frame="world",
+                    translation_m=(0.0, 0.0, 0.01),
+                    rotation_vector_rad=(0.0, 0.0, 0.0),
+                )
+            )
 
 
 if __name__ == "__main__":

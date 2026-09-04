@@ -1,6 +1,6 @@
 # Online Manipulation Environment Architecture
 
-Status: Accepted migration architecture; Phase 2 Adapter integrated
+Status: Accepted migration architecture; Phase 3 typed facade integrated
 Source of truth: `docs/ONLINE_ENV_REQUIREMENTS.md`
 
 ## 0. Migration Baseline
@@ -133,6 +133,13 @@ until Task owns it in Phase 4.
 
 控制器不得依赖具体任务或场景对象。
 
+Phase 3 extracts `CoupledInverseDynamicsServo`. It accepts ordered Drake
+joints and actuators plus robot-independent `JointSpec` values, computes the
+full coupled inverse-dynamics command, and reports gravity, PD, raw, applied,
+and saturation telemetry. The compatibility runtime receives these specs
+from `ZerithRobotAdapter`; direct legacy construction retains the same
+defaults.
+
 ### Task
 
 负责：
@@ -187,6 +194,12 @@ until Task owns it in Phase 4.
 
 所有字段必须说明坐标系、单位和语义。
 
+`OnlineManipulationEnv` is a typed facade over a concrete runtime backend.
+The Zerith compatibility backend translates named joint position/delta and
+physical gripper-width commands to the legacy 7+1 array. The public facade
+does not accept bare arrays. Cartesian deltas currently fail explicitly until
+Phase 4 provides the planning/IK query; there is no silent fallback.
+
 ## 5. Observation Model
 
 Observation 分为：
@@ -198,6 +211,10 @@ Observation 分为：
 * task
 
 任务对象不得硬编码成固定顶层字段。
+
+Phase 3 normalizes the legacy runtime into these fields. Scene bodies exposed
+to policies are declared with `ObservedBodySpec`; the current task's red box
+appears under the caller-selected name `pick_target`, not a core field.
 
 ## 6. Timing Contract
 

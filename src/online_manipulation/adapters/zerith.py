@@ -9,7 +9,20 @@ from typing import Any
 import numpy as np
 from pydrake.all import Meshcat, RigidTransform, RollPitchYaw
 
+from src.online_manipulation.actions import (
+    CartesianDeltaAction,
+    CompositeAction,
+    GripperAction,
+    HoldAction,
+    JointDeltaAction,
+    JointPositionAction,
+    RobotAction,
+)
+from src.online_manipulation.environment import OnlineManipulationEnv
 from src.online_manipulation.observations import (
+    ContactObservation,
+    ObjectObservation,
+    Observation,
     Pose,
     RobotObservation,
     SpatialVelocity,
@@ -17,6 +30,7 @@ from src.online_manipulation.observations import (
 from src.online_manipulation.specs import (
     GripperSpec,
     JointSpec,
+    ObservedBodySpec,
     RobotSpec,
     ScenarioSpec,
     TimingConfig,
@@ -316,6 +330,226 @@ class ZerithRobotAdapter:
         )
 
 
+class ZerithLegacyActionTranslator:
+    """Translate typed actions to the legacy seven-plus-one array."""
+
+    def __init__(self, spec: RobotSpec):
+        """Initialize held targets from the RobotSpec home configuration."""
+        gripper = spec.gripper
+        if gripper is None:
+            raise ValueError("Legacy Zerith translation requires a gripper")
+        self._spec = spec
+        self._gripper = gripper
+        self._arm_names = tuple(
+            name
+            for name in spec.controlled_joint_names
+            if name not in gripper.joint_names
+        )
+        if len(self._arm_names) != len(LEFT_ARM_SERVO_CONFIGS):
+            raise ValueError(
+                "Legacy Zerith translation requires seven arm joints"
+            )
+        home_by_name = dict(
+            zip(
+                spec.controlled_joint_names,
+                spec.home_positions,
+                strict=True,
+            )
+        )
+        self._home_arm = np.asarray(
+            [home_by_name[name] for name in self._arm_names],
+            dtype=float,
+        )
+        self.reset()
+
+    def reset(self) -> None:
+        """Restore held arm and gripper targets to RobotSpec home values."""
+        self._desired_arm = self._home_arm.copy()
+        self._desired_gripper_width = self._gripper.maximum_width_m
+
+    def update_from_runtime_info(self, info: Mapping[str, Any]) -> None:
+        """Synchronize held targets after legacy clipping is applied."""
+        desired_arm = np.asarray(info["desired_q_left"], dtype=float)
+        if desired_arm.shape != self._desired_arm.shape:
+            raise ValueError("Legacy runtime returned invalid desired_q_left")
+        self._desired_arm = desired_arm.copy()
+        self._desired_gripper_width = float(info["desired_gripper_width"])
+
+    def translate(self, action: RobotAction) -> np.ndarray:
+        """Return one legacy action without mutating held target state."""
+        arm_action: (
+            HoldAction
+            | JointPositionAction
+            | JointDeltaAction
+            | CartesianDeltaAction
+            | None
+        )
+        gripper_action: GripperAction | None
+        if isinstance(action, CompositeAction):
+            arm_action = action.arm
+            gripper_action = action.gripper
+        elif isinstance(action, GripperAction):
+            arm_action = None
+            gripper_action = action
+        else:
+            arm_action = action
+            gripper_action = None
+
+        arm_delta = np.zeros(len(self._arm_names))
+        if arm_action is None or isinstance(arm_action, HoldAction):
+            pass
+        elif isinstance(arm_action, JointDeltaAction):
+            arm_delta = self._ordered_arm_values(
+                arm_action.joint_names,
+                arm_action.deltas,
+            )
+        elif isinstance(arm_action, JointPositionAction):
+            requested = self._desired_arm.copy()
+            for name, value in zip(
+                arm_action.joint_names,
+                arm_action.positions,
+                strict=True,
+            ):
+                requested[self._arm_index(name)] = value
+            arm_delta = requested - self._desired_arm
+        elif isinstance(arm_action, CartesianDeltaAction):
+            raise NotImplementedError(
+                "CartesianDeltaAction requires the Phase 4 planning query"
+            )
+        else:
+            raise TypeError(f"Unsupported arm action: {type(arm_action)}")
+
+        gripper_width = self._desired_gripper_width
+        if gripper_action is not None:
+            gripper_width = gripper_action.width_m
+            if not (
+                self._gripper.minimum_width_m
+                <= gripper_width
+                <= self._gripper.maximum_width_m
+            ):
+                raise ValueError(
+                    "GripperAction width violates RobotSpec limits"
+                )
+        normalized_gripper = (
+            2.0 * gripper_width / self._gripper.maximum_width_m - 1.0
+        )
+        return np.concatenate((arm_delta, [normalized_gripper]))
+
+    def _ordered_arm_values(
+        self,
+        names: Sequence[str],
+        values: Sequence[float],
+    ) -> np.ndarray:
+        """Insert a sparse named command into legacy left-arm order."""
+        ordered = np.zeros(len(self._arm_names))
+        for name, value in zip(names, values, strict=True):
+            ordered[self._arm_index(name)] = value
+        return ordered
+
+    def _arm_index(self, name: str) -> int:
+        """Return one legacy arm index or fail with an actionable message."""
+        if name not in self._arm_names:
+            raise ValueError(
+                f"Joint {name} is not a legacy Zerith arm joint; use "
+                "GripperAction for finger motion"
+            )
+        return self._arm_names.index(name)
+
+
+class LegacyZerithRuntimeBackend:
+    """Normalize the validated ZerithOnlineEnv behind the generic facade."""
+
+    def __init__(
+        self,
+        runtime: ZerithOnlineEnv,
+        adapter: ZerithRobotAdapter,
+        observed_bodies: Sequence[ObservedBodySpec],
+    ):
+        """Store the runtime and explicit generic object observation list."""
+        self.runtime = runtime
+        self.adapter = adapter
+        self.observed_bodies = tuple(observed_bodies)
+        self.action_translator = ZerithLegacyActionTranslator(adapter.spec)
+
+    @property
+    def control_log(self):
+        """Expose legacy controller diagnostics during migration."""
+        return self.runtime.control_log
+
+    def reset(self) -> tuple[Observation, dict]:
+        """Reset runtime and translator state, then normalize observation."""
+        self.runtime.reset()
+        self.action_translator.reset()
+        return self._observation(), {
+            "control_updates": 0,
+            "physics_steps_per_control": (
+                self.runtime.physics_steps_per_control
+            ),
+        }
+
+    def step(
+        self,
+        action: RobotAction,
+    ) -> tuple[Observation, bool, dict]:
+        """Translate and execute one typed action for one policy period."""
+        legacy_action = self.action_translator.translate(action)
+        _, _, done, info = self.runtime.step(legacy_action)
+        self.action_translator.update_from_runtime_info(info)
+        normalized_info = dict(info)
+        normalized_info["legacy_action"] = legacy_action.copy()
+        return self._observation(), done, normalized_info
+
+    def robot_penetrations(self):
+        """Expose the legacy robot penetration diagnostic during migration."""
+        return self.runtime.robot_penetrations()
+
+    def _observation(self) -> Observation:
+        """Read a generic observation from the active Drake context."""
+        plant = self.runtime.plant
+        plant_context = self.runtime.plant_context
+        robot = self.adapter.make_robot_observation(
+            plant,
+            plant_context,
+            self.runtime.robot_model_instance,
+            self.runtime.controller_state,
+        )
+        objects = {}
+        for body_spec in self.observed_bodies:
+            model_instance = plant.GetModelInstanceByName(
+                body_spec.model_instance_name
+            )
+            body = plant.GetBodyByName(body_spec.body_name, model_instance)
+            transform = plant.EvalBodyPoseInWorld(plant_context, body)
+            velocity = plant.EvalBodySpatialVelocityInWorld(
+                plant_context,
+                body,
+            )
+            objects[body_spec.observation_name] = ObjectObservation(
+                pose=_drake_pose(transform),
+                spatial_velocity=SpatialVelocity(
+                    tuple(float(value) for value in velocity.rotational()),
+                    tuple(float(value) for value in velocity.translational()),
+                ),
+            )
+        query = plant.get_geometry_query_input_port().Eval(plant_context)
+        inspector = query.inspector()
+        contacts = tuple(
+            ContactObservation(
+                body_a=inspector.GetName(inspector.GetFrameId(pair.id_A)),
+                body_b=inspector.GetName(inspector.GetFrameId(pair.id_B)),
+                penetration_depth_m=float(pair.depth),
+            )
+            for pair in query.ComputePointPairPenetration()
+        )
+        return Observation(
+            time_s=float(plant_context.get_time()),
+            robot=robot,
+            objects=objects,
+            contacts=contacts,
+            task={},
+        )
+
+
 def make_legacy_zerith_environment(
     *,
     scenario: ScenarioSpec,
@@ -382,4 +616,33 @@ def make_legacy_zerith_environment(
         max_joint_delta=max_joint_delta,
         realtime_rate=scenario.visualization.realtime_rate,
         meshcat=meshcat,
+        servo_joint_specs=adapter.spec.controlled_joints,
     )
+
+
+def make_legacy_zerith_online_environment(
+    *,
+    scenario: ScenarioSpec,
+    adapter: ZerithRobotAdapter,
+    timing: TimingConfig,
+    target_model_name: str,
+    target_body_name: str = "base_link",
+    episode_duration: float = 30.0,
+    max_joint_delta: float = 0.1,
+) -> OnlineManipulationEnv:
+    """Build the typed Phase 3 facade over the validated legacy runtime."""
+    runtime = make_legacy_zerith_environment(
+        scenario=scenario,
+        adapter=adapter,
+        timing=timing,
+        target_model_name=target_model_name,
+        target_body_name=target_body_name,
+        episode_duration=episode_duration,
+        max_joint_delta=max_joint_delta,
+    )
+    backend = LegacyZerithRuntimeBackend(
+        runtime=runtime,
+        adapter=adapter,
+        observed_bodies=scenario.observed_bodies,
+    )
+    return OnlineManipulationEnv(backend)
