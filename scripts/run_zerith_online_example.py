@@ -71,6 +71,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--joint-name", default="left_shoulder_pitch_joint")
     parser.add_argument("--joint-delta", type=float, default=0.03)
+    parser.add_argument("--maximum-joint-step", type=float, default=0.01)
     parser.add_argument("--approach-distance", type=float)
     parser.add_argument("--closed-width", type=float, default=0.03)
     parser.add_argument("--lift-distance", type=float, default=0.1)
@@ -227,6 +228,7 @@ def main() -> None:
         target_model_name=TARGET_MODEL_NAME,
         target_body_name=TARGET_BODY_NAME,
         episode_duration=(max_steps + 1) * timing.policy_dt,
+        max_joint_delta=args.maximum_joint_step,
         planning_query=planning_query,
         task=task,
     )

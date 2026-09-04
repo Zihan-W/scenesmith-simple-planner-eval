@@ -109,6 +109,14 @@ def _trace_row(
         "q_commanded_json": json.dumps(
             list(observation.robot.q_commanded)
         ),
+        "end_effector_pose_json": json.dumps(
+            observation.robot.end_effector_pose.as_dict(),
+            separators=(",", ":"),
+        ),
+        "object_poses_json": json.dumps(
+            _object_poses(observation),
+            separators=(",", ":"),
+        ),
         "max_tracking_error": _tracking_error(observation),
         "saturated_joint_count": sum(
             observation.robot.torque_saturated

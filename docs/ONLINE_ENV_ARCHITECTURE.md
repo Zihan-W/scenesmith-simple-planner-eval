@@ -177,9 +177,14 @@ of Environment or Task evaluation.
 
 `PlanningQuery` owns a separate RobotDiagram context initialized through the
 same RobotAdapter. It provides body/frame FK, joint limits, configuration and
-dense edge checks, dual-layer clearance, and pose IK with independent endpoint
-validation. The current IK is solved once per requested target and then checked
-for collision; it does not run RRT, TOPPRA, or advance simulation.
+dense edge checks, dual-layer clearance, pose IK with independent endpoint
+validation, and bounded differential-IK steps for online Cartesian commands.
+Before each online command, observed free-body poses are synchronized from the
+latest runtime observation into this separate context; fixed observed bodies
+remain at their independently loaded scene poses. A differential-IK result is
+globally scaled to preserve its joint-space direction, then the complete edge
+is densely checked. These queries do not run RRT, TOPPRA, or advance the real
+simulation context.
 
 ### EpisodeRunner
 
@@ -208,8 +213,10 @@ for collision; it does not run RRT, TOPPRA, or advance simulation.
 `OnlineManipulationEnv` is a typed facade over a concrete runtime backend.
 The Zerith compatibility backend translates named joint position/delta and
 physical gripper-width commands to the legacy 7+1 array. The public facade
-does not accept bare arrays. Cartesian deltas currently fail explicitly until
-Phase 4 provides the planning/IK query; there is no silent fallback.
+does not accept bare arrays. World-frame Cartesian deltas use the configured
+PlanningQuery to produce one bounded differential-IK increment and reject an
+invalid edge before it reaches the servo. Unsupported frames or a missing
+query fail explicitly; there is no silent fallback.
 
 ## 5. Observation Model
 

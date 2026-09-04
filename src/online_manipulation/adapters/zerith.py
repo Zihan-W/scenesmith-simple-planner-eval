@@ -8,13 +8,10 @@ from typing import Any
 
 import numpy as np
 from pydrake.all import (
-    AngleAxis,
     Meshcat,
-    Quaternion,
     RigidTransform,
     Role,
     RollPitchYaw,
-    RotationMatrix,
 )
 
 from src.online_manipulation.actions import (
@@ -357,6 +354,7 @@ class ZerithLegacyActionTranslator:
         self,
         spec: RobotSpec,
         planning_query: PlanningQuery | None = None,
+        maximum_joint_delta: float | None = None,
     ):
         """Initialize held targets from the RobotSpec home configuration."""
         gripper = spec.gripper
@@ -364,6 +362,9 @@ class ZerithLegacyActionTranslator:
             raise ValueError("Legacy Zerith translation requires a gripper")
         self._spec = spec
         self._planning_query = planning_query
+        if maximum_joint_delta is not None and maximum_joint_delta <= 0.0:
+            raise ValueError("maximum_joint_delta must be positive")
+        self._maximum_joint_delta = maximum_joint_delta
         self._gripper = gripper
         self._arm_names = tuple(
             name
@@ -490,7 +491,7 @@ class ZerithLegacyActionTranslator:
         action: CartesianDeltaAction,
         contact_policy: ContactPolicy | None,
     ) -> np.ndarray:
-        """Solve one online world-frame Cartesian increment with pose IK."""
+        """Solve one safe online world-frame differential-IK increment."""
         if self._planning_query is None:
             raise NotImplementedError(
                 "CartesianDeltaAction requires a configured PlanningQuery"
@@ -513,47 +514,33 @@ class ZerithLegacyActionTranslator:
         q_seed = tuple(
             desired_by_name[name] for name in self._spec.controlled_joint_names
         )
-        current_pose = self._planning_query.frame_pose_at(
-            q_seed,
-            self._spec.model_instance_name,
-            action.end_effector_frame,
-        )
-        current_rotation = RotationMatrix(
-            Quaternion(np.asarray(current_pose.quaternion_wxyz))
-        )
-        rotation_vector = np.asarray(action.rotation_vector_rad)
-        angle = float(np.linalg.norm(rotation_vector))
-        delta_rotation = RotationMatrix()
-        if angle > 0.0:
-            delta_rotation = RotationMatrix(
-                AngleAxis(angle, rotation_vector / angle)
+        if self._maximum_joint_delta is None:
+            raise RuntimeError(
+                "CartesianDeltaAction requires maximum_joint_delta"
             )
-        target_rotation = delta_rotation @ current_rotation
-        target_pose = Pose(
-            tuple(
-                np.asarray(current_pose.translation_m)
-                + np.asarray(action.translation_m)
-            ),
-            tuple(target_rotation.ToQuaternion().wxyz()),
-        )
         solve_kwargs = {}
         if contact_policy is not None:
             solve_kwargs["contact_policy"] = contact_policy
-        result = self._planning_query.solve_ik(
-            target_pose,
+        result = self._planning_query.differential_ik_step(
+            translation_m=action.translation_m,
+            rotation_vector_rad=action.rotation_vector_rad,
             frame_name=action.end_effector_frame,
             seed=q_seed,
+            maximum_joint_delta=self._maximum_joint_delta,
             **solve_kwargs,
         )
         if not result.success:
             raise RuntimeError(
-                "CartesianDeltaAction IK failed: "
-                f"{result.reason}; solver={result.solver_result}"
+                "CartesianDeltaAction edge failed collision validation: "
+                f"nonpenetration="
+                f"{result.edge.minimum_nonpenetration_distance_m}, "
+                f"safety={result.edge.minimum_safety_clearance_m}"
             )
+        applied_configuration = np.asarray(result.configuration)
         solution_by_name = dict(
             zip(
                 self._spec.controlled_joint_names,
-                result.configuration,
+                applied_configuration,
                 strict=True,
             )
         )
@@ -590,9 +577,11 @@ class LegacyZerithRuntimeBackend:
         self.adapter = adapter
         self.scenario = scenario
         self.observed_bodies = tuple(scenario.observed_bodies)
+        self.planning_query = planning_query
         self.action_translator = ZerithLegacyActionTranslator(
             adapter.spec,
             planning_query=planning_query,
+            maximum_joint_delta=runtime.max_joint_delta,
         )
 
     @property
@@ -620,6 +609,14 @@ class LegacyZerithRuntimeBackend:
         contact_policy: ContactPolicy,
     ) -> tuple[Observation, bool, dict]:
         """Translate and execute one typed action for one policy period."""
+        if self.planning_query is not None:
+            observation = self._observation()
+            self.planning_query.set_observed_body_poses(
+                {
+                    name: object_observation.pose
+                    for name, object_observation in observation.objects.items()
+                }
+            )
         legacy_action = self.action_translator.translate(
             action,
             contact_policy,

@@ -26,6 +26,7 @@ Current phase: Phase 6 — External Policy Examples
 * `30736b5` Add task and planning query interfaces
 * `cee8389` Add selective DMD pose finalization
 * `7bc092d` Add deterministic online episode runner
+* `ab94332` Add replaceable online policy examples
 
 ## Current Validated State
 
@@ -299,6 +300,31 @@ had zero saturation steps and retained 1.64127 mm minimum robot-related signed
 distance. The 33-test suite covers all staged policy transitions. Physical
 PickLift is intentionally not claimed until Phase 7 passes real bilateral
 contact and stable-lift criteria.
+
+### Phase 6B State-Synchronized Cartesian Steps
+
+The planning context now synchronizes the latest poses of observed free bodies
+before translating each online action. This keeps collision checks consistent
+with objects that moved in the dynamics simulation without mutating or
+advancing the planning context. Fixed observed bodies remain usable as query
+objects, while an articulated observed body fails explicitly because a single
+body pose is insufficient to recover its joint state.
+
+`CartesianDeltaAction` now uses a damped differential-IK step instead of a
+loose endpoint pose solve. Arm-joint increments are scaled as one vector to
+preserve Cartesian direction, the gripper configuration remains fixed, and
+the full command edge is checked against joint limits, strict
+nonpenetration, and policy-filtered safety clearance. Episode CSV traces now
+include the end-effector pose and every observed object pose at each policy
+boundary.
+
+The 37-test suite covers free-body synchronization, fixed observed bodies,
+bounded differential IK, and rejection of a colliding Cartesian edge. A real
+Zerith smoke test commanded a 1 mm world-Z increment from PICK_HOME with the
+gripper open. The command produced exactly 20 servo updates with 5 physics
+steps each, retained the 1.64127 mm minimum robot-related signed distance, and
+did not terminate or truncate. This is a control/query integration check, not
+a claim that APPROACH or grasp execution is validated.
 
 ## Phase 0 Reproducible Commands
 

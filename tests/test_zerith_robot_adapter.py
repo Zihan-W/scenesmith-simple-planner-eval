@@ -168,23 +168,18 @@ class ZerithRobotAdapterTest(unittest.TestCase):
 
     def test_legacy_translation_solves_configured_cartesian_action(self) -> None:
         class FakePlanningQuery:
-            """Record one Cartesian target and return a named joint result."""
+            """Record one Cartesian delta and return a named joint result."""
 
             def __init__(self) -> None:
-                self.target_pose = None
+                self.kwargs = None
 
-            def frame_pose_at(self, configuration, model_name, frame_name):
-                del configuration, model_name, frame_name
-                return Pose((1.0, 2.0, 3.0), (1.0, 0.0, 0.0, 0.0))
-
-            def solve_ik(self, target_pose, **kwargs):
-                del kwargs
-                self.target_pose = target_pose
+            def differential_ik_step(self, **kwargs):
+                self.kwargs = kwargs
                 return SimpleNamespace(
                     success=True,
                     reason="success",
-                    solver_result="solution",
                     configuration=(0.01,) + (0.0,) * 8,
+                    edge=SimpleNamespace(valid=True),
                 )
 
         query = FakePlanningQuery()
@@ -192,6 +187,7 @@ class ZerithRobotAdapterTest(unittest.TestCase):
         translator = ZerithLegacyActionTranslator(
             adapter.spec,
             planning_query=query,
+            maximum_joint_delta=0.1,
         )
         legacy = translator.translate(
             CartesianDeltaAction(
@@ -202,10 +198,39 @@ class ZerithRobotAdapterTest(unittest.TestCase):
             )
         )
         np.testing.assert_allclose(legacy[:7], [0.01, 0, 0, 0, 0, 0, 0])
-        np.testing.assert_allclose(
-            query.target_pose.translation_m,
-            [1.01, 1.98, 3.03],
+        self.assertEqual(query.kwargs["translation_m"], (0.01, -0.02, 0.03))
+        self.assertEqual(query.kwargs["maximum_joint_delta"], 0.1)
+
+    def test_cartesian_joint_delta_is_scaled_without_changing_direction(self):
+        class FakePlanningQuery:
+            """Return a direction-preserving bounded differential-IK step."""
+
+            def differential_ik_step(self, **kwargs):
+                self.maximum_joint_delta = kwargs["maximum_joint_delta"]
+                return SimpleNamespace(
+                    success=True,
+                    reason="success",
+                    configuration=(0.005, -0.0025) + (0.0,) * 7,
+                    edge=SimpleNamespace(valid=True),
+                )
+
+        adapter = _adapter()
+        query = FakePlanningQuery()
+        translator = ZerithLegacyActionTranslator(
+            adapter.spec,
+            planning_query=query,
+            maximum_joint_delta=0.005,
         )
+        action = translator.translate(
+            CartesianDeltaAction(
+                end_effector_frame=adapter.spec.end_effector_frame_name,
+                reference_frame="world",
+                translation_m=(0.001, 0.0, 0.0),
+                rotation_vector_rad=(0.0, 0.0, 0.0),
+            )
+        )
+        np.testing.assert_allclose(action[:2], [0.005, -0.0025])
+        self.assertEqual(query.maximum_joint_delta, 0.005)
 
 
 if __name__ == "__main__":

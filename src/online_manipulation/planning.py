@@ -2,15 +2,17 @@
 
 import dataclasses
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
 from pydrake.all import (
     InverseKinematics,
+    JacobianWrtVariable,
     LoadModelDirectives,
     ProcessModelDirectives,
     Quaternion,
+    RigidTransform,
     RotationMatrix,
     Solve,
 )
@@ -22,7 +24,11 @@ from src.online_manipulation.contact import (
 from src.online_manipulation.drake_utils import register_package_xml
 from src.online_manipulation.observations import Pose
 from src.online_manipulation.protocols import ContactPolicy, RobotAdapter
-from src.online_manipulation.specs import ScenarioSpec, TimingConfig
+from src.online_manipulation.specs import (
+    ObservedBodySpec,
+    ScenarioSpec,
+    TimingConfig,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -81,6 +87,18 @@ class IkResult:
     clearance: ClearanceMetrics
 
 
+@dataclasses.dataclass(frozen=True)
+class DifferentialIkResult:
+    """One bounded online differential-IK step and edge validation."""
+
+    success: bool
+    reason: str
+    configuration: tuple[float, ...]
+    requested_twist: tuple[float, ...]
+    achieved_twist: tuple[float, ...]
+    edge: EdgeCheck
+
+
 def _qualified_body_name(plant: Any, body: Any) -> str:
     """Return a stable ``model_instance::body`` name."""
     return (
@@ -109,12 +127,14 @@ class PlanningQuery:
         plant: Any,
         robot_model_instance: Any,
         robot_adapter: RobotAdapter,
+        observed_bodies: Sequence[ObservedBodySpec] = (),
     ):
         """Create and initialize a context owned only by planning queries."""
         self.diagram = diagram
         self.plant = plant
         self.robot_model_instance = robot_model_instance
         self.robot_adapter = robot_adapter
+        self.observed_bodies = tuple(observed_bodies)
         self._root_context = diagram.CreateDefaultContext()
         self._plant_context = plant.GetMyMutableContextFromRoot(
             self._root_context
@@ -130,6 +150,10 @@ class PlanningQuery:
         )
         self._controlled_indices = np.asarray(
             [joint.position_start() for joint in self._controlled_joints],
+            dtype=int,
+        )
+        self._controlled_velocity_indices = np.asarray(
+            [joint.velocity_start() for joint in self._controlled_joints],
             dtype=int,
         )
         self._base_positions = plant.GetPositions(self._plant_context).copy()
@@ -169,6 +193,83 @@ class PlanningQuery:
             spec.name: (spec.position_lower, spec.position_upper)
             for spec in self.robot_adapter.spec.controlled_joints
         }
+
+    def set_observed_body_poses(
+        self,
+        poses: Mapping[str, Pose],
+    ) -> None:
+        """Synchronize mutable observed bodies into the planning context.
+
+        Fixed observed bodies already have the same pose in the independently
+        loaded planning model and are therefore left unchanged. Articulated
+        bodies cannot be synchronized from a body pose alone and fail loudly.
+        """
+        expected = {spec.observation_name for spec in self.observed_bodies}
+        missing = expected - poses.keys()
+        if missing:
+            raise KeyError(f"Missing observed body poses: {sorted(missing)}")
+        for spec in self.observed_bodies:
+            model_instance = self.plant.GetModelInstanceByName(
+                spec.model_instance_name
+            )
+            body = self.plant.GetBodyByName(spec.body_name, model_instance)
+            child_joints = [
+                self.plant.get_joint(index)
+                for index in self.plant.GetJointIndices(model_instance)
+                if self.plant.get_joint(index).child_body().index()
+                == body.index()
+            ]
+            floating_joints = [
+                joint
+                for joint in child_joints
+                if joint.num_positions() == 7
+                and joint.num_velocities() == 6
+            ]
+            if len(floating_joints) > 1:
+                raise ValueError(
+                    f"Observed body has multiple floating joints: "
+                    f"{spec.model_instance_name}::{spec.body_name}"
+                )
+            if not floating_joints:
+                if all(joint.num_velocities() == 0 for joint in child_joints):
+                    continue
+                raise ValueError(
+                    f"Observed body is articulated rather than free: "
+                    f"{spec.model_instance_name}::{spec.body_name}"
+                )
+            floating_joint = floating_joints[0]
+            pose = poses[spec.observation_name]
+            quaternion = np.asarray(pose.quaternion_wxyz, dtype=float)
+            quaternion /= np.linalg.norm(quaternion)
+            world_from_parent_joint = (
+                floating_joint.frame_on_parent().CalcPoseInWorld(
+                    self._plant_context
+                )
+            )
+            world_from_body = RigidTransform(
+                Quaternion(quaternion),
+                np.asarray(pose.translation_m, dtype=float),
+            )
+            body_from_child_joint = (
+                floating_joint.frame_on_child().CalcPoseInBodyFrame(
+                    self._plant_context
+                )
+            )
+            self.plant.SetFreeBodyPose(
+                self._plant_context,
+                body,
+                world_from_parent_joint.inverse()
+                @ world_from_body
+                @ body_from_child_joint,
+            )
+        current_positions = self.plant.GetPositions(
+            self._plant_context
+        )
+        fixed_indices = np.setdiff1d(
+            np.arange(self.plant.num_positions()),
+            self._controlled_indices,
+        )
+        self._base_positions[fixed_indices] = current_positions[fixed_indices]
 
     def body_pose(self, model_instance_name: str, body_name: str) -> Pose:
         """Return a body's world pose from the planning context."""
@@ -440,6 +541,23 @@ class PlanningQuery:
             self._base_positions[fixed_indices],
             q[fixed_indices],
         )
+        gripper = self.robot_adapter.spec.gripper
+        if gripper is not None:
+            gripper_controlled_indices = np.asarray(
+                [
+                    index
+                    for index, spec in enumerate(
+                        self.robot_adapter.spec.controlled_joints
+                    )
+                    if spec.name in gripper.joint_names
+                ],
+                dtype=int,
+            )
+            program.AddBoundingBoxConstraint(
+                q_seed[gripper_controlled_indices],
+                q_seed[gripper_controlled_indices],
+                q[self._controlled_indices[gripper_controlled_indices]],
+            )
         program.AddQuadraticErrorCost(
             np.eye(len(self._controlled_indices)),
             q_seed,
@@ -485,6 +603,85 @@ class PlanningQuery:
             position_error_m=position_error,
             orientation_error_rad=float(orientation_error),
             clearance=check.clearance,
+        )
+
+    def differential_ik_step(
+        self,
+        *,
+        translation_m: Sequence[float],
+        rotation_vector_rad: Sequence[float],
+        frame_name: str,
+        seed: Sequence[float],
+        maximum_joint_delta: float,
+        contact_policy: ContactPolicy = FREE_MOTION_CONTACT_POLICY,
+        damping: float = 1e-4,
+    ) -> DifferentialIkResult:
+        """Map one small world-frame pose delta to a safe joint-space edge."""
+        translation = np.asarray(translation_m, dtype=float)
+        rotation = np.asarray(rotation_vector_rad, dtype=float)
+        if translation.shape != (3,) or rotation.shape != (3,):
+            raise ValueError("Differential IK deltas must be 3-vectors")
+        if not np.all(np.isfinite(translation)) or not np.all(
+            np.isfinite(rotation)
+        ):
+            raise ValueError("Differential IK deltas must be finite")
+        if maximum_joint_delta <= 0.0 or damping <= 0.0:
+            raise ValueError("Differential IK limits must be positive")
+        q_seed = self._configuration_array(seed)
+        self._set_configuration(q_seed)
+        frame = self.plant.GetFrameByName(
+            frame_name,
+            self.robot_model_instance,
+        )
+        jacobian = self.plant.CalcJacobianSpatialVelocity(
+            self._plant_context,
+            JacobianWrtVariable.kV,
+            frame,
+            np.zeros(3),
+            self.plant.world_frame(),
+            self.plant.world_frame(),
+        )[:, self._controlled_velocity_indices]
+        gripper = self.robot_adapter.spec.gripper
+        active_indices = np.asarray(
+            [
+                index
+                for index, spec in enumerate(
+                    self.robot_adapter.spec.controlled_joints
+                )
+                if gripper is None or spec.name not in gripper.joint_names
+            ],
+            dtype=int,
+        )
+        active_jacobian = jacobian[:, active_indices]
+        requested_twist = np.concatenate((rotation, translation))
+        normal_matrix = (
+            active_jacobian @ active_jacobian.T
+            + damping * np.eye(6)
+        )
+        active_delta = active_jacobian.T @ np.linalg.solve(
+            normal_matrix,
+            requested_twist,
+        )
+        largest_delta = float(np.max(np.abs(active_delta)))
+        if largest_delta > maximum_joint_delta:
+            active_delta *= maximum_joint_delta / largest_delta
+        delta = np.zeros_like(q_seed)
+        delta[active_indices] = active_delta
+        candidate = q_seed + delta
+        edge = self.check_edge(
+            q_seed,
+            candidate,
+            contact_policy=contact_policy,
+            maximum_joint_step=min(0.002, maximum_joint_delta),
+        )
+        achieved_twist = jacobian @ delta
+        return DifferentialIkResult(
+            success=edge.valid,
+            reason="success" if edge.valid else "edge_collision_or_clearance",
+            configuration=tuple(float(value) for value in candidate),
+            requested_twist=tuple(float(value) for value in requested_twist),
+            achieved_twist=tuple(float(value) for value in achieved_twist),
+            edge=edge,
         )
 
     def _configuration_array(
@@ -594,4 +791,5 @@ def build_planning_query(
         plant=plant,
         robot_model_instance=robot_model_instance,
         robot_adapter=robot_adapter,
+        observed_bodies=scenario.observed_bodies,
     )

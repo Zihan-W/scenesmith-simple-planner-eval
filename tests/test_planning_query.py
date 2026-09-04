@@ -11,6 +11,7 @@ from pydrake.planning import RobotDiagramBuilder
 from src.online_manipulation import (
     GripperSpec,
     JointSpec,
+    ObservedBodySpec,
     PairContactPolicy,
     PlanningQuery,
     Pose,
@@ -55,6 +56,25 @@ _OBSTACLE_SDF = """
     <link name="body">
       <collision name="obstacle_collision">
         <geometry><box><size>0.2 0.2 0.2</size></box></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
+"""
+
+_MOVABLE_SDF = """
+<sdf version="1.7">
+  <model name="movable">
+    <pose>2 2 0 0 0 0</pose>
+    <link name="body">
+      <inertial>
+        <mass>1</mass>
+        <inertia>
+          <ixx>0.01</ixx><iyy>0.01</iyy><izz>0.01</izz>
+        </inertia>
+      </inertial>
+      <collision name="movable_collision">
+        <geometry><box><size>0.1 0.1 0.1</size></box></geometry>
       </collision>
     </link>
   </model>
@@ -109,6 +129,7 @@ def _planning_query() -> PlanningQuery:
     plant = builder.plant()
     robot = parser.AddModelsFromString(_ROBOT_URDF, "urdf")[0]
     parser.AddModelsFromString(_OBSTACLE_SDF, "sdf")
+    parser.AddModelsFromString(_MOVABLE_SDF, "sdf")
     plant.WeldFrames(
         plant.world_frame(),
         plant.GetFrameByName("base", robot),
@@ -123,6 +144,10 @@ def _planning_query() -> PlanningQuery:
         plant=plant,
         robot_model_instance=robot,
         robot_adapter=_TestRobotAdapter(),
+        observed_bodies=(
+            ObservedBodySpec("target", "movable", "body"),
+            ObservedBodySpec("fixed", "obstacle", "body"),
+        ),
     )
 
 
@@ -180,6 +205,50 @@ class PlanningQueryTest(unittest.TestCase):
         self.assertLess(result.orientation_error_rad, 0.01)
         self.assertEqual(query.joint_limits()["joint"], (-3.14, 3.14))
         self.assertEqual(query.body_pose("obstacle", "body").translation_m[0], 0.75)
+
+    def test_observed_free_body_pose_can_follow_runtime_state(self) -> None:
+        query = _planning_query()
+        updated = Pose((2.0, 1.0, 0.5), (1.0, 0.0, 0.0, 0.0))
+        fixed = query.body_pose("obstacle", "body")
+        query.set_observed_body_poses({"target": updated, "fixed": fixed})
+        self.assertEqual(query.body_pose("movable", "body"), updated)
+        self.assertEqual(query.body_pose("obstacle", "body"), fixed)
+
+        query.check_configuration([math.pi / 2.0])
+        self.assertEqual(query.body_pose("movable", "body"), updated)
+
+    def test_differential_ik_returns_bounded_collision_checked_edge(self):
+        query = _planning_query()
+        result = query.differential_ik_step(
+            translation_m=(0.0, 0.0, 0.0),
+            rotation_vector_rad=(0.0, 0.0, 0.01),
+            frame_name="arm",
+            seed=(math.pi / 2.0,),
+            maximum_joint_delta=0.02,
+        )
+        self.assertTrue(result.success, result)
+        self.assertLessEqual(
+            abs(result.configuration[0] - math.pi / 2.0),
+            0.02,
+        )
+        self.assertTrue(result.edge.valid)
+        self.assertAlmostEqual(result.achieved_twist[2], 0.01, places=5)
+
+    def test_differential_ik_rejects_a_colliding_edge(self) -> None:
+        query = _planning_query()
+        result = query.differential_ik_step(
+            translation_m=(0.0, 0.0, 0.0),
+            rotation_vector_rad=(0.0, 0.0, 0.01),
+            frame_name="arm",
+            seed=(0.0,),
+            maximum_joint_delta=0.02,
+        )
+        self.assertFalse(result.success)
+        self.assertEqual(result.reason, "edge_collision_or_clearance")
+        self.assertLess(
+            result.edge.minimum_nonpenetration_distance_m,
+            0.0,
+        )
 
 
 if __name__ == "__main__":
