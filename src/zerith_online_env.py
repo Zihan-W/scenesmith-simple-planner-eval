@@ -32,6 +32,7 @@ from pydrake.all import (
 from src.online_manipulation.controller import CoupledInverseDynamicsServo
 from src.online_manipulation.drake_utils import register_package_xml
 from src.online_manipulation.specs import JointSpec
+from src.zerith_grasp_geometry import add_left_grasp_frame
 from src.zerith_robot_config import (
     ROBOT_BASE_XYZ_METERS,
     ROBOT_BASE_YAW_DEG,
@@ -265,6 +266,7 @@ class ZerithOnlineEnv:
                 f"Expected one Zerith model, got {len(model_instances)}"
             )
         self._zerith = model_instances[0]
+        add_left_grasp_frame(self.plant, self._zerith)
         self._target_instance = self.plant.GetModelInstanceByName(
             target_model_name
         )

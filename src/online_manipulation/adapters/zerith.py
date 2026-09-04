@@ -55,9 +55,13 @@ from src.zerith_online_env import (
     ZERITH_URDF_RELATIVE_PATH,
     ZerithOnlineEnv,
 )
+from src.zerith_grasp_geometry import (
+    LEFT_GRASP_FRAME_NAME,
+    add_left_grasp_frame,
+)
 
 _BASE_LINK_NAME = "dipan_link"
-_END_EFFECTOR_FRAME_NAME = "left_end_effector_link"
+_END_EFFECTOR_FRAME_NAME = LEFT_GRASP_FRAME_NAME
 _RAIL_JOINT_NAME = "daogui_joint"
 
 
@@ -247,6 +251,7 @@ class ZerithRobotAdapter:
                 np.asarray(base_pose.translation_m, dtype=float),
             ),
         )
+        add_left_grasp_frame(plant, model_instance)
         for joint_spec in self.spec.controlled_joints:
             joint = plant.GetJointByName(joint_spec.name, model_instance)
             plant.AddJointActuator(
@@ -293,15 +298,12 @@ class ZerithRobotAdapter:
         )
         q = tuple(float(positions[joint.position_start()]) for joint in joints)
         v = tuple(float(velocities[joint.velocity_start()]) for joint in joints)
-        end_effector = plant.GetBodyByName(
+        end_effector = plant.GetFrameByName(
             self.spec.end_effector_frame_name,
             model_instance,
         )
-        transform = plant.EvalBodyPoseInWorld(plant_context, end_effector)
-        velocity = plant.EvalBodySpatialVelocityInWorld(
-            plant_context,
-            end_effector,
-        )
+        transform = end_effector.CalcPoseInWorld(plant_context)
+        velocity = end_effector.CalcSpatialVelocityInWorld(plant_context)
         return RobotObservation(
             joint_names=self.spec.controlled_joint_names,
             q=q,
@@ -730,10 +732,17 @@ class LegacyZerithRuntimeBackend:
             )
         query = plant.get_geometry_query_input_port().Eval(plant_context)
         inspector = query.inspector()
+
+        def qualified_body_name(frame_id):
+            """Return a stable model-instance-qualified body name."""
+            body = plant.GetBodyFromFrameId(frame_id)
+            model_name = plant.GetModelInstanceName(body.model_instance())
+            return f"{model_name}::{body.name()}"
+
         contacts = tuple(
             ContactObservation(
-                body_a=inspector.GetName(inspector.GetFrameId(pair.id_A)),
-                body_b=inspector.GetName(inspector.GetFrameId(pair.id_B)),
+                body_a=qualified_body_name(inspector.GetFrameId(pair.id_A)),
+                body_b=qualified_body_name(inspector.GetFrameId(pair.id_B)),
                 penetration_depth_m=float(pair.depth),
             )
             for pair in query.ComputePointPairPenetration()

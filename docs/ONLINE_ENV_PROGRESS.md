@@ -25,6 +25,7 @@ Current phase: Phase 6 — External Policy Examples
 * `8cab195` Add typed online manipulation environment facade
 * `30736b5` Add task and planning query interfaces
 * `cee8389` Add selective DMD pose finalization
+* `7bc092d` Add deterministic online episode runner
 
 ## Current Validated State
 
@@ -258,6 +259,46 @@ HTML/final-DMD hooks, multi-seed reset, distinct directory naming, and refusal
 to overwrite a nonempty result directory. A real headless Zerith hold episode
 also passed through the runner and reported the expected 1.64127 mm minimum
 robot-related signed distance with zero tracking error.
+
+## Phase 6 External Policy Examples
+
+The external `HoldPolicy`, `JointStepPolicy`, and `PickLiftPolicy` consume only
+public observations and produce only typed public actions. The staged pick
+policy owns PREGRASP, APPROACH, CLOSE, LIFT, and HOLD transitions; the
+environment and task contain no motion state machine. Its transitions depend
+on measured joint state, end-effector motion, bilateral target contact, and
+target height rather than elapsed waypoint playback.
+
+The Zerith Adapter now exposes the calibrated `left_grasp_frame` as its public
+end effector. The fixed offset remains robot-specific, while Cartesian policy
+actions and observations operate at the physical center between the fingers.
+The legacy runtime adds this frame without changing URDF geometry, dynamics,
+or the validated joint-space PREGRASP trajectory.
+
+Run the first two real examples with the unified CLI:
+
+```bash
+SCENE_ROOT=/root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000
+
+.venv/bin/python -B scripts/run_zerith_online_example.py hold \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml "$SCENE_ROOT/package.xml" \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/online_examples/hold
+
+.venv/bin/python -B scripts/run_zerith_online_example.py joint-step \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml "$SCENE_ROOT/package.xml" \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/online_examples/joint_step
+```
+
+Both real five-step smoke runs completed headlessly. Hold reported zero
+tracking error; JointStep reported 0.02293 rad maximum transient error. Both
+had zero saturation steps and retained 1.64127 mm minimum robot-related signed
+distance. The 33-test suite covers all staged policy transitions. Physical
+PickLift is intentionally not claimed until Phase 7 passes real bilateral
+contact and stable-lift criteria.
 
 ## Phase 0 Reproducible Commands
 

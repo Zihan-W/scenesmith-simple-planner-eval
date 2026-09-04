@@ -154,11 +154,12 @@ class ZerithRobotAdapterTest(unittest.TestCase):
         self.assertAlmostEqual(position[7], 0.0)
 
     def test_legacy_translation_rejects_unsupported_cartesian_action(self) -> None:
-        translator = ZerithLegacyActionTranslator(_adapter().spec)
+        adapter = _adapter()
+        translator = ZerithLegacyActionTranslator(adapter.spec)
         with self.assertRaisesRegex(NotImplementedError, "PlanningQuery"):
             translator.translate(
                 CartesianDeltaAction(
-                    end_effector_frame="left_end_effector_link",
+                    end_effector_frame=adapter.spec.end_effector_frame_name,
                     reference_frame="world",
                     translation_m=(0.0, 0.0, 0.01),
                     rotation_vector_rad=(0.0, 0.0, 0.0),
@@ -187,13 +188,14 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                 )
 
         query = FakePlanningQuery()
+        adapter = _adapter()
         translator = ZerithLegacyActionTranslator(
-            _adapter().spec,
+            adapter.spec,
             planning_query=query,
         )
         legacy = translator.translate(
             CartesianDeltaAction(
-                end_effector_frame="left_end_effector_link",
+                end_effector_frame=adapter.spec.end_effector_frame_name,
                 reference_frame="world",
                 translation_m=(0.01, -0.02, 0.03),
                 rotation_vector_rad=(0.0, 0.0, 0.0),

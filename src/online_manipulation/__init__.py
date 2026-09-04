@@ -30,6 +30,13 @@ from src.online_manipulation.planning import (
     PlanningQuery,
     build_planning_query,
 )
+from src.online_manipulation.policies import (
+    HoldPolicy,
+    JointStepPolicy,
+    JointStepPolicyConfig,
+    PickLiftPolicy,
+    PickLiftPolicyConfig,
+)
 from src.online_manipulation.runner import (
     EpisodeResult,
     run_episode,
@@ -76,11 +83,14 @@ __all__ = [
     "FREE_MOTION_CONTACT_POLICY",
     "GripperAction",
     "GripperSpec",
+    "HoldPolicy",
     "HoldAction",
     "IkResult",
     "JointDeltaAction",
     "JointPositionAction",
     "JointSpec",
+    "JointStepPolicy",
+    "JointStepPolicyConfig",
     "NullTask",
     "ObjectObservation",
     "Observation",
@@ -90,6 +100,8 @@ __all__ = [
     "PairContactPolicy",
     "PickLiftTask",
     "PickLiftTaskConfig",
+    "PickLiftPolicy",
+    "PickLiftPolicyConfig",
     "Policy",
     "PlanningQuery",
     "build_planning_query",
