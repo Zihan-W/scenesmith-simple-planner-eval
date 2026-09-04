@@ -405,11 +405,17 @@ Scene paths and observed objects belong to `ScenarioSpec`:
 
 ```python
 from pathlib import Path
-from src.online_manipulation import ObservedBodySpec, ScenarioSpec
+from src.online_manipulation import ObservedBodySpec, Pose, ScenarioSpec
 
 scenario = ScenarioSpec(
     dmd_path=Path("my_scene/house.dmd.yaml"),
     package_xmls=(Path("my_scene/package.xml"),),
+    initial_object_poses={
+        "movable_object": Pose(
+            translation_m=(0.5, 0.2, 0.8),
+            quaternion_wxyz=(1.0, 0.0, 0.0, 0.0),
+        ),
+    },
     observed_bodies=(
         ObservedBodySpec(
             observation_name="movable_object",
@@ -418,12 +424,25 @@ scenario = ScenarioSpec(
             write_back=True,
         ),
     ),
+    contact_parameters={
+        "penetration_allowance_m": 0.001,
+        "stiction_tolerance_m_s": 0.01,
+    },
 )
 ```
 
 Changing a DMD scene or its package map changes this configuration, not the
-controller. `write_back=True` is deliberately opt-in: only selected free-body
-poses are copied into the final DMD, and the input DMD is never modified.
+controller. Initial poses are keyed by the public observation name and are
+applied consistently to both simulation and planning contexts. Both listed
+contact parameters must be positive; unsupported names fail explicitly.
+`write_back=True` is deliberately opt-in: only selected free-body poses are
+copied into the final DMD, and the input DMD is never modified. `NullTask`
+does not require a target model; task-specific target identity stays outside
+the environment core.
+
+If `policy.act()` or `env.step()` raises during an episode, the runner re-raises
+the original exception after writing `failure.json`, the partial `trace.csv`,
+and the current `simulation.html` recording when enabled.
 
 ## Usage
 

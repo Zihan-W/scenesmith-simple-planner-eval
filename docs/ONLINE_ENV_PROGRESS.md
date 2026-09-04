@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
 Last updated: 2026-09-05
-Current phase: Phase 6 — External Policy Examples
+Current phase: Phase 8 — Documentation and API Audit
 
 ## Product Goal
 
@@ -28,6 +28,8 @@ Current phase: Phase 6 — External Policy Examples
 * `7bc092d` Add deterministic online episode runner
 * `ab94332` Add replaceable online policy examples
 * `72f9d69` Add state-synchronized Cartesian control
+* `55ba5d8` Document BT and TAMP online integrations
+* `0738fdc` Complete generic scenario initialization and diagnostics
 
 ## Current Validated State
 
@@ -349,6 +351,28 @@ each settled successfully in 5 policy steps at measured position
 `0.00164127 m` strict nonpenetration distance and `0.02628 m` safety
 clearance. The full suite contains 40 passing tests.
 
+## Phase 8 API Audit
+
+Scenario initialization is now effective rather than declarative. Initial
+free-body poses are keyed by public observation name and applied consistently
+to both the real simulation context and independent planning context. Planning
+pose synchronization accepts partial updates and rejects unknown names. A
+`NullTask` scene no longer needs a legacy target model.
+
+The Zerith runtime applies the two documented positive Drake contact
+parameters, `penetration_allowance_m` and `stiction_tolerance_m_s`, and rejects
+unknown names. EpisodeRunner now preserves policy/environment exceptions as
+failures: it writes `failure.json`, the completed portion of `trace.csv`, and
+the current optional Meshcat HTML before re-raising the original exception.
+
+The full suite contains 43 passing tests, including a real Drake target-free
+scene with an overridden free-body pose and contact parameters. The calibrated
+open-gripper PREGRASP regression was rerun for one episode after these changes:
+it reached PREGRASP in 81 policy steps with 0.884 mrad final joint error,
+20.04 mm minimum safety clearance, zero continuous torque saturation, an
+80 mm open gripper, and 0.020 mm target settling motion. No APPROACH or CLOSE
+command was issued.
+
 ## Phase 0 Reproducible Commands
 
 Run from `/root/workspace/scenesmith-simple-planner-eval` after activating the
@@ -433,12 +457,15 @@ largest reported step error was `0.013955 rad`.
 ## Current Blockers
 
 * No trusted rail velocity or force parameters.
-* Robot portability has not yet been verified with a second adapter or mock.
+* Robot portability has structural mock coverage but no second real adapter.
 * Physical PickLift has not yet been completed.
 * Removing the deprecated untracked script requires an explicit owner choice.
+* Experimental PickLift policy changes remain uncommitted pending physical
+  validation.
 
 ## Next Action
 
-Begin Phase 6 by adding external HoldPolicy, JointStepPolicy, and a staged
-PickLiftPolicy. Preserve the validated open-gripper PREGRASP result while the
-physical APPROACH/CLOSE/LIFT sequence is developed and diagnosed.
+Present the open-gripper PREGRASP execution in Meshcat for manual front, side,
+and top-view acceptance. Do not issue APPROACH or CLOSE commands until that
+review is complete. After approval, resume Phase 7 with the final-centimeters
+online approach and bilateral-contact grasp test.

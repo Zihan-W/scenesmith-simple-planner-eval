@@ -1,6 +1,6 @@
 # Online Manipulation Environment Architecture
 
-Status: Accepted migration architecture; Phase 4 task and query integrated
+Status: Implemented through Phase 8 API audit; physical PickLift pending
 Source of truth: `docs/ONLINE_ENV_REQUIREMENTS.md`
 
 ## 0. Migration Baseline
@@ -121,11 +121,18 @@ joint are explicit locked-joint entries; the rail value is 0.4 m for the
 current pick task.
 
 `make_legacy_zerith_environment()` is the temporary compatibility boundary.
-It constructs the unchanged `ZerithOnlineEnv` from `ScenarioSpec`,
-`TimingConfig`, and `ZerithRobotAdapter`. For this legacy-only function, the
-first `ScenarioSpec.package_xmls` entry is the scene package and later entries
-are additional packages. Target model identity remains an explicit argument
-until Task owns it in Phase 4.
+It constructs `ZerithOnlineEnv` from `ScenarioSpec`, `TimingConfig`, and
+`ZerithRobotAdapter`. For this legacy-only function, the first
+`ScenarioSpec.package_xmls` entry is the scene package and later entries are
+additional packages. A legacy dictionary-observation target is optional;
+generic object identity is declared only through
+`ScenarioSpec.observed_bodies` and Task configuration.
+
+Scenario initial object poses are keyed by public observation name and applied
+to the simulation and independent planning contexts. The Zerith runtime
+currently supports positive `penetration_allowance_m` and
+`stiction_tolerance_m_s` contact parameters. Unknown parameter names fail
+explicitly.
 
 ### Controller
 
@@ -202,6 +209,11 @@ simulation context.
 * batch episodes；
 * JSON/CSV/HTML；
 * benchmark metrics。
+
+If a Policy or environment step raises, EpisodeRunner writes a partial trace,
+exception metadata, and the current optional Meshcat recording before
+re-raising the original exception. It never converts an execution exception
+into a successful or silently truncated episode.
 
 ## 4. Action Model
 
@@ -295,14 +307,11 @@ reference frames fail explicitly until their transform semantics are added.
 * 左臂和夹爪使用 Drake 接触动力学。
 * 不允许通过 weld、attach、瞬移或全局摩擦倍增伪造抓取。
 
-## 10. Open Decisions
+## 10. Resolved Decisions and Remaining Validation
 
-Agent 在实现过程中必须记录但不得静默决定：
-
-* DMD finalizer 的通用对象选择规则。
-
-These remain explicit design decisions rather than hidden implementation
-defaults. Phase 1 uses a Drake-independent structural mock for the first
-RobotAdapter contract test. Phase 2 must add a real Zerith Adapter integration
-test before any legacy path can be retired; later phases own the remaining
-decisions.
+The DMD finalizer is deny-by-default: only `ObservedBodySpec(write_back=True)`
+free bodies are updated, and the input DMD is never overwritten. A
+Drake-independent adapter mock and the real Zerith adapter both have contract
+coverage. Retiring the compatibility runtime still requires an equivalent
+replacement regression. Physical APPROACH, CLOSE, LIFT, and stable bilateral
+grasp remain intentionally unvalidated.
