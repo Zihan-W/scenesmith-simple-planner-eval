@@ -4,6 +4,12 @@ This repository is a companion to [SceneSmith](https://scenesmith.github.io/), p
 
 For the main SceneSmith codebase and research, please visit the [SceneSmith GitHub repository](https://github.com/nepfaff/scenesmith).
 
+The general online environment is being migrated under the contracts in
+[`docs/ONLINE_ENV_REQUIREMENTS.md`](docs/ONLINE_ENV_REQUIREMENTS.md). See
+[`docs/ONLINE_ENV_ARCHITECTURE.md`](docs/ONLINE_ENV_ARCHITECTURE.md) for module
+boundaries and [`docs/ONLINE_ENV_PROGRESS.md`](docs/ONLINE_ENV_PROGRESS.md) for
+verified commands and exact regression results.
+
 ## Robot Evaluation Pipeline
 
 This repository focuses on the **Policy Interface** and **Validation** stages of the SceneSmith evaluation pipeline. For a comprehensive overview of how to generate scenes and perform end-to-end evaluation, refer to the [Robot Evaluation section of the main SceneSmith repository](https://github.com/nepfaff/scenesmith?tab=readme-ov-file#-robot-evaluation).
@@ -77,8 +83,9 @@ python scripts/simulate_zerith_left_arm.py \
     <scene-root>/combined_house/house_furniture_welded.dmd.yaml
 ```
 
-This test uses a 1 kHz Drake plant, a 200 Hz gravity-compensated PD
-servo, and a 10 Hz policy interface. It performs a five-second home-pose hold
+This legacy-compatible test uses a 1 kHz Drake plant, a 200 Hz coupled
+inverse-dynamics PD servo, and a 10 Hz policy interface. It performs a
+five-second home-pose hold
 followed by a positive and negative step test for each left-arm joint. It does
 not load a plan or use RRT or TOPPRA. Controller-frequency state, gravity, PD,
 raw, applied, and saturation values are written to
@@ -111,6 +118,175 @@ The action is seven accumulated joint-target increments in radians followed by
 one normalized gripper command (`-1` closed, `+1` open). Each action is held
 for one policy period. The first version returns zero reward; task rewards and
 termination belong to the evaluation layer.
+
+Prepare the tracked 6 x 4 x 3 cm red-box task without modifying the original
+SceneSmith output:
+
+```bash
+python scripts/prepare_zerith_pick_eval_scene.py \
+    <scene-root>/combined_house/house_furniture_welded.dmd.yaml
+```
+
+This writes `output/zerith_pick_eval/zerith_pick_eval.dmd.yaml` and synchronized
+`task_metadata.yaml`. The box link origin is its geometric center. By default,
+the red box is aligned with the open left gripper at rail position 0.4 m and
+the zero seven-joint left-arm posture. In the top view, its nearest face is
+1 cm beyond the fingertip front plane; this is not a 3D gap because the
+fingertips remain above the table. `living_room_vase_0` is moved to the exact
+mirrored location on the robot's right side. Both objects have their Z
+positions solved against the local coffee-table collision surface. The red
+box source yaw is retained, and its roll and pitch follow the coffee-table
+body. Four tiled collision boxes preserve its exact dimensions while providing
+stable multipoint support. The original scene is not edited. Register both the
+original scene package and `models/zerith_pick_eval/package.xml` when loading
+the derived DMD.
+
+The authoritative Zerith placement for this pick task is
+`xyz=(2.65, 2.95, 0.1815) m`, `yaw=180 deg`. It is shared by visualization,
+dynamics, IK, and generated task metadata; CLI arguments may explicitly
+override it for a different experiment. DMD `!Rpy deg` values are degrees, and
+the generated metadata records the target yaw in both degrees and radians.
+
+Inspect the vertical rail and the calibrated box from multiple views:
+
+```bash
+python scripts/visualize_zerith_left_arm.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml \
+    --additional-package-xml models/zerith_pick_eval/package.xml \
+    --robot-xyz 2.65 2.95 0.1815 \
+    --robot-yaw-deg 180 \
+    --rail-position 0.4 \
+    --q-left 0 0 0 0 0 0 0
+```
+
+The `daogui_joint` slider covers the upstream URDF range from 0 to 0.8 m and
+moves the complete torso and arm assembly along world Z. The upstream model
+sets both effort and velocity to zero and provides no vendor operating height,
+speed, or force data. Those values remain uncalibrated and must not be guessed.
+
+Verify that the calibrated target remains stable as a free body for five
+seconds:
+
+```bash
+python scripts/validate_zerith_target_settle.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml
+```
+
+Search collision-safe static left-arm postures jointly at each rail height:
+
+```bash
+python scripts/search_zerith_rail_postures.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml
+```
+
+The search does not assign a weighted "natural posture" score or approve a
+rail height. It records collision distance, normalized joint-limit margin,
+elbow bend, wrist midpoint deviation, and grasp-frame Jacobian metrics, then
+writes a per-height visual shortlist to
+`output/zerith_pick_eval/rail_postures.json`. The right arm remains fixed, so a
+height can be rejected because the right wrist intersects the table even when
+the left-arm solve itself is well conditioned.
+
+> **Calibration status:** This task fixes `daogui_joint=0.4 m`. PREGRASP and
+> the online path are validated only up to the open-gripper PREGRASP pose;
+> APPROACH, gripper closure, and grasp execution are intentionally out of
+> scope.
+
+First search the generic collision-regression posture `q_safe_home`:
+
+```bash
+python scripts/search_zerith_safe_home.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml \
+    --rail-position 0.4
+```
+
+Then search collision-constrained PREGRASP targets for the left arm:
+
+```bash
+python scripts/validate_zerith_pregrasp_ik.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml \
+    --rail-position 0.4 \
+    --pregrasp-distance 0.11 \
+    --approach-tilt-deg 15 30 60 \
+    --yaw-offset-deg 0 -20 20 \
+    --num-random-seeds 0 \
+    --exhaustive
+```
+
+The check fixes the base, every non-left-arm joint, and every free scene body;
+the box stays at its derived calibrated pose. By default it searches
+horizontal, oblique, and top-down approaches at five yaw offsets using
+`q_safe_home` and four deterministic random initial guesses. The collision
+model has two planning-only layers: all real candidate pairs must remain
+nonpenetrating, while environment and non-assembly self-collision pairs target
+7 mm and must retain at least 5 mm clearance. The dynamics collision filters
+are unchanged. The left-shoulder-to-torso assembly is the sole explicit
+safety-layer whitelist: its maximum observed separation was 5.1649 mm in an
+81 x 81 joint-range grid search. That is high-density numerical evidence, not
+a mathematical proof.
+
+Finally search the task-specific `q_pick_home`, then execute the online motion:
+
+```bash
+python scripts/search_zerith_pick_home.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml \
+    --pregrasp-json output/zerith_pick_eval/pregrasp_ik.json \
+    --rail-position 0.4
+
+python scripts/validate_zerith_safe_home_dynamics.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml \
+    --home-json output/zerith_pick_eval/pick_home.json \
+    --home-key q_pick_home \
+    --rail-position 0.4
+
+python scripts/simulate_zerith_pick_home_to_pregrasp.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml \
+    --pick-home-json output/zerith_pick_eval/pick_home.json \
+    --rail-position 0.4
+```
+
+`q_pick_home` is separate from `q_safe_home`. Its whole wrist-and-gripper
+collision AABB must be above the coffee table or outside the table projection
+expanded by the wrist-and-gripper footprint and 5 mm. The complete straight
+joint edge to PREGRASP is checked with high-density numerical sampling. The
+execution is an observation-driven 10 Hz policy over a 200 Hz inverse-dynamics
+servo and a 1 kHz plant; it does not use RRT, TOPPRA, or a precomputed
+trajectory.
+
+Inspect the saved PREGRASP posture from front, side, and top by orbiting the
+Meshcat camera:
+
+```bash
+python scripts/visualize_zerith_left_arm.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml \
+    --additional-package-xml models/zerith_pick_eval/package.xml \
+    --rail-position 0.4 \
+    --configuration-json output/zerith_pick_eval/pick_home.json \
+    --configuration-key q_pregrasp
+```
+
+To watch one online execution in real time while keeping the gripper open:
+
+```bash
+python scripts/simulate_zerith_pick_home_to_pregrasp.py \
+    output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+    --scene-package-xml <scene-root>/package.xml \
+    --pick-home-json output/zerith_pick_eval/pick_home.json \
+    --rail-position 0.4 \
+    --episodes 1 \
+    --meshcat \
+    --realtime-rate 1 \
+    --record-html output/zerith_pick_eval/online_pregrasp.html
+```
 
 ## Usage
 
