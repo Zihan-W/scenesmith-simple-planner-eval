@@ -3,6 +3,7 @@
 import numpy as np
 
 from src.zerith_robot_config import (
+    PICK_RAIL_POSITION_METERS,
     ROBOT_BASE_XYZ_METERS as _ROBOT_BASE_XYZ_METERS,
     ROBOT_BASE_YAW_DEG,
 )
@@ -20,7 +21,9 @@ UP_AXIS_GRASP = np.array([0.0, 0.0, 1.0])
 
 BOX_SIZE_METERS = np.array([0.06, 0.04, 0.03])
 GRASP_WIDTH_METERS = BOX_SIZE_METERS[1]
-PREGRASP_DISTANCE_METERS = 0.09
+# The grasp-frame offset yields roughly 5-10 cm of collision-surface
+# clearance from the calibrated box for the selected oblique approach.
+PREGRASP_DISTANCE_METERS = 0.11
 LIFT_DISTANCE_METERS = 0.07
 ROBOT_BASE_XYZ_METERS = np.asarray(_ROBOT_BASE_XYZ_METERS, dtype=float)
 

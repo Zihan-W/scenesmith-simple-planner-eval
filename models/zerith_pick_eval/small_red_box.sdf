@@ -26,11 +26,61 @@
           <diffuse>0.8 0.02 0.02 1</diffuse>
         </material>
       </visual>
-      <collision name="collision">
-        <pose>0 0 0 0 0 0</pose>
+      <!-- Four tiled collision boxes preserve the exact 6 x 4 x 3 cm shape
+           while providing multiple point-contact pairs on flat supports. -->
+      <collision name="collision_positive_x_positive_y">
+        <pose>0.015 0.01 0 0 0 0</pose>
         <geometry>
           <box>
-            <size>0.06 0.04 0.03</size>
+            <size>0.03 0.02 0.03</size>
+          </box>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.8</mu>
+              <mu2>0.8</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <collision name="collision_positive_x_negative_y">
+        <pose>0.015 -0.01 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.03 0.02 0.03</size>
+          </box>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.8</mu>
+              <mu2>0.8</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <collision name="collision_negative_x_positive_y">
+        <pose>-0.015 0.01 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.03 0.02 0.03</size>
+          </box>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.8</mu>
+              <mu2>0.8</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <collision name="collision_negative_x_negative_y">
+        <pose>-0.015 -0.01 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.03 0.02 0.03</size>
           </box>
         </geometry>
         <surface>
