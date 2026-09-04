@@ -375,6 +375,13 @@ class ZerithLegacyActionTranslator:
             raise ValueError(
                 "Legacy Zerith translation requires seven arm joints"
             )
+        joint_specs = {joint.name: joint for joint in spec.controlled_joints}
+        self._arm_position_lower = np.asarray(
+            [joint_specs[name].position_lower for name in self._arm_names]
+        )
+        self._arm_position_upper = np.asarray(
+            [joint_specs[name].position_upper for name in self._arm_names]
+        )
         home_by_name = dict(
             zip(
                 spec.controlled_joint_names,
@@ -392,6 +399,16 @@ class ZerithLegacyActionTranslator:
         """Restore held arm and gripper targets to RobotSpec home values."""
         self._desired_arm = self._home_arm.copy()
         self._desired_gripper_width = self._gripper.maximum_width_m
+        self._last_decision = {
+            "status": "accepted",
+            "reasons": (),
+            "requested_action_type": "reset",
+        }
+
+    @property
+    def last_decision(self) -> dict[str, Any]:
+        """Return diagnostics for the most recent action translation."""
+        return dict(self._last_decision)
 
     def update_from_runtime_info(self, info: Mapping[str, Any]) -> None:
         """Synchronize held targets after legacy clipping is applied."""
@@ -407,6 +424,8 @@ class ZerithLegacyActionTranslator:
         contact_policy: ContactPolicy | None = None,
     ) -> np.ndarray:
         """Return one legacy action without mutating held target state."""
+        reasons = []
+        rejected = False
         arm_action: (
             HoldAction
             | JointPositionAction
@@ -425,11 +444,11 @@ class ZerithLegacyActionTranslator:
             arm_action = action
             gripper_action = None
 
-        arm_delta = np.zeros(len(self._arm_names))
+        requested_arm_delta = np.zeros(len(self._arm_names))
         if arm_action is None or isinstance(arm_action, HoldAction):
             pass
         elif isinstance(arm_action, JointDeltaAction):
-            arm_delta = self._ordered_arm_values(
+            requested_arm_delta = self._ordered_arm_values(
                 arm_action.joint_names,
                 arm_action.deltas,
             )
@@ -441,30 +460,84 @@ class ZerithLegacyActionTranslator:
                 strict=True,
             ):
                 requested[self._arm_index(name)] = value
-            arm_delta = requested - self._desired_arm
+            requested_arm_delta = requested - self._desired_arm
         elif isinstance(arm_action, CartesianDeltaAction):
-            arm_delta = self._cartesian_arm_delta(
+            requested_arm_delta, result = self._cartesian_arm_delta(
                 arm_action,
                 contact_policy,
             )
+            if not result.success:
+                rejected = True
+                reasons.append(f"cartesian_{result.reason}")
+            elif getattr(result, "joint_delta_scaled", False):
+                reasons.append("cartesian_joint_delta_scaled")
         else:
             raise TypeError(f"Unsupported arm action: {type(arm_action)}")
 
-        gripper_width = self._desired_gripper_width
+        applied_arm_delta = requested_arm_delta.copy()
+        if self._maximum_joint_delta is not None:
+            applied_arm_delta = np.clip(
+                applied_arm_delta,
+                -self._maximum_joint_delta,
+                self._maximum_joint_delta,
+            )
+            if not np.array_equal(applied_arm_delta, requested_arm_delta):
+                reasons.append("maximum_joint_delta")
+        requested_target = self._desired_arm + applied_arm_delta
+        applied_target = np.clip(
+            requested_target,
+            self._arm_position_lower,
+            self._arm_position_upper,
+        )
+        if not np.array_equal(applied_target, requested_target):
+            reasons.append("joint_position_limit")
+        applied_arm_delta = applied_target - self._desired_arm
+
+        requested_gripper_width = self._desired_gripper_width
         if gripper_action is not None:
-            gripper_width = gripper_action.width_m
+            if gripper_action.maximum_effort_n is not None:
+                raise NotImplementedError(
+                    "Legacy Zerith gripper does not support per-action "
+                    "maximum_effort_n"
+                )
+            requested_gripper_width = gripper_action.width_m
             if not (
                 self._gripper.minimum_width_m
-                <= gripper_width
+                <= requested_gripper_width
                 <= self._gripper.maximum_width_m
             ):
-                raise ValueError(
-                    "GripperAction width violates RobotSpec limits"
-                )
+                rejected = True
+                reasons.append("gripper_width_limit")
+        applied_gripper_width = requested_gripper_width
+        if rejected:
+            applied_arm_delta = np.zeros(len(self._arm_names))
+            applied_gripper_width = self._desired_gripper_width
+        if rejected:
+            status = "rejected"
+        elif reasons:
+            status = "adjusted"
+        else:
+            status = "accepted"
+        self._last_decision = {
+            "status": status,
+            "reasons": tuple(reasons),
+            "requested_action_type": type(action).__name__,
+            "requested_arm_delta": tuple(
+                float(value) for value in requested_arm_delta
+            ),
+            "applied_arm_delta": tuple(
+                float(value) for value in applied_arm_delta
+            ),
+            "requested_gripper_width_m": float(requested_gripper_width),
+            "applied_gripper_width_m": float(applied_gripper_width),
+        }
         normalized_gripper = (
-            2.0 * gripper_width / self._gripper.maximum_width_m - 1.0
+            2.0
+            * applied_gripper_width
+            / self._gripper.maximum_width_m
+            - 1.0
         )
-        return np.concatenate((arm_delta, [normalized_gripper]))
+        return np.concatenate((applied_arm_delta, [normalized_gripper]))
 
     def _ordered_arm_values(
         self,
@@ -490,7 +563,7 @@ class ZerithLegacyActionTranslator:
         self,
         action: CartesianDeltaAction,
         contact_policy: ContactPolicy | None,
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, Any]:
         """Solve one safe online world-frame differential-IK increment."""
         if self._planning_query is None:
             raise NotImplementedError(
@@ -530,12 +603,7 @@ class ZerithLegacyActionTranslator:
             **solve_kwargs,
         )
         if not result.success:
-            raise RuntimeError(
-                "CartesianDeltaAction edge failed collision validation: "
-                f"nonpenetration="
-                f"{result.edge.minimum_nonpenetration_distance_m}, "
-                f"safety={result.edge.minimum_safety_clearance_m}"
-            )
+            return np.zeros(len(self._arm_names)), result
         applied_configuration = np.asarray(result.configuration)
         solution_by_name = dict(
             zip(
@@ -544,11 +612,12 @@ class ZerithLegacyActionTranslator:
                 strict=True,
             )
         )
-        return np.asarray(
-            [
+        return (
+            np.asarray([
                 solution_by_name[name] - self._desired_arm[index]
                 for index, name in enumerate(self._arm_names)
-            ]
+            ]),
+            result,
         )
 
     def _gripper_joint_targets(self, width_m: float) -> dict[str, float]:
@@ -625,6 +694,13 @@ class LegacyZerithRuntimeBackend:
         self.action_translator.update_from_runtime_info(info)
         normalized_info = dict(info)
         normalized_info["legacy_action"] = legacy_action.copy()
+        decision = self.action_translator.last_decision
+        if info["action_clipped"]:
+            reasons = tuple(decision["reasons"]) + (
+                "legacy_runtime_limit",
+            )
+            decision.update(status="adjusted", reasons=reasons)
+        normalized_info["action_decision"] = decision
         distance, is_lower_bound = self._minimum_robot_signed_distance()
         normalized_info["minimum_collision_distance_m"] = distance
         normalized_info[

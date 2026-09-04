@@ -306,6 +306,60 @@ class ZerithRobotAdapterTest(unittest.TestCase):
         np.testing.assert_allclose(action[:2], [0.005, -0.0025])
         self.assertEqual(query.maximum_joint_delta, 0.005)
 
+    def test_joint_delta_adjustment_reports_reason(self) -> None:
+        adapter = _adapter()
+        translator = ZerithLegacyActionTranslator(
+            adapter.spec,
+            maximum_joint_delta=0.01,
+        )
+        action = translator.translate(
+            JointDeltaAction(
+                (adapter.spec.controlled_joint_names[0],),
+                (0.2,),
+            )
+        )
+        self.assertAlmostEqual(action[0], 0.01)
+        self.assertEqual(translator.last_decision["status"], "adjusted")
+        self.assertIn(
+            "maximum_joint_delta",
+            translator.last_decision["reasons"],
+        )
+
+    def test_colliding_cartesian_edge_is_rejected_as_hold(self) -> None:
+        class FakePlanningQuery:
+            """Return one expected online collision rejection."""
+
+            def differential_ik_step(self, **kwargs):
+                del kwargs
+                return SimpleNamespace(
+                    success=False,
+                    reason="edge_collision_or_clearance",
+                    joint_delta_scaled=False,
+                    edge=SimpleNamespace(valid=False),
+                )
+
+        adapter = _adapter()
+        translator = ZerithLegacyActionTranslator(
+            adapter.spec,
+            planning_query=FakePlanningQuery(),
+            maximum_joint_delta=0.01,
+        )
+        action = translator.translate(
+            CartesianDeltaAction(
+                end_effector_frame=adapter.spec.end_effector_frame_name,
+                reference_frame="world",
+                translation_m=(0.01, 0.0, 0.0),
+                rotation_vector_rad=(0.0, 0.0, 0.0),
+            )
+        )
+        np.testing.assert_allclose(action[:7], np.zeros(7))
+        self.assertEqual(action[7], 1.0)
+        self.assertEqual(translator.last_decision["status"], "rejected")
+        self.assertEqual(
+            translator.last_decision["reasons"],
+            ("cartesian_edge_collision_or_clearance",),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

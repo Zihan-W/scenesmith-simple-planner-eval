@@ -106,6 +106,10 @@ def _trace_row(
         "truncated": truncated,
         "action_type": type(action).__name__,
         "action_json": json.dumps(_jsonable(action), separators=(",", ":")),
+        "action_decision_json": json.dumps(
+            _jsonable(info.get("action_decision")),
+            separators=(",", ":"),
+        ),
         "q_json": json.dumps(list(observation.robot.q)),
         "q_commanded_json": json.dumps(
             list(observation.robot.q_commanded)

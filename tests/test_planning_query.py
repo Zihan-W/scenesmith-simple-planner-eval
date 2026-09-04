@@ -230,6 +230,7 @@ class PlanningQueryTest(unittest.TestCase):
             maximum_joint_delta=0.02,
         )
         self.assertTrue(result.success, result)
+        self.assertIsInstance(result.joint_delta_scaled, bool)
         self.assertLessEqual(
             abs(result.configuration[0] - math.pi / 2.0),
             0.02,

@@ -106,6 +106,10 @@ class _Environment:
                     0.005 if done else 0.01
                 ),
                 "minimum_collision_distance_is_lower_bound": False,
+                "action_decision": {
+                    "status": "accepted",
+                    "reasons": (),
+                },
                 "task": {
                     "success": done,
                     "reason": "goal_reached" if done else "running",
@@ -177,6 +181,10 @@ class EpisodeRunnerTest(unittest.TestCase):
                 rows = list(csv.DictReader(stream))
             self.assertEqual(len(rows), 2)
             self.assertEqual(rows[-1]["action_type"], "HoldAction")
+            self.assertEqual(
+                json.loads(rows[-1]["action_decision_json"]),
+                {"status": "accepted", "reasons": []},
+            )
 
     def test_run_episodes_resets_and_uses_unique_directories(self):
         with tempfile.TemporaryDirectory() as directory:

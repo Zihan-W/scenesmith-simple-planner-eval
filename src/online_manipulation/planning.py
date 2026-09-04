@@ -99,6 +99,7 @@ class DifferentialIkResult:
     configuration: tuple[float, ...]
     requested_twist: tuple[float, ...]
     achieved_twist: tuple[float, ...]
+    joint_delta_scaled: bool
     edge: EdgeCheck
 
 
@@ -656,7 +657,8 @@ class PlanningQuery:
             requested_twist,
         )
         largest_delta = float(np.max(np.abs(active_delta)))
-        if largest_delta > maximum_joint_delta:
+        joint_delta_scaled = largest_delta > maximum_joint_delta
+        if joint_delta_scaled:
             active_delta *= maximum_joint_delta / largest_delta
         delta = np.zeros_like(q_seed)
         delta[active_indices] = active_delta
@@ -674,6 +676,7 @@ class PlanningQuery:
             configuration=tuple(float(value) for value in candidate),
             requested_twist=tuple(float(value) for value in requested_twist),
             achieved_twist=tuple(float(value) for value in achieved_twist),
+            joint_delta_scaled=joint_delta_scaled,
             edge=edge,
         )
 
