@@ -323,6 +323,21 @@ result = run_episode(
 physics steps per controller update at 1 kHz. The command is held between
 policy updates; no future waypoint or offline trajectory is consumed.
 
+Every successful step reports how the safety layer handled its command:
+
+```python
+decision = info["action_decision"]
+print(decision["status"])   # accepted, adjusted, or rejected
+print(decision["reasons"])  # e.g. ("maximum_joint_delta",)
+```
+
+Joint-step and joint-limit adjustments include requested and applied arm
+deltas. A collision-invalid Cartesian edge or out-of-range gripper width is
+atomically rejected as a hold command; it is never partially executed.
+Programming/configuration errors such as an unknown joint or unsupported frame
+still raise an exception. Episode CSV traces include the complete decision as
+`action_decision_json`.
+
 The complete Zerith construction, task selection, and batch runner wiring are
 in [`scripts/run_zerith_online_example.py`](scripts/run_zerith_online_example.py).
 Run replaceable Hold and JointStep policies without editing the environment:

@@ -285,6 +285,12 @@ Task 通过 ContactPolicy 声明允许的接触模式：
 
 任务白名单只影响规划和安全检查，不改变动力学 Plant 的真实 collision filter。
 
+The runtime returns an `action_decision` mapping on every completed policy
+step. Its status is `accepted`, `adjusted`, or `rejected`, with explicit reason
+codes and requested/applied values. Expected safety rejection is an atomic
+hold that still advances exactly one policy period. Invalid API usage remains
+an exception and EpisodeRunner preserves its failure artifacts.
+
 The concrete representation is `PairContactPolicy`: unordered qualified-body
 pairs are denied by default and must be explicitly listed. Allowed pairs are
 excluded only from safety-clearance scoring; the nonpenetration layer still

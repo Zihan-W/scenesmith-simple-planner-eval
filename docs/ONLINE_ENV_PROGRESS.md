@@ -34,6 +34,9 @@ Current phase: Phase 7 — Manual PREGRASP Acceptance Gate
 * `9ef30dd` Guard staged Cartesian pick motions
 * `2ab2722` Enforce generic environment boundaries
 * `5f71dfc` Ignore deprecated pregrasp prototype
+* `5e155eb` Complete online environment API audit
+* `d5b8c8b` Report online action safety decisions
+* `64aec13` Expand action decision contract coverage
 
 ## Current Validated State
 
@@ -394,6 +397,43 @@ current robot/scene identifiers nor imports the Zerith adapter. The deprecated
 untracked PREGRASP prototype is preserved locally through one exact ignore
 rule. After the milestone commits, `git status --short` is empty.
 
+Completed policy steps now return `info.action_decision` with one of
+`accepted`, `adjusted`, or `rejected`, explicit reason codes, and requested and
+applied values. Joint limits and per-period deltas are reported as adjustments.
+A collision-invalid Cartesian edge or invalid gripper width is atomically
+rejected as a hold; API/configuration errors still raise. The same decision is
+stored in each EpisodeRunner CSV row.
+
+The 52-test suite passed after this addition. A real 0.03 rad JointStep request
+with a 0.01 rad policy limit recorded `adjusted/maximum_joint_delta` and applied
+exactly 0.01 rad; its next Hold step recorded `accepted`. The open-gripper
+PREGRASP regression then reproduced the 81-step baseline exactly.
+
+Real EpisodeRunner artifact coverage was also rerun with a two-step headless
+Hold episode and produced `summary.json`, `trace.csv`, `simulation.html`, and
+`final.dmd.yaml`. The final DMD reloaded through Drake and completed a 3 s
+free-body settling run; the target remained free with 0.0127 mm maximum XY
+drift and negligible final Z displacement.
+
+Reproduce the artifact and reload checks:
+
+```bash
+SCENE_ROOT=/root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000
+
+.venv/bin/python -B scripts/run_zerith_online_example.py hold \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml "$SCENE_ROOT/package.xml" \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/online_examples/phase8_artifacts \
+  --episodes 1 --seed 41 --max-steps 2 \
+  --record-html --write-final-dmd --realtime-rate 0
+
+.venv/bin/python -B scripts/validate_zerith_target_settle.py \
+  output/online_examples/phase8_artifacts/episode_000_seed_41/final.dmd.yaml \
+  --scene-package-xml "$SCENE_ROOT/package.xml" \
+  --duration 3
+```
+
 ## Phase 0 Reproducible Commands
 
 Run from `/root/workspace/scenesmith-simple-planner-eval` after activating the
@@ -474,6 +514,32 @@ largest reported step error was `0.013955 rad`.
 * [x] Phase 6: add external policy, BT and TAMP examples
 * [ ] Phase 7: run PickLift integration test
 * [x] Phase 8: documentation, API audit and clean worktree
+
+## Definition of Done Audit
+
+1. **Pass:** architecture tests reject current robot/scene identifiers in the
+   generic core.
+2. **Pass:** Zerith model, joint, gripper, and legacy translation logic lives
+   in `ZerithRobotAdapter` and its adapter module.
+3. **Pass:** Policy and Task have independent public protocols, implementations,
+   and replacement tests.
+4. **Pass:** deterministic `reset()` / one-policy-period `step()` semantics are
+   documented and tested.
+5. **Pass:** the 1000/200/10 Hz integer schedule is unit-tested and checked in
+   real PREGRASP execution.
+6. **Pass:** EpisodeRunner covers seeded multi-episode headless execution and
+   non-overlapping outputs.
+7. **Pass:** PlanningQuery exposes FK, IK, collision, clearance, configuration,
+   and dense-edge checks to TAMP without advancing simulation.
+8. **Pass:** selective final-DMD write/reload has unit and real Drake evidence.
+9. **Pass:** Hold, JointStep, and PickLift policies remain outside environment
+   core; BT and TAMP handoffs use the same typed action boundary.
+10. **Pending:** physical PickLift has not passed bilateral contact, 8 cm lift,
+    3 s hold, and three consecutive episodes.
+11. **Pass:** tests, README, JSON, CSV, real Meshcat HTML, and final-DMD example
+    commands and artifacts exist.
+12. **Pass:** milestone commits are separated and `git status --short` is empty
+    after documentation commit.
 
 ## Current Blockers
 
