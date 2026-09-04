@@ -288,6 +288,143 @@ python scripts/simulate_zerith_pick_home_to_pregrasp.py \
     --record-html output/zerith_pick_eval/online_pregrasp.html
 ```
 
+## Online Manipulation API
+
+The public API uses typed observations and actions. A policy is an external
+object with `reset()` and `act()` methods; it does not receive a Drake Context
+and does not modify the environment:
+
+```python
+from src.online_manipulation import JointDeltaAction, run_episode
+
+
+class MyPolicy:
+    def reset(self, observation, info):
+        del observation, info
+
+    def act(self, observation):
+        joint = observation.robot.joint_names[0]
+        return JointDeltaAction(joint_names=(joint,), deltas=(0.001,))
+
+
+result = run_episode(
+    env=env,
+    policy=MyPolicy(),
+    seed=0,
+    max_steps=100,
+    output_directory="output/my_policy/episode_000",
+    record_html=True,
+    write_final_dmd=True,
+)
+```
+
+`env.step(action)` advances exactly one policy period. With the default
+`TimingConfig`, that is 0.1 s containing 20 controller updates at 200 Hz and 5
+physics steps per controller update at 1 kHz. The command is held between
+policy updates; no future waypoint or offline trajectory is consumed.
+
+The complete Zerith construction, task selection, and batch runner wiring are
+in [`scripts/run_zerith_online_example.py`](scripts/run_zerith_online_example.py).
+Run replaceable Hold and JointStep policies without editing the environment:
+
+```bash
+python -B scripts/run_zerith_online_example.py hold \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml <scene-root>/package.xml \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/online_examples/hold
+
+python -B scripts/run_zerith_online_example.py joint-step \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml <scene-root>/package.xml \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/online_examples/joint_step \
+  --episodes 3
+```
+
+Each episode gets a distinct directory containing `summary.json` and
+`trace.csv`. Add `--record-html` for `simulation.html` and
+`--write-final-dmd` for a reloadable `final.dmd.yaml`. Output directories are
+never silently overwritten.
+
+### Behavior Tree tick
+
+[`examples/online_manipulation/behavior_tree_tick.py`](examples/online_manipulation/behavior_tree_tick.py)
+shows one minimal leaf rather than introducing a Behavior Tree framework. One
+tick reads the latest observation, sends one typed action, and advances exactly
+one environment policy period:
+
+```python
+from examples.online_manipulation import BehaviorTreeStatus, JointTargetLeaf
+
+observation, info = env.reset(seed=0)
+leaf = JointTargetLeaf("left_shoulder_pitch_joint", 0.1)
+
+status = BehaviorTreeStatus.RUNNING
+while status is BehaviorTreeStatus.RUNNING:
+    tick = leaf.tick(env, observation)
+    observation = tick.observation
+    status = tick.status
+```
+
+The same leaf can be wrapped by py_trees, BehaviorTree.CPP bindings, or a
+project-specific tree. Tree state remains outside the environment.
+
+### TAMP query and execution handoff
+
+[`examples/online_manipulation/tamp_execution.py`](examples/online_manipulation/tamp_execution.py)
+shows the intended TAMP boundary. The planner synchronizes observed free-body
+poses, validates the current configuration and complete direct edge in an
+independent context, then sends absolute typed joint targets online:
+
+```python
+from examples.online_manipulation import execute_validated_joint_goal
+
+observation, info = env.reset(seed=0)
+execution = execute_validated_joint_goal(
+    env=env,
+    query=planning_query,
+    observation=observation,
+    goal_positions={"left_shoulder_pitch_joint": 0.1},
+)
+```
+
+An invalid start or edge fails before `env.step()` is called. This helper does
+not search a path or perform TOPPRA; a full TAMP system can supply multiple
+validated edges through the same query/action interface.
+
+### Replace task or scene
+
+Task identity, reward, allowed contacts, termination, and final metrics belong
+to the Task object. Replace `NullTask()` with another Task implementation when
+constructing `OnlineManipulationEnv`; no environment-core edit is required.
+`NullTask` and `PickLiftTask` are the reference implementations in
+[`src/online_manipulation/tasks.py`](src/online_manipulation/tasks.py).
+
+Scene paths and observed objects belong to `ScenarioSpec`:
+
+```python
+from pathlib import Path
+from src.online_manipulation import ObservedBodySpec, ScenarioSpec
+
+scenario = ScenarioSpec(
+    dmd_path=Path("my_scene/house.dmd.yaml"),
+    package_xmls=(Path("my_scene/package.xml"),),
+    observed_bodies=(
+        ObservedBodySpec(
+            observation_name="movable_object",
+            model_instance_name="scene_model_name",
+            body_name="base_link",
+            write_back=True,
+        ),
+    ),
+)
+```
+
+Changing a DMD scene or its package map changes this configuration, not the
+controller. `write_back=True` is deliberately opt-in: only selected free-body
+poses are copied into the final DMD, and the input DMD is never modified.
+
 ## Usage
 
 ### Running Experiments

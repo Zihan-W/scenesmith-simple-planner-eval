@@ -27,6 +27,7 @@ Current phase: Phase 6 — External Policy Examples
 * `cee8389` Add selective DMD pose finalization
 * `7bc092d` Add deterministic online episode runner
 * `ab94332` Add replaceable online policy examples
+* `72f9d69` Add state-synchronized Cartesian control
 
 ## Current Validated State
 
@@ -326,6 +327,28 @@ steps each, retained the 1.64127 mm minimum robot-related signed distance, and
 did not terminate or truncate. This is a control/query integration check, not
 a claim that APPROACH or grasp execution is validated.
 
+### Phase 6C Behavior Tree and TAMP Handoffs
+
+Two importable examples now document the external integration boundary. The
+Behavior Tree leaf performs exactly one typed action and one `env.step()` per
+tick. The TAMP helper synchronizes observed object poses, rejects an invalid
+start or direct edge before execution, and then sends absolute joint targets
+online until the measured position and velocity settle. It deliberately does
+not implement a Behavior Tree framework, path search, or time
+parameterization.
+
+README now shows a user-defined Policy, deterministic batch episodes,
+JSON/CSV/HTML/final-DMD artifacts, BT ticking, TAMP query-to-execution handoff,
+and task/scene replacement. Three contract tests verify tick semantics,
+query-before-step ordering, and rejection without environment mutation.
+
+Both handoffs were also run against the real Zerith dynamics model with an
+open gripper and a 0.02 rad left-shoulder target. The BT leaf and TAMP helper
+each settled successfully in 5 policy steps at measured position
+`0.0180566 rad` and speed `0.0133001 rad/s`. The TAMP edge retained
+`0.00164127 m` strict nonpenetration distance and `0.02628 m` safety
+clearance. The full suite contains 40 passing tests.
+
 ## Phase 0 Reproducible Commands
 
 Run from `/root/workspace/scenesmith-simple-planner-eval` after activating the
@@ -403,7 +426,7 @@ largest reported step error was `0.013955 rad`.
 * [x] Phase 3: generalize controller, action and observation
 * [x] Phase 4: implement Task, ContactPolicy and PlanningQuery
 * [x] Phase 5: implement EpisodeRunner and DMD finalizer
-* [ ] Phase 6: add external policy, BT and TAMP examples
+* [x] Phase 6: add external policy, BT and TAMP examples
 * [ ] Phase 7: run PickLift integration test
 * [ ] Phase 8: documentation, API audit and clean worktree
 

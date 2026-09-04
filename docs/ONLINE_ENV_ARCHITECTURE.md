@@ -161,6 +161,12 @@ of Environment or Task evaluation.
 
 存在于 Environment 外部，只通过 observation、action 和 query API 工作。
 
+The minimal integrations under `examples/online_manipulation` demonstrate the
+boundary without adding a framework dependency. A Behavior Tree leaf advances
+exactly one `env.step()` per tick. The TAMP handoff synchronizes object poses,
+checks a proposed direct edge through PlanningQuery, and only then sends typed
+online actions. Neither integration is imported by the environment core.
+
 ### PlanningQuery
 
 向 TAMP 提供：
