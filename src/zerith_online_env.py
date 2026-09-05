@@ -62,17 +62,17 @@ class JointServoConfig:
 
 
 LEFT_ARM_SERVO_CONFIGS = (
-    JointServoConfig("left_shoulder_pitch_joint", 80.0, 18.0, 36.0),
-    JointServoConfig("left_shoulder_roll_joint", 80.0, 18.0, 36.0),
-    JointServoConfig("left_shoulder_yaw_joint", 40.0, 13.0, 27.0),
-    JointServoConfig("left_elbow_joint", 60.0, 16.0, 27.0),
-    JointServoConfig("left_wrist_roll_joint", 30.0, 11.0, 9.0),
-    JointServoConfig("left_wrist_yaw_joint", 30.0, 11.0, 9.0),
-    JointServoConfig("left_wrist_pitch_joint", 30.0, 11.0, 9.0),
+    JointServoConfig("left_shoulder_pitch_joint", 320.0, 36.0, 36.0),
+    JointServoConfig("left_shoulder_roll_joint", 320.0, 36.0, 36.0),
+    JointServoConfig("left_shoulder_yaw_joint", 160.0, 26.0, 27.0),
+    JointServoConfig("left_elbow_joint", 240.0, 32.0, 27.0),
+    JointServoConfig("left_wrist_roll_joint", 1000.0, 64.0, 9.0),
+    JointServoConfig("left_wrist_yaw_joint", 1000.0, 64.0, 9.0),
+    JointServoConfig("left_wrist_pitch_joint", 1000.0, 64.0, 9.0),
 )
 LEFT_GRIPPER_SERVO_CONFIGS = (
-    JointServoConfig("left_jaw_left_finger_joint", 100.0, 20.0, 25.0),
-    JointServoConfig("left_jaw_right_finger_joint", 100.0, 20.0, 25.0),
+    JointServoConfig("left_jaw_left_finger_joint", 2500.0, 100.0, 25.0),
+    JointServoConfig("left_jaw_right_finger_joint", 2500.0, 100.0, 25.0),
 )
 ALL_SERVO_CONFIGS = LEFT_ARM_SERVO_CONFIGS + LEFT_GRIPPER_SERVO_CONFIGS
 
