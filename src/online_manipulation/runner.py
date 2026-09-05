@@ -87,6 +87,19 @@ def _contact_rows(
     ]
 
 
+def _policy_diagnostics(policy: Policy) -> Mapping[str, Any]:
+    """Return optional policy-owned diagnostics without requiring them."""
+    diagnostics = getattr(policy, "diagnostics", None)
+    if diagnostics is None:
+        return {}
+    if not callable(diagnostics):
+        raise TypeError("policy.diagnostics must be callable")
+    result = diagnostics()
+    if not isinstance(result, Mapping):
+        raise TypeError("policy.diagnostics() must return a mapping")
+    return result
+
+
 def _trace_row(
     *,
     step: int,
@@ -96,6 +109,7 @@ def _trace_row(
     terminated: bool,
     truncated: bool,
     info: Mapping[str, Any],
+    policy_diagnostics: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Build one compact, CSV-safe policy-period record."""
     return {
@@ -114,6 +128,17 @@ def _trace_row(
         "q_commanded_json": json.dumps(
             list(observation.robot.q_commanded)
         ),
+        "v_json": json.dumps(list(observation.robot.v)),
+        "torque_commanded_json": json.dumps(
+            list(observation.robot.torque_commanded)
+        ),
+        "torque_applied_json": json.dumps(
+            list(observation.robot.torque_applied)
+        ),
+        "torque_saturated_json": json.dumps(
+            list(observation.robot.torque_saturated)
+        ),
+        "gripper_width_m": observation.robot.gripper_width_m,
         "end_effector_pose_json": json.dumps(
             observation.robot.end_effector_pose.as_dict(),
             separators=(",", ":"),
@@ -134,6 +159,10 @@ def _trace_row(
             "minimum_collision_distance_is_lower_bound"
         ),
         "task_reason": info.get("task", {}).get("reason", "running"),
+        "policy_diagnostics_json": json.dumps(
+            _jsonable(policy_diagnostics),
+            separators=(",", ":"),
+        ),
     }
 
 
@@ -267,6 +296,7 @@ def run_episode(
             terminated=terminated,
             truncated=truncated,
             info=last_info,
+            policy_diagnostics=_policy_diagnostics(policy),
         )
         trace.append(row)
         maximum_tracking_error = max(
@@ -287,6 +317,11 @@ def run_episode(
                 row["minimum_collision_distance_is_lower_bound"]
             )
         contact_events.extend(_contact_rows(observation, step=step))
+        policy_failure = _policy_diagnostics(policy).get("failure_reason")
+        if policy_failure:
+            reason = f"policy_failed:{policy_failure}"
+            truncated = True
+            break
         if terminated:
             reason = last_info.get("task", {}).get("reason", "terminated")
             break
@@ -330,6 +365,7 @@ def run_episode(
         "initial_object_poses": initial_object_poses,
         "final_object_poses": _object_poses(observation),
         "task": _jsonable(final_task),
+        "policy": _jsonable(_policy_diagnostics(policy)),
     }
     artifacts: dict[str, str] = {}
     if destination is not None:
@@ -357,6 +393,13 @@ def run_episode(
                 json.dumps(_jsonable(summary), indent=2) + "\n",
                 encoding="utf-8",
             )
+        if not success:
+            failure_path = destination / "failure.json"
+            failure_path.write_text(
+                json.dumps(_jsonable(summary), indent=2) + "\n",
+                encoding="utf-8",
+            )
+            artifacts["failure_json"] = str(failure_path)
     return EpisodeResult(
         summary=summary,
         trace=tuple(trace),

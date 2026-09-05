@@ -4,6 +4,9 @@ import unittest
 from pathlib import Path
 
 from src.online_manipulation import (
+    CartesianDeltaAction,
+    CompositeAction,
+    ContactObservation,
     HoldAction,
     ObjectObservation,
     Observation,
@@ -21,6 +24,7 @@ def _observation(
     time_s: float,
     *,
     target_height_m: float | None = None,
+    contacts=(),
 ) -> Observation:
     """Return a minimal normalized observation at one simulation time."""
     pose = Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
@@ -45,7 +49,7 @@ def _observation(
             ),
             twist,
         )
-    return Observation(time_s, robot, objects, (), {})
+    return Observation(time_s, robot, objects, tuple(contacts), {})
 
 
 class _FakeRuntimeBackend:
@@ -124,8 +128,20 @@ class OnlineManipulationEnvTest(unittest.TestCase):
                 del contact_policy
                 self.actions.append(action)
                 self.time_s += 0.1
+                contacts = (
+                    ContactObservation(
+                        "robot::left", "scene::target", 0.001
+                    ),
+                    ContactObservation(
+                        "robot::right", "scene::target", 0.001
+                    ),
+                )
                 return (
-                    _observation(self.time_s, target_height_m=0.6),
+                    _observation(
+                        self.time_s,
+                        target_height_m=0.6,
+                        contacts=contacts,
+                    ),
                     False,
                     {},
                 )
@@ -135,6 +151,7 @@ class OnlineManipulationEnvTest(unittest.TestCase):
                 target_observation_name="target",
                 gripper_contact_bodies=("robot::left", "robot::right"),
                 target_contact_body="scene::target",
+                support_contact_bodies=("scene::support",),
                 required_lift_m=0.08,
                 required_hold_s=0.2,
             )
@@ -154,6 +171,102 @@ class OnlineManipulationEnvTest(unittest.TestCase):
         self.assertEqual(reward, 1.0)
         self.assertTrue(observation.task["success"])
         self.assertEqual(info["task"]["reason"], "lift_held")
+
+    def test_pick_lift_task_rejects_support_only_height(self) -> None:
+        class SupportedLiftBackend(_FakeRuntimeBackend):
+            """Expose a lifted target that remains supported by the table."""
+
+            def reset(self):
+                self.time_s = 0.0
+                self.actions.clear()
+                return _observation(0.0, target_height_m=0.5), {}
+
+            def step(self, action, contact_policy):
+                del contact_policy
+                self.actions.append(action)
+                self.time_s += 0.1
+                contacts = (
+                    ContactObservation(
+                        "robot::left", "scene::target", 0.001
+                    ),
+                    ContactObservation(
+                        "robot::right", "scene::target", 0.001
+                    ),
+                    ContactObservation(
+                        "scene::support", "scene::target", 0.001
+                    ),
+                )
+                return (
+                    _observation(
+                        self.time_s,
+                        target_height_m=0.6,
+                        contacts=contacts,
+                    ),
+                    False,
+                    {},
+                )
+
+        task = PickLiftTask(
+            PickLiftTaskConfig(
+                target_observation_name="target",
+                gripper_contact_bodies=("robot::left", "robot::right"),
+                target_contact_body="scene::target",
+                support_contact_bodies=("scene::support",),
+                required_lift_m=0.08,
+                required_hold_s=0.2,
+            )
+        )
+        env = OnlineManipulationEnv(SupportedLiftBackend(), task=task)
+        env.reset(seed=4)
+        observation, _, terminated, _, info = env.step(HoldAction())
+        observation, _, terminated, _, info = env.step(HoldAction())
+        self.assertFalse(terminated)
+        self.assertFalse(observation.task["success"])
+        self.assertTrue(observation.task["support_contact"])
+        self.assertFalse(info["task"]["metrics"]["stable_lift"])
+
+    def test_pick_lift_declares_carried_body_after_bilateral_contact(self):
+        contacts = (
+            ContactObservation("robot::left", "scene::target", 1e-6),
+            ContactObservation("robot::right", "scene::target", 1e-6),
+            ContactObservation("scene::support", "scene::target", 1e-6),
+        )
+        observation = _observation(
+            0.0,
+            target_height_m=0.5,
+            contacts=contacts,
+        )
+        task = PickLiftTask(
+            PickLiftTaskConfig(
+                target_observation_name="target",
+                gripper_contact_bodies=("robot::left", "robot::right"),
+                target_contact_body="scene::target",
+                support_contact_bodies=("scene::support",),
+            )
+        )
+
+        class _Env:
+            pass
+
+        env = _Env()
+        env.observation = observation
+        action = CompositeAction(
+            arm=CartesianDeltaAction(
+                end_effector_frame="tool",
+                reference_frame="world",
+                translation_m=(0.0, 0.0, 0.001),
+                rotation_vector_rad=(0.0, 0.0, 0.0),
+            )
+        )
+        contact_policy = task.allowed_contacts(env, action)
+        self.assertEqual(len(contact_policy.carried_bodies), 1)
+        self.assertEqual(
+            contact_policy.carried_bodies[0].body_name,
+            "scene::target",
+        )
+        self.assertTrue(
+            contact_policy.permits("scene::target", "scene::support")
+        )
 
 
 if __name__ == "__main__":

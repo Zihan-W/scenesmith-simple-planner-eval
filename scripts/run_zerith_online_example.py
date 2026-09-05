@@ -21,6 +21,7 @@ from src.online_manipulation import (  # noqa: E402
     PickLiftPolicyConfig,
     PickLiftTask,
     PickLiftTaskConfig,
+    Pose,
     ScenarioSpec,
     TimingConfig,
     VisualizationConfig,
@@ -45,6 +46,14 @@ ROBOT_MODEL_DIR = REPOSITORY_ROOT / "models" / "zerith_drake"
 TARGET_MODEL_NAME = "living_room_box_0"
 TARGET_BODY_NAME = "base_link"
 TARGET_OBSERVATION_NAME = "pick_target"
+SUPPORT_MODEL_NAME = "living_room_coffee_table_0"
+SUPPORT_BODY_NAME = "base_link"
+PICK_LIFT_CALIBRATION_JSON = (
+    REPOSITORY_ROOT
+    / "models"
+    / "zerith_pick_eval"
+    / "pick_lift_calibration.json"
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -63,6 +72,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--scene-package-xml", type=Path, required=True)
     parser.add_argument("--pick-home-json", type=Path, required=True)
     parser.add_argument("--pregrasp-json", type=Path)
+    parser.add_argument(
+        "--pick-lift-calibration-json",
+        type=Path,
+        default=PICK_LIFT_CALIBRATION_JSON,
+    )
     parser.add_argument("--eval-package-xml", type=Path, default=EVAL_PACKAGE_XML)
     parser.add_argument("--robot-model-dir", type=Path, default=ROBOT_MODEL_DIR)
     parser.add_argument("--output-root", type=Path, required=True)
@@ -72,9 +86,24 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--joint-name", default="left_shoulder_pitch_joint")
     parser.add_argument("--joint-delta", type=float, default=0.03)
     parser.add_argument("--maximum-joint-step", type=float, default=0.01)
+    parser.add_argument(
+        "--maximum-cartesian-joint-step",
+        type=float,
+        default=0.02,
+        help=(
+            "Per-policy differential-IK joint bound; independent of the "
+            "held-target slew bound in --maximum-joint-step."
+        ),
+    )
     parser.add_argument("--approach-distance", type=float)
     parser.add_argument("--closed-width", type=float, default=0.03)
     parser.add_argument("--lift-distance", type=float, default=0.1)
+    parser.add_argument("--cartesian-step", type=float, default=0.003)
+    parser.add_argument(
+        "--maximum-alignment-error",
+        type=float,
+        default=0.015,
+    )
     parser.add_argument("--policy-dt", type=float, default=0.1)
     parser.add_argument("--controller-dt", type=float, default=0.005)
     parser.add_argument("--physics-dt", type=float, default=0.001)
@@ -118,6 +147,15 @@ def _load_calibration(
     return q_home, q_pregrasp, axis, approach_distance
 
 
+def _load_target_relative_pose(payload: dict, name: str) -> Pose:
+    """Load one target-relative pose from the pick-lift calibration."""
+    pose = payload[name]
+    return Pose(
+        tuple(pose["translation_m"]),
+        tuple(pose["quaternion_wxyz"]),
+    )
+
+
 def main() -> None:
     """Construct the configured external policy, environment, and runner."""
     args = _parse_args()
@@ -130,6 +168,17 @@ def main() -> None:
     )
     q_home, q_pregrasp, approach_axis, calibrated_approach = (
         _load_calibration(args.pick_home_json.resolve(), pregrasp_json)
+    )
+    pick_lift_calibration = json.loads(
+        args.pick_lift_calibration_json.resolve().read_text(encoding="utf-8")
+    )
+    staging_pose_in_target = _load_target_relative_pose(
+        pick_lift_calibration,
+        "staging_pose_in_target",
+    )
+    grasp_pose_in_target = _load_target_relative_pose(
+        pick_lift_calibration,
+        "grasp_pose_in_target",
     )
     timing = TimingConfig(
         physics_dt=args.physics_dt,
@@ -190,11 +239,13 @@ def main() -> None:
                 "left_jaw_right_finger_link",
             )
         )
+        support_body = f"{SUPPORT_MODEL_NAME}::{SUPPORT_BODY_NAME}"
         task = PickLiftTask(
             PickLiftTaskConfig(
                 target_observation_name=TARGET_OBSERVATION_NAME,
                 gripper_contact_bodies=finger_bodies,
                 target_contact_body=target_qualified_name,
+                support_contact_bodies=(support_body,),
                 required_lift_m=0.08,
                 required_hold_s=3.0,
             )
@@ -208,6 +259,7 @@ def main() -> None:
                 approach_axis_world=tuple(approach_axis),
                 finger_contact_bodies=finger_bodies,
                 target_contact_body=target_qualified_name,
+                support_contact_bodies=(support_body,),
                 open_width_m=robot_spec.gripper.maximum_width_m,
                 closed_width_m=args.closed_width,
                 approach_distance_m=(
@@ -216,6 +268,10 @@ def main() -> None:
                     else calibrated_approach
                 ),
                 lift_distance_m=args.lift_distance,
+                cartesian_step_m=args.cartesian_step,
+                maximum_alignment_error_m=args.maximum_alignment_error,
+                staging_pose_in_target=staging_pose_in_target,
+                grasp_pose_in_target=grasp_pose_in_target,
             )
         )
         default_max_steps = 600
@@ -229,6 +285,9 @@ def main() -> None:
         target_body_name=TARGET_BODY_NAME,
         episode_duration=(max_steps + 1) * timing.policy_dt,
         max_joint_delta=args.maximum_joint_step,
+        maximum_cartesian_joint_delta=(
+            args.maximum_cartesian_joint_step
+        ),
         planning_query=planning_query,
         task=task,
     )

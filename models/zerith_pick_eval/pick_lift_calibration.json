@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "status": "fixed_rail_target_relative_pick_lift_validated",
+  "rail_position_m": 0.4,
+  "target_model_name": "living_room_box_0",
+  "target_body_name": "base_link",
+  "staging_pose_in_target": {
+    "translation_m": [
+      0.09535564137368374,
+      -0.00005333016684190841,
+      0.05496462025120825
+    ],
+    "quaternion_wxyz": [
+      0.0001993688760415169,
+      -0.25493941490324334,
+      -0.0004905649172979198,
+      0.9669568833856581
+    ]
+  },
+  "grasp_pose_in_target": {
+    "translation_m": [
+      0.024660751752532167,
+      0.0012972904440575182,
+      0.015494194872976819
+    ],
+    "quaternion_wxyz": [
+      0.046430647802600845,
+      -0.32578984743055917,
+      0.021516930017392594,
+      0.9440562440757597
+    ]
+  },
+  "staging_target_center_in_end_effector_m": [
+    0.11005980087821868,
+    0.000017317086178162212,
+    -0.0008065953249297569
+  ],
+  "grasp_target_center_in_end_effector_m": [
+    0.02878581732960237,
+    0.0036374328270880976,
+    0.002837519577593789
+  ],
+  "validation": {
+    "pregrasp_to_staging_edge_samples": 322,
+    "pregrasp_to_staging_minimum_safety_clearance_m": 0.022434410772726683,
+    "staging_to_grasp_edge_samples": 459,
+    "staging_to_grasp_minimum_safety_clearance_m": 0.012314372236029924,
+    "endpoint_minimum_safety_clearance_m": 0.012578992838466436,
+    "online_staging_steps": 34,
+    "online_grasp_steps": 48,
+    "validation_kind": "dense_joint_edge_and_online_differential_ik"
+  }
+}

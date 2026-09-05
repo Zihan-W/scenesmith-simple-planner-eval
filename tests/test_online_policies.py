@@ -1,5 +1,6 @@
 """Tests for replaceable example policies outside the environment."""
 
+import dataclasses
 import unittest
 
 from src.online_manipulation import (
@@ -10,6 +11,7 @@ from src.online_manipulation import (
     HoldAction,
     HoldPolicy,
     JointDeltaAction,
+    JointPositionAction,
     JointStepPolicy,
     JointStepPolicyConfig,
     ObjectObservation,
@@ -29,15 +31,24 @@ def _observation(
     q_commanded=None,
     ee_x=0.0,
     ee_y=0.0,
+    ee_z=0.5,
+    ee_quaternion=(1.0, 0.0, 0.0, 0.0),
+    target_x=0.1,
+    target_y=0.0,
     target_z=0.5,
+    target_quaternion=(1.0, 0.0, 0.0, 0.0),
     contacts=(),
+    gripper_width=0.08,
 ) -> Observation:
     """Build one small policy observation."""
     if q_commanded is None:
         q_commanded = q
-    pose = Pose((ee_x, ee_y, 0.5), (1.0, 0.0, 0.0, 0.0))
+    pose = Pose((ee_x, ee_y, ee_z), ee_quaternion)
     twist = SpatialVelocity((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
-    target_pose = Pose((0.1, 0.0, target_z), (1.0, 0.0, 0.0, 0.0))
+    target_pose = Pose(
+        (target_x, target_y, target_z),
+        target_quaternion,
+    )
     return Observation(
         time_s=0.0,
         robot=RobotObservation(
@@ -50,7 +61,7 @@ def _observation(
             torque_saturated=(False, False),
             end_effector_pose=pose,
             end_effector_twist=twist,
-            gripper_width_m=0.08,
+            gripper_width_m=gripper_width,
         ),
         objects={"target": ObjectObservation(target_pose, twist)},
         contacts=contacts,
@@ -76,6 +87,25 @@ def _pick_policy() -> PickLiftPolicy:
             cartesian_step_m=0.01,
             stable_pregrasp_steps=2,
             stable_contact_steps=2,
+            stable_verify_steps=2,
+        )
+    )
+
+
+def _target_relative_pick_policy() -> PickLiftPolicy:
+    """Return a short target-relative ALIGN/APPROACH policy."""
+    return PickLiftPolicy(
+        dataclasses.replace(
+            _pick_policy().config,
+            staging_pose_in_target=Pose(
+                (-0.1, 0.0, 0.0),
+                (1.0, 0.0, 0.0, 0.0),
+            ),
+            grasp_pose_in_target=Pose(
+                (-0.02, 0.0, 0.0),
+                (1.0, 0.0, 0.0, 0.0),
+            ),
+            stable_target_pose_steps=2,
         )
     )
 
@@ -123,6 +153,26 @@ class OnlinePoliciesTest(unittest.TestCase):
         policy.act(_observation(q=(0.1, 0.2), ee_x=0.098, contacts=contacts))
         transition = policy.act(
             _observation(q=(0.1, 0.2), ee_x=0.098, contacts=contacts)
+        )
+        self.assertIsInstance(transition, CompositeAction)
+        self.assertIsInstance(transition.arm, JointPositionAction)
+        self.assertEqual(policy.stage, "verify")
+
+        policy.act(
+            _observation(
+                q=(0.1, 0.2),
+                ee_x=0.098,
+                target_z=0.51,
+                contacts=contacts,
+            )
+        )
+        transition = policy.act(
+            _observation(
+                q=(0.1, 0.2),
+                ee_x=0.098,
+                target_z=0.51,
+                contacts=contacts,
+            )
         )
         self.assertIsInstance(transition, HoldAction)
         self.assertEqual(policy.stage, "lift")
@@ -180,6 +230,102 @@ class OnlinePoliciesTest(unittest.TestCase):
         action = policy.act(at_pregrasp)
         self.assertIsInstance(action, CompositeAction)
         self.assertEqual(action.arm.translation_m, (0.01, 0.0, 0.0))
+
+    def test_approach_corrects_observed_lateral_drift(self):
+        policy = _pick_policy()
+        at_pregrasp = _observation(q=(0.1, 0.2))
+        policy.reset(at_pregrasp, {})
+        policy.act(at_pregrasp)
+        policy.act(at_pregrasp)
+
+        action = policy.act(
+            _observation(q=(0.1, 0.2), ee_y=0.005)
+        )
+        self.assertIsInstance(action, CompositeAction)
+        self.assertLess(action.arm.translation_m[1], 0.0)
+        self.assertAlmostEqual(
+            sum(value * value for value in action.arm.translation_m) ** 0.5,
+            0.01,
+        )
+
+    def test_target_relative_alignment_and_approach_use_live_pose(self):
+        policy = _target_relative_pick_policy()
+        at_pregrasp = _observation(q=(0.1, 0.2))
+        policy.reset(at_pregrasp, {})
+        policy.act(at_pregrasp)
+        policy.act(at_pregrasp)
+        self.assertEqual(policy.stage, "align")
+
+        policy.act(at_pregrasp)
+        transition = policy.act(at_pregrasp)
+        self.assertIsInstance(transition, HoldAction)
+        self.assertEqual(policy.stage, "approach")
+
+        approach = policy.act(at_pregrasp)
+        self.assertIsInstance(approach, CompositeAction)
+        self.assertEqual(approach.arm.translation_m, (0.01, 0.0, 0.0))
+        at_grasp = _observation(q=(0.1, 0.2), ee_x=0.08)
+        policy.act(at_grasp)
+        close = policy.act(at_grasp)
+        self.assertIsInstance(close, GripperAction)
+        self.assertEqual(policy.stage, "close")
+
+    def test_target_relative_motion_rejects_target_drift(self):
+        policy = _target_relative_pick_policy()
+        at_pregrasp = _observation(q=(0.1, 0.2))
+        policy.reset(at_pregrasp, {})
+        policy.act(at_pregrasp)
+        policy.act(at_pregrasp)
+
+        action = policy.act(
+            _observation(q=(0.1, 0.2), target_x=0.12)
+        )
+        self.assertIsInstance(action, HoldAction)
+        self.assertEqual(policy.stage, "failed")
+        self.assertEqual(
+            policy.diagnostics()["failure_reason"],
+            "target_moved_before_grasp",
+        )
+
+    def test_verify_requires_target_to_leave_support(self):
+        policy = PickLiftPolicy(
+            dataclasses.replace(
+                _pick_policy().config,
+                support_contact_bodies=("scene::support",),
+            )
+        )
+        bilateral = (
+            ContactObservation("robot::left", "scene::target", 0.001),
+            ContactObservation("robot::right", "scene::target", 0.001),
+        )
+        supported = bilateral + (
+            ContactObservation("scene::support", "scene::target", 0.001),
+        )
+        at_pregrasp = _observation(q=(0.1, 0.2))
+        policy.reset(at_pregrasp, {})
+        policy.act(at_pregrasp)
+        policy.act(at_pregrasp)
+        policy.act(_observation(q=(0.1, 0.2), ee_x=0.098))
+        policy.act(
+            _observation(q=(0.1, 0.2), ee_x=0.098, contacts=bilateral)
+        )
+        policy.act(
+            _observation(q=(0.1, 0.2), ee_x=0.098, contacts=bilateral)
+        )
+        self.assertEqual(policy.stage, "verify")
+
+        action = policy.act(
+            _observation(
+                q=(0.1, 0.2),
+                ee_x=0.098,
+                target_z=0.51,
+                contacts=supported,
+                gripper_width=0.04,
+            )
+        )
+        self.assertIsInstance(action, CompositeAction)
+        self.assertIsInstance(action.arm, CartesianDeltaAction)
+        self.assertEqual(policy.stage, "verify")
 
 
 if __name__ == "__main__":

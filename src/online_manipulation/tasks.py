@@ -7,8 +7,13 @@ from typing import Any
 
 import numpy as np
 
-from src.online_manipulation.actions import RobotAction
+from src.online_manipulation.actions import (
+    CartesianDeltaAction,
+    CompositeAction,
+    RobotAction,
+)
 from src.online_manipulation.contact import (
+    CarriedBody,
     FREE_MOTION_CONTACT_POLICY,
     PairContactPolicy,
 )
@@ -55,19 +60,33 @@ class PickLiftTaskConfig:
     target_observation_name: str
     gripper_contact_bodies: tuple[str, ...]
     target_contact_body: str
+    support_contact_bodies: tuple[str, ...] = ()
     required_lift_m: float = 0.08
     required_hold_s: float = 3.0
+    maximum_target_translational_speed_m_s: float = 0.02
+    maximum_target_rotational_speed_rad_s: float = 0.5
+    maximum_allowed_contact_penetration_m: float = 0.0001
 
     def __post_init__(self) -> None:
         """Validate target identifiers and success thresholds."""
         contacts = tuple(self.gripper_contact_bodies)
+        supports = tuple(self.support_contact_bodies)
         if (
             not self.target_observation_name
             or not self.target_contact_body
-            or not contacts
+            or len(contacts) != 2
+            or len(set(contacts)) != 2
             or any(not name for name in contacts)
+            or any(not name for name in supports)
         ):
-            raise ValueError("PickLiftTask body names must be nonempty")
+            raise ValueError(
+                "PickLiftTask requires two distinct gripper bodies and "
+                "nonempty target/support body names"
+            )
+        if self.target_contact_body in contacts or (
+            self.target_contact_body in supports
+        ):
+            raise ValueError("The target body cannot also be a contact body")
         if (
             not math.isfinite(self.required_lift_m)
             or not math.isfinite(self.required_hold_s)
@@ -75,7 +94,21 @@ class PickLiftTaskConfig:
             or self.required_hold_s <= 0.0
         ):
             raise ValueError("PickLiftTask thresholds must be positive")
+        speeds = (
+            self.maximum_target_translational_speed_m_s,
+            self.maximum_target_rotational_speed_rad_s,
+        )
+        if not all(math.isfinite(value) and value > 0.0 for value in speeds):
+            raise ValueError("PickLiftTask velocity limits must be positive")
+        if (
+            not math.isfinite(self.maximum_allowed_contact_penetration_m)
+            or self.maximum_allowed_contact_penetration_m <= 0.0
+        ):
+            raise ValueError(
+                "PickLiftTask contact penetration limit must be positive"
+            )
         object.__setattr__(self, "gripper_contact_bodies", contacts)
+        object.__setattr__(self, "support_contact_bodies", supports)
 
 
 class PickLiftTask:
@@ -106,6 +139,14 @@ class PickLiftTask:
     def observe(self, env: Any) -> Mapping[str, Any]:
         """Return current lift progress and success thresholds."""
         lift_m = self._lift_m(env)
+        contact_state = self._contact_state(env)
+        target = self._target(env)
+        translational_speed = float(
+            np.linalg.norm(target.spatial_velocity.translational_m_s)
+        )
+        rotational_speed = float(
+            np.linalg.norm(target.spatial_velocity.rotational_rad_s)
+        )
         return {
             "task_name": "pick_lift",
             "target": self.config.target_observation_name,
@@ -113,6 +154,9 @@ class PickLiftTask:
             "required_lift_m": self.config.required_lift_m,
             "held_above_threshold_s": self._held_above_threshold_s,
             "required_hold_s": self.config.required_hold_s,
+            **contact_state,
+            "target_translational_speed_m_s": translational_speed,
+            "target_rotational_speed_rad_s": rotational_speed,
             "success": self._success,
         }
 
@@ -123,7 +167,25 @@ class PickLiftTask:
         if elapsed < 0.0:
             raise ValueError("Simulation time moved backwards")
         lift_m = self._lift_m(env)
-        if lift_m >= self.config.required_lift_m:
+        contact_state = self._contact_state(env)
+        target = self._target(env)
+        translational_speed = float(
+            np.linalg.norm(target.spatial_velocity.translational_m_s)
+        )
+        rotational_speed = float(
+            np.linalg.norm(target.spatial_velocity.rotational_rad_s)
+        )
+        stable_lift = bool(
+            lift_m >= self.config.required_lift_m
+            and contact_state["bilateral_gripper_contact"]
+            and not contact_state["support_contact"]
+            and not contact_state["unexpected_target_contacts"]
+            and translational_speed
+            <= self.config.maximum_target_translational_speed_m_s
+            and rotational_speed
+            <= self.config.maximum_target_rotational_speed_rad_s
+        )
+        if stable_lift:
             self._held_above_threshold_s += elapsed
         else:
             self._held_above_threshold_s = 0.0
@@ -139,6 +201,10 @@ class PickLiftTask:
             metrics={
                 "lift_m": lift_m,
                 "held_above_threshold_s": self._held_above_threshold_s,
+                "stable_lift": stable_lift,
+                **contact_state,
+                "target_translational_speed_m_s": translational_speed,
+                "target_rotational_speed_rad_s": rotational_speed,
             },
         )
 
@@ -148,12 +214,43 @@ class PickLiftTask:
         action: RobotAction,
     ) -> ContactPolicy:
         """Allow configured gripper-target pairs in planning safety checks."""
-        del env, action
+        cartesian_action = None
+        if isinstance(action, CartesianDeltaAction):
+            cartesian_action = action
+        elif isinstance(action, CompositeAction) and isinstance(
+            action.arm,
+            CartesianDeltaAction,
+        ):
+            cartesian_action = action.arm
+        carried_bodies = ()
+        if (
+            cartesian_action is not None
+            and self._contact_state(env)["bilateral_gripper_contact"]
+        ):
+            carried_bodies = (
+                CarriedBody(
+                    body_name=self.config.target_contact_body,
+                    carrier_frame_name=(
+                        cartesian_action.end_effector_frame
+                    ),
+                    body_pose_world=self._target(env).pose,
+                    carrier_pose_world=(
+                        env.observation.robot.end_effector_pose
+                    ),
+                ),
+            )
         return PairContactPolicy.from_pairs(
             "pick_lift_target_contact",
-            (
+            tuple(
                 (body, self.config.target_contact_body)
                 for body in self.config.gripper_contact_bodies
+            ) + tuple(
+                (body, self.config.target_contact_body)
+                for body in self.config.support_contact_bodies
+            ),
+            carried_bodies=carried_bodies,
+            maximum_allowed_penetration_m=(
+                self.config.maximum_allowed_contact_penetration_m
             ),
         )
 
@@ -165,6 +262,41 @@ class PickLiftTask:
             "success": self._success,
             "lift_m": self._lift_m(env),
             "held_above_threshold_s": self._held_above_threshold_s,
+            **self._contact_state(env),
+        }
+
+    def _contact_state(self, env: Any) -> dict[str, Any]:
+        """Classify physical contacts involving the configured target."""
+        finger_contacts = {
+            body: False for body in self.config.gripper_contact_bodies
+        }
+        support_contact = False
+        unexpected_contacts = set()
+        known_contacts = set(self.config.gripper_contact_bodies) | set(
+            self.config.support_contact_bodies
+        )
+        for contact in env.observation.contacts:
+            if self.config.target_contact_body == contact.body_a:
+                other_body = contact.body_b
+            elif self.config.target_contact_body == contact.body_b:
+                other_body = contact.body_a
+            else:
+                continue
+            if other_body in finger_contacts:
+                finger_contacts[other_body] = True
+            elif other_body in self.config.support_contact_bodies:
+                support_contact = True
+            elif other_body not in known_contacts:
+                unexpected_contacts.add(other_body)
+        finger_flags = tuple(
+            finger_contacts[body]
+            for body in self.config.gripper_contact_bodies
+        )
+        return {
+            "finger_contacts": finger_flags,
+            "bilateral_gripper_contact": all(finger_flags),
+            "support_contact": support_contact,
+            "unexpected_target_contacts": tuple(sorted(unexpected_contacts)),
         }
 
     def _target(self, env: Any):

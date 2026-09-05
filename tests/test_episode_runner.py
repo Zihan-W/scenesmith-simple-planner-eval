@@ -60,6 +60,10 @@ class _Policy:
         del observation
         return HoldAction()
 
+    def diagnostics(self):
+        """Expose one generic policy state for artifact coverage."""
+        return {"stage": "hold"}
+
 
 class _FailingPolicy(_Policy):
     """Raise after one completed policy period for artifact testing."""
@@ -74,6 +78,17 @@ class _FailingPolicy(_Policy):
         if self.action_count == 2:
             raise RuntimeError("intentional policy failure")
         return HoldAction()
+
+
+class _TerminalDiagnosticPolicy(_Policy):
+    """Expose a terminal policy reason after one environment step."""
+
+    def diagnostics(self):
+        """Return one explicit external-policy failure reason."""
+        return {
+            "stage": "failed",
+            "failure_reason": "no_safe_action",
+        }
 
 
 class _Environment:
@@ -184,6 +199,48 @@ class EpisodeRunnerTest(unittest.TestCase):
             self.assertEqual(
                 json.loads(rows[-1]["action_decision_json"]),
                 {"status": "accepted", "reasons": []},
+            )
+            self.assertEqual(
+                json.loads(rows[-1]["policy_diagnostics_json"]),
+                {"stage": "hold"},
+            )
+            self.assertEqual(result.summary["policy"], {"stage": "hold"})
+
+    def test_unsuccessful_episode_writes_failure_diagnostics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "episode"
+            result = run_episode(
+                env=_Environment(),
+                policy=_Policy(),
+                seed=10,
+                max_steps=1,
+                output_directory=output,
+            )
+            self.assertFalse(result.success)
+            self.assertEqual(
+                result.artifact_paths["failure_json"],
+                str(output / "failure.json"),
+            )
+            failure = json.loads(
+                (output / "failure.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(failure["policy"], {"stage": "hold"})
+
+    def test_policy_failure_stops_episode_and_preserves_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = run_episode(
+                env=_Environment(),
+                policy=_TerminalDiagnosticPolicy(),
+                seed=11,
+                max_steps=10,
+                output_directory=Path(directory) / "episode",
+            )
+            self.assertFalse(result.success)
+            self.assertEqual(result.summary["policy_steps"], 1)
+            self.assertTrue(result.summary["truncated"])
+            self.assertEqual(
+                result.summary["termination_reason"],
+                "policy_failed:no_safe_action",
             )
 
     def test_run_episodes_resets_and_uses_unique_directories(self):
