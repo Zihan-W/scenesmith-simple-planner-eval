@@ -23,6 +23,18 @@ class ContactPolicy(Protocol):
     def permits(self, body_a: str, body_b: str) -> bool:
         """Return whether the qualified body pair may contact."""
 
+    @property
+    def monitored_bodies(self) -> frozenset[str]:
+        """Return non-robot bodies included in carried-object checks."""
+
+    @property
+    def carried_bodies(self) -> tuple:
+        """Return planning-only body-to-robot-frame rigid relations."""
+
+    @property
+    def maximum_allowed_penetration_m(self) -> float:
+        """Return the bounded penetration permitted for allowed pairs."""
+
 
 @runtime_checkable
 class RobotAdapter(Protocol):

@@ -16,9 +16,12 @@ from src.online_manipulation import (
     JointPositionAction,
     NullTask,
     ObservedBodySpec,
+    Observation,
     Pose,
+    RobotObservation,
     RobotAdapter,
     ScenarioSpec,
+    SpatialVelocity,
     TimingConfig,
 )
 from src.online_manipulation.adapters.zerith import (
@@ -253,7 +256,17 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                     success=True,
                     reason="success",
                     configuration=(0.01,) + (0.0,) * 8,
-                    edge=SimpleNamespace(valid=True),
+                    joint_delta_scaled=False,
+                    requested_twist=(0.0,) * 6,
+                    achieved_twist=(0.0,) * 6,
+                    edge=SimpleNamespace(
+                        valid=True,
+                        minimum_nonpenetration_distance_m=0.01,
+                        minimum_safety_clearance_m=0.01,
+                        minimum_nonpenetration_alpha=0.0,
+                        minimum_safety_alpha=0.0,
+                        sample_count=2,
+                    ),
                 )
 
         query = FakePlanningQuery()
@@ -275,6 +288,86 @@ class ZerithRobotAdapterTest(unittest.TestCase):
         self.assertEqual(query.kwargs["translation_m"], (0.01, -0.02, 0.03))
         self.assertEqual(query.kwargs["maximum_joint_delta"], 0.1)
 
+    def test_cartesian_seed_uses_each_measured_finger_position(self) -> None:
+        class FakePlanningQuery:
+            """Return the seed while recording its physical finger state."""
+
+            def differential_ik_step(self, **kwargs):
+                self.seed = kwargs["seed"]
+                self.validation_start = kwargs["validation_start"]
+                self.maximum_joint_delta = kwargs["maximum_joint_delta"]
+                return SimpleNamespace(
+                    success=True,
+                    reason="success",
+                    configuration=tuple(self.seed),
+                    joint_delta_scaled=False,
+                    requested_twist=(0.0,) * 6,
+                    achieved_twist=(0.0,) * 6,
+                    edge=SimpleNamespace(
+                        valid=True,
+                        minimum_nonpenetration_distance_m=0.01,
+                        minimum_safety_clearance_m=0.01,
+                        minimum_nonpenetration_alpha=0.0,
+                        minimum_safety_alpha=0.0,
+                        sample_count=2,
+                    ),
+                )
+
+        adapter = _adapter()
+        query = FakePlanningQuery()
+        translator = ZerithLegacyActionTranslator(
+            adapter.spec,
+            planning_query=query,
+            maximum_joint_delta=0.1,
+            maximum_cartesian_joint_delta=0.02,
+        )
+        zeros = (0.0,) * 9
+        finger_positions = (-0.02003, 0.01997)
+        pose = Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+        twist = SpatialVelocity((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+        translator.update_from_observation(
+            Observation(
+                time_s=0.0,
+                robot=RobotObservation(
+                    joint_names=adapter.spec.controlled_joint_names,
+                    q=zeros[:7] + finger_positions,
+                    v=zeros,
+                    q_commanded=zeros,
+                    torque_commanded=zeros,
+                    torque_applied=zeros,
+                    torque_saturated=(False,) * 9,
+                    end_effector_pose=pose,
+                    end_effector_twist=twist,
+                    gripper_width_m=0.04,
+                ),
+                objects={},
+                contacts=(),
+                task={},
+            )
+        )
+        translator.update_from_runtime_info(
+            {
+                "desired_q_left": np.full(7, 0.1),
+                "desired_gripper_width": 0.04,
+            }
+        )
+        translator.translate(
+            CartesianDeltaAction(
+                end_effector_frame=adapter.spec.end_effector_frame_name,
+                reference_frame="world",
+                translation_m=(0.0, 0.0, 0.001),
+                rotation_vector_rad=(0.0, 0.0, 0.0),
+            )
+        )
+        np.testing.assert_allclose(query.seed[:7], np.full(7, 0.1))
+        np.testing.assert_allclose(query.seed[-2:], finger_positions)
+        np.testing.assert_allclose(query.validation_start[:7], np.zeros(7))
+        np.testing.assert_allclose(
+            query.validation_start[-2:],
+            finger_positions,
+        )
+        self.assertEqual(query.maximum_joint_delta, 0.02)
+
     def test_cartesian_joint_delta_is_scaled_without_changing_direction(self):
         class FakePlanningQuery:
             """Return a direction-preserving bounded differential-IK step."""
@@ -285,7 +378,17 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                     success=True,
                     reason="success",
                     configuration=(0.005, -0.0025) + (0.0,) * 7,
-                    edge=SimpleNamespace(valid=True),
+                    joint_delta_scaled=False,
+                    requested_twist=(0.0,) * 6,
+                    achieved_twist=(0.0,) * 6,
+                    edge=SimpleNamespace(
+                        valid=True,
+                        minimum_nonpenetration_distance_m=0.01,
+                        minimum_safety_clearance_m=0.01,
+                        minimum_nonpenetration_alpha=0.0,
+                        minimum_safety_alpha=0.0,
+                        sample_count=2,
+                    ),
                 )
 
         adapter = _adapter()
@@ -380,7 +483,16 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                     success=False,
                     reason="edge_collision_or_clearance",
                     joint_delta_scaled=False,
-                    edge=SimpleNamespace(valid=False),
+                    requested_twist=(0.0,) * 6,
+                    achieved_twist=(0.0,) * 6,
+                    edge=SimpleNamespace(
+                        valid=False,
+                        minimum_nonpenetration_distance_m=-0.01,
+                        minimum_safety_clearance_m=0.0,
+                        minimum_nonpenetration_alpha=0.5,
+                        minimum_safety_alpha=0.5,
+                        sample_count=2,
+                    ),
                 )
 
         adapter = _adapter()

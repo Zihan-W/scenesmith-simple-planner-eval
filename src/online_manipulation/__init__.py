@@ -10,6 +10,7 @@ from src.online_manipulation.actions import (
     RobotAction,
 )
 from src.online_manipulation.contact import (
+    CarriedBody,
     FREE_MOTION_CONTACT_POLICY,
     PairContactPolicy,
 )
@@ -73,6 +74,7 @@ PUBLIC_API_VERSION = "0.1"
 __all__ = [
     "PUBLIC_API_VERSION",
     "CartesianDeltaAction",
+    "CarriedBody",
     "ClearanceMetrics",
     "CollisionPair",
     "CompositeAction",

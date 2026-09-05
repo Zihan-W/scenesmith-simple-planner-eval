@@ -19,6 +19,7 @@ from pydrake.all import (
 from pydrake.planning import RobotDiagramBuilder
 
 from src.online_manipulation.contact import (
+    CarriedBody,
     FREE_MOTION_CONTACT_POLICY,
 )
 from src.online_manipulation.drake_utils import (
@@ -118,6 +119,16 @@ def _pose(transform: Any) -> Pose:
             float(value)
             for value in transform.rotation().ToQuaternion().wxyz()
         ),
+    )
+
+
+def _rigid_transform(pose: Pose) -> RigidTransform:
+    """Convert a public pose into a Drake rigid transform."""
+    quaternion = np.asarray(pose.quaternion_wxyz, dtype=float)
+    quaternion /= np.linalg.norm(quaternion)
+    return RigidTransform(
+        Quaternion(quaternion),
+        np.asarray(pose.translation_m, dtype=float),
     )
 
 
@@ -303,15 +314,22 @@ class PlanningQuery:
         configuration: Sequence[float],
         *,
         influence_distance_m: float = 0.05,
+        additional_body_names: Sequence[str] = (),
+        carried_bodies: Sequence[CarriedBody] = (),
     ) -> tuple[CollisionPair, ...]:
-        """Return robot-related signed distances within an influence range."""
+        """Return robot/carried-body distances within an influence range."""
         if influence_distance_m <= 0.0:
             raise ValueError("influence_distance_m must be positive")
         self._set_configuration(configuration)
+        self._set_carried_body_poses(carried_bodies)
         query = self.plant.get_geometry_query_input_port().Eval(
             self._plant_context
         )
         inspector = query.inspector()
+        additional_body_indices = {
+            self._body_from_qualified_name(name).index()
+            for name in additional_body_names
+        }
         pairs = []
         for pair in query.ComputeSignedDistancePairwiseClosestPoints(
             max_distance=influence_distance_m
@@ -325,6 +343,8 @@ class PlanningQuery:
             if (
                 body_a.index() not in self._robot_body_indices
                 and body_b.index() not in self._robot_body_indices
+                and body_a.index() not in additional_body_indices
+                and body_b.index() not in additional_body_indices
             ):
                 continue
             pairs.append(
@@ -349,27 +369,12 @@ class PlanningQuery:
         pairs = self.collision_pairs(
             configuration,
             influence_distance_m=influence_distance_m,
+            additional_body_names=tuple(contact_policy.monitored_bodies),
+            carried_bodies=contact_policy.carried_bodies,
         )
-        nearest_nonpenetration = pairs[0] if pairs else None
-        safety_pairs = tuple(
-            pair
-            for pair in pairs
-            if not self._safety_pair_exempt(pair, contact_policy)
-        )
-        nearest_safety = safety_pairs[0] if safety_pairs else None
-        return ClearanceMetrics(
-            minimum_nonpenetration_distance_m=(
-                nearest_nonpenetration.distance_m
-                if nearest_nonpenetration is not None
-                else influence_distance_m
-            ),
-            minimum_safety_clearance_m=(
-                nearest_safety.distance_m
-                if nearest_safety is not None
-                else influence_distance_m
-            ),
-            nearest_nonpenetration_pair=nearest_nonpenetration,
-            nearest_safety_pair=nearest_safety,
+        return self._clearance_from_pairs(
+            pairs,
+            contact_policy=contact_policy,
             influence_distance_m=influence_distance_m,
         )
 
@@ -391,15 +396,30 @@ class PlanningQuery:
                 strict=True,
             )
         )
-        clearance = self.clearance(
+        pairs = self.collision_pairs(
             values,
+            influence_distance_m=influence_distance_m,
+            additional_body_names=tuple(contact_policy.monitored_bodies),
+            carried_bodies=contact_policy.carried_bodies,
+        )
+        clearance = self._clearance_from_pairs(
+            pairs,
             contact_policy=contact_policy,
             influence_distance_m=influence_distance_m,
+        )
+        nonpenetrating = all(
+            pair.distance_m
+            >= (
+                -contact_policy.maximum_allowed_penetration_m
+                if contact_policy.permits(pair.body_a, pair.body_b)
+                else 0.0
+            )
+            for pair in pairs
         )
         return ConfigurationCheck(
             valid=bool(
                 within_limits
-                and clearance.minimum_nonpenetration_distance_m >= 0.0
+                and nonpenetrating
                 and clearance.minimum_safety_clearance_m
                 >= minimum_safety_clearance_m
             ),
@@ -607,6 +627,7 @@ class PlanningQuery:
         frame_name: str,
         seed: Sequence[float],
         maximum_joint_delta: float,
+        validation_start: Sequence[float] | None = None,
         contact_policy: ContactPolicy = FREE_MOTION_CONTACT_POLICY,
         damping: float = 1e-4,
     ) -> DifferentialIkResult:
@@ -648,23 +669,57 @@ class PlanningQuery:
         )
         active_jacobian = jacobian[:, active_indices]
         requested_twist = np.concatenate((rotation, translation))
-        normal_matrix = (
-            active_jacobian @ active_jacobian.T
-            + damping * np.eye(6)
+
+        # Translation is the primary manipulation objective. Solving all six
+        # twist components with one least-squares system can reverse a small
+        # requested translation near an arm singularity in order to reduce a
+        # zero-orientation residual. First satisfy translation, then use its
+        # Jacobian nullspace for the requested angular increment.
+        linear_jacobian = active_jacobian[3:, :]
+        angular_jacobian = active_jacobian[:3, :]
+        linear_pseudoinverse = np.linalg.pinv(
+            linear_jacobian,
+            rcond=damping,
         )
-        active_delta = active_jacobian.T @ np.linalg.solve(
-            normal_matrix,
-            requested_twist,
+        primary_delta = linear_pseudoinverse @ translation
+        translation_nullspace = (
+            np.eye(len(active_indices))
+            - linear_pseudoinverse @ linear_jacobian
         )
+        angular_residual = rotation - angular_jacobian @ primary_delta
+        nullspace_angular_jacobian = (
+            angular_jacobian @ translation_nullspace
+        )
+        secondary_delta = translation_nullspace @ (
+            nullspace_angular_jacobian.T
+            @ np.linalg.solve(
+                nullspace_angular_jacobian
+                @ nullspace_angular_jacobian.T
+                + damping * np.eye(3),
+                angular_residual,
+            )
+        )
+        active_delta = primary_delta + secondary_delta
+        joint_delta_scaled = False
         largest_delta = float(np.max(np.abs(active_delta)))
-        joint_delta_scaled = largest_delta > maximum_joint_delta
-        if joint_delta_scaled:
+        if largest_delta > maximum_joint_delta:
+            # Scale the complete motion uniformly. Scaling the translation
+            # term before adding a separately clipped orientation correction
+            # can leave a large unintended wrist rotation. During a grasp,
+            # that rotation jams the fingers against the supported object
+            # instead of producing the requested Cartesian lift.
             active_delta *= maximum_joint_delta / largest_delta
+            joint_delta_scaled = True
         delta = np.zeros_like(q_seed)
         delta[active_indices] = active_delta
         candidate = q_seed + delta
+        q_edge_start = (
+            self._configuration_array(validation_start)
+            if validation_start is not None
+            else q_seed
+        )
         edge = self.check_edge(
-            q_seed,
+            q_edge_start,
             candidate,
             contact_policy=contact_policy,
             maximum_joint_step=min(0.002, maximum_joint_delta),
@@ -749,9 +804,45 @@ class PlanningQuery:
             return True
         body_a = self._body_from_qualified_name(pair.body_a)
         body_b = self._body_from_qualified_name(pair.body_b)
+        if (
+            body_a.index() not in self._robot_body_indices
+            and body_b.index() not in self._robot_body_indices
+        ):
+            return False
         return (
             self._safety_joint_influences[int(body_a.index())]
             == self._safety_joint_influences[int(body_b.index())]
+        )
+
+    def _clearance_from_pairs(
+        self,
+        pairs: Sequence[CollisionPair],
+        *,
+        contact_policy: ContactPolicy,
+        influence_distance_m: float,
+    ) -> ClearanceMetrics:
+        """Build dual-layer metrics from precomputed collision pairs."""
+        nearest_nonpenetration = pairs[0] if pairs else None
+        safety_pairs = tuple(
+            pair
+            for pair in pairs
+            if not self._safety_pair_exempt(pair, contact_policy)
+        )
+        nearest_safety = safety_pairs[0] if safety_pairs else None
+        return ClearanceMetrics(
+            minimum_nonpenetration_distance_m=(
+                nearest_nonpenetration.distance_m
+                if nearest_nonpenetration is not None
+                else influence_distance_m
+            ),
+            minimum_safety_clearance_m=(
+                nearest_safety.distance_m
+                if nearest_safety is not None
+                else influence_distance_m
+            ),
+            nearest_nonpenetration_pair=nearest_nonpenetration,
+            nearest_safety_pair=nearest_safety,
+            influence_distance_m=influence_distance_m,
         )
 
     def _body_from_qualified_name(self, name: str) -> Any:
@@ -759,6 +850,37 @@ class PlanningQuery:
         model_name, body_name = name.split("::", maxsplit=1)
         model_instance = self.plant.GetModelInstanceByName(model_name)
         return self.plant.GetBodyByName(body_name, model_instance)
+
+    def _set_carried_body_poses(
+        self,
+        carried_bodies: Sequence[CarriedBody],
+    ) -> None:
+        """Apply planning-only carried poses at the current configuration."""
+        for carried in carried_bodies:
+            body = self._body_from_qualified_name(carried.body_name)
+            carrier_frame = self.plant.GetFrameByName(
+                carried.carrier_frame_name,
+                self.robot_model_instance,
+            )
+            world_from_carrier = carrier_frame.CalcPoseInWorld(
+                self._plant_context
+            )
+            initial_world_from_carrier = _rigid_transform(
+                carried.carrier_pose_world
+            )
+            initial_world_from_body = _rigid_transform(
+                carried.body_pose_world
+            )
+            carrier_from_body = (
+                initial_world_from_carrier.inverse()
+                @ initial_world_from_body
+            )
+            set_free_body_world_pose(
+                self.plant,
+                self._plant_context,
+                body,
+                world_from_carrier @ carrier_from_body,
+            )
 
 
 def build_planning_query(

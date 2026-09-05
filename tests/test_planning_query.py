@@ -9,6 +9,7 @@ from pydrake.all import RigidTransform
 from pydrake.planning import RobotDiagramBuilder
 
 from src.online_manipulation import (
+    CarriedBody,
     GripperSpec,
     JointSpec,
     ObservedBodySpec,
@@ -182,6 +183,62 @@ class PlanningQueryTest(unittest.TestCase):
         clearance = query.clearance([0.0], contact_policy=policy)
         self.assertLess(clearance.minimum_nonpenetration_distance_m, 0.0)
         self.assertEqual(clearance.minimum_safety_clearance_m, 0.05)
+
+    def test_bounded_allowed_penetration_and_monitored_body(self) -> None:
+        query = _planning_query()
+        collision = query.collision_pairs([0.0])[0]
+        allowed = PairContactPolicy.from_pairs(
+            "bounded_contact",
+            [(collision.body_a, collision.body_b)],
+            maximum_allowed_penetration_m=(
+                -collision.distance_m + 0.001
+            ),
+        )
+        self.assertTrue(
+            query.check_configuration([0.0], contact_policy=allowed).valid
+        )
+
+        query.set_observed_body_poses({
+            "target": Pose((0.75, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
+        })
+        monitored = PairContactPolicy.from_pairs(
+            "monitor_target",
+            (),
+            monitored_bodies=("movable::body",),
+        )
+        result = query.check_configuration(
+            [math.pi / 2.0],
+            contact_policy=monitored,
+        )
+        self.assertFalse(result.valid)
+        self.assertLess(
+            result.clearance.minimum_nonpenetration_distance_m,
+            0.0,
+        )
+
+    def test_carried_body_follows_robot_frame_in_planning_context(self) -> None:
+        query = _planning_query()
+        initial_body_pose = query.body_pose("movable", "body")
+        initial_carrier_pose = query.frame_pose("test_robot", "arm")
+        carried = CarriedBody(
+            body_name="movable::body",
+            carrier_frame_name="arm",
+            body_pose_world=initial_body_pose,
+            carrier_pose_world=initial_carrier_pose,
+        )
+        query.collision_pairs(
+            [0.0],
+            additional_body_names=("movable::body",),
+            carried_bodies=(carried,),
+        )
+        moved_body_pose = query.body_pose("movable", "body")
+        self.assertGreater(
+            np.linalg.norm(
+                np.asarray(moved_body_pose.translation_m)
+                - np.asarray(initial_body_pose.translation_m)
+            ),
+            1.0,
+        )
 
     def test_pose_ik_uses_independent_context(self) -> None:
         query = _planning_query()

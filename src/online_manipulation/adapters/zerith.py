@@ -355,6 +355,7 @@ class ZerithLegacyActionTranslator:
         spec: RobotSpec,
         planning_query: PlanningQuery | None = None,
         maximum_joint_delta: float | None = None,
+        maximum_cartesian_joint_delta: float | None = None,
     ):
         """Initialize held targets from the RobotSpec home configuration."""
         gripper = spec.gripper
@@ -364,7 +365,19 @@ class ZerithLegacyActionTranslator:
         self._planning_query = planning_query
         if maximum_joint_delta is not None and maximum_joint_delta <= 0.0:
             raise ValueError("maximum_joint_delta must be positive")
+        if (
+            maximum_cartesian_joint_delta is not None
+            and maximum_cartesian_joint_delta <= 0.0
+        ):
+            raise ValueError(
+                "maximum_cartesian_joint_delta must be positive"
+            )
         self._maximum_joint_delta = maximum_joint_delta
+        self._maximum_cartesian_joint_delta = (
+            maximum_cartesian_joint_delta
+            if maximum_cartesian_joint_delta is not None
+            else maximum_joint_delta
+        )
         self._gripper = gripper
         self._arm_names = tuple(
             name
@@ -382,6 +395,13 @@ class ZerithLegacyActionTranslator:
         self._arm_position_upper = np.asarray(
             [joint_specs[name].position_upper for name in self._arm_names]
         )
+        self._gripper_position_limits = {
+            name: (
+                joint_specs[name].position_lower,
+                joint_specs[name].position_upper,
+            )
+            for name in self._gripper.joint_names
+        }
         home_by_name = dict(
             zip(
                 spec.controlled_joint_names,
@@ -399,6 +419,11 @@ class ZerithLegacyActionTranslator:
         """Restore held arm and gripper targets to RobotSpec home values."""
         self._desired_arm = self._home_arm.copy()
         self._desired_gripper_width = self._gripper.maximum_width_m
+        self._measured_arm = self._home_arm.copy()
+        self._measured_gripper_width = self._gripper.maximum_width_m
+        self._measured_gripper_positions = {
+            name: 0.0 for name in self._gripper.joint_names
+        }
         self._last_decision = {
             "status": "accepted",
             "reasons": (),
@@ -418,6 +443,31 @@ class ZerithLegacyActionTranslator:
         self._desired_arm = desired_arm.copy()
         self._desired_gripper_width = float(info["desired_gripper_width"])
 
+    def update_from_observation(self, observation: Observation) -> None:
+        """Synchronize the physical arm and gripper state used by IK."""
+        position_by_name = dict(
+            zip(
+                observation.robot.joint_names,
+                observation.robot.q,
+                strict=True,
+            )
+        )
+        self._measured_arm = np.asarray(
+            [position_by_name[name] for name in self._arm_names],
+            dtype=float,
+        )
+        self._measured_gripper_positions = {
+            name: float(np.clip(
+                position_by_name[name],
+                *self._gripper_position_limits[name],
+            ))
+            for name in self._gripper.joint_names
+        }
+        width = observation.robot.gripper_width_m
+        if width is None:
+            raise ValueError("Zerith Cartesian control requires gripper width")
+        self._measured_gripper_width = float(width)
+
     def translate(
         self,
         action: RobotAction,
@@ -426,6 +476,7 @@ class ZerithLegacyActionTranslator:
         """Return one legacy action without mutating held target state."""
         reasons = []
         rejected = False
+        cartesian_diagnostics = None
         arm_action: (
             HoldAction
             | JointPositionAction
@@ -466,6 +517,25 @@ class ZerithLegacyActionTranslator:
                 arm_action,
                 contact_policy,
             )
+            cartesian_diagnostics = {
+                "success": result.success,
+                "reason": result.reason,
+                "minimum_nonpenetration_distance_m": (
+                    result.edge.minimum_nonpenetration_distance_m
+                ),
+                "minimum_safety_clearance_m": (
+                    result.edge.minimum_safety_clearance_m
+                ),
+                "minimum_nonpenetration_alpha": (
+                    result.edge.minimum_nonpenetration_alpha
+                ),
+                "minimum_safety_alpha": (
+                    result.edge.minimum_safety_alpha
+                ),
+                "edge_sample_count": result.edge.sample_count,
+                "requested_twist": result.requested_twist,
+                "achieved_twist": result.achieved_twist,
+            }
             if not result.success:
                 rejected = True
                 reasons.append(f"cartesian_{result.reason}")
@@ -531,6 +601,8 @@ class ZerithLegacyActionTranslator:
             "requested_gripper_width_m": float(requested_gripper_width),
             "applied_gripper_width_m": float(applied_gripper_width),
         }
+        if cartesian_diagnostics is not None:
+            self._last_decision["cartesian"] = cartesian_diagnostics
         normalized_gripper = (
             2.0
             * applied_gripper_width
@@ -579,17 +651,21 @@ class ZerithLegacyActionTranslator:
                 "CartesianDeltaAction end_effector_frame does not match "
                 "RobotSpec"
             )
-        finger_targets = self._gripper_joint_targets(
-            self._desired_gripper_width
-        )
-        desired_by_name = dict(zip(self._arm_names, self._desired_arm))
-        desired_by_name.update(finger_targets)
+        seed_by_name = dict(zip(self._arm_names, self._desired_arm))
+        seed_by_name.update(self._measured_gripper_positions)
         q_seed = tuple(
-            desired_by_name[name] for name in self._spec.controlled_joint_names
+            seed_by_name[name] for name in self._spec.controlled_joint_names
         )
-        if self._maximum_joint_delta is None:
+        measured_by_name = dict(zip(self._arm_names, self._measured_arm))
+        measured_by_name.update(self._measured_gripper_positions)
+        validation_start = tuple(
+            measured_by_name[name]
+            for name in self._spec.controlled_joint_names
+        )
+        if self._maximum_cartesian_joint_delta is None:
             raise RuntimeError(
-                "CartesianDeltaAction requires maximum_joint_delta"
+                "CartesianDeltaAction requires "
+                "maximum_cartesian_joint_delta"
             )
         solve_kwargs = {}
         if contact_policy is not None:
@@ -599,7 +675,8 @@ class ZerithLegacyActionTranslator:
             rotation_vector_rad=action.rotation_vector_rad,
             frame_name=action.end_effector_frame,
             seed=q_seed,
-            maximum_joint_delta=self._maximum_joint_delta,
+            validation_start=validation_start,
+            maximum_joint_delta=self._maximum_cartesian_joint_delta,
             **solve_kwargs,
         )
         if not result.success:
@@ -640,6 +717,7 @@ class LegacyZerithRuntimeBackend:
         adapter: ZerithRobotAdapter,
         scenario: ScenarioSpec,
         planning_query: PlanningQuery | None = None,
+        maximum_cartesian_joint_delta: float | None = None,
     ):
         """Store the runtime and explicit generic object observation list."""
         self.runtime = runtime
@@ -651,6 +729,7 @@ class LegacyZerithRuntimeBackend:
             adapter.spec,
             planning_query=planning_query,
             maximum_joint_delta=runtime.max_joint_delta,
+            maximum_cartesian_joint_delta=maximum_cartesian_joint_delta,
         )
 
     @property
@@ -662,8 +741,10 @@ class LegacyZerithRuntimeBackend:
         """Reset runtime and translator state, then normalize observation."""
         self.runtime.reset()
         self.action_translator.reset()
+        observation = self._observation()
+        self.action_translator.update_from_observation(observation)
         distance, is_lower_bound = self._minimum_robot_signed_distance()
-        return self._observation(), {
+        return observation, {
             "control_updates": 0,
             "physics_steps_per_control": (
                 self.runtime.physics_steps_per_control
@@ -680,6 +761,7 @@ class LegacyZerithRuntimeBackend:
         """Translate and execute one typed action for one policy period."""
         if self.planning_query is not None:
             observation = self._observation()
+            self.action_translator.update_from_observation(observation)
             self.planning_query.set_observed_body_poses(
                 {
                     name: object_observation.pose
@@ -913,6 +995,7 @@ def make_legacy_zerith_online_environment(
     target_body_name: str = "base_link",
     episode_duration: float = 30.0,
     max_joint_delta: float = 0.1,
+    maximum_cartesian_joint_delta: float | None = None,
     planning_query: PlanningQuery | None = None,
     task: Task | None = None,
 ) -> OnlineManipulationEnv:
@@ -931,5 +1014,6 @@ def make_legacy_zerith_online_environment(
         adapter=adapter,
         scenario=scenario,
         planning_query=planning_query,
+        maximum_cartesian_joint_delta=maximum_cartesian_joint_delta,
     )
     return OnlineManipulationEnv(backend, task=task)
