@@ -1,6 +1,6 @@
 # Online Manipulation Environment Architecture
 
-Status: Implemented through Phase 8 API audit; physical PickLift pending
+Status: Physical PickLift validated; Phase 8 API boundaries retained
 Source of truth: `docs/ONLINE_ENV_REQUIREMENTS.md`
 
 ## 0. Migration Baseline
@@ -159,10 +159,13 @@ defaults.
 * task metrics；
 * finalization metadata。
 
-Phase 4 provides `NullTask` and `PickLiftTask`. PickLift owns only target
-observation identity, allowed gripper-target contacts, reward, success, and
-the lift/hold thresholds. Motion phases remain Policy state and are not part
-of Environment or Task evaluation.
+Phase 4 provides `NullTask` and `PickLiftTask`. PickLift owns target and
+support identity, the two distinct finger-contact identities, allowed
+contact pairs, reward, success, and lift/hold thresholds. Success requires
+bilateral target contact, no support or unexpected target contact, at least
+8 cm of lift, bounded target velocity, and a continuous 3 s stable hold.
+Motion phases remain Policy state and are not part of Environment or Task
+evaluation.
 
 ### Policy
 
@@ -175,11 +178,14 @@ checks a proposed direct edge through PlanningQuery, and only then sends typed
 online actions. Neither integration is imported by the environment core.
 
 The staged PickLift example waits for measured servo tracking and velocity to
-settle before each Cartesian command. APPROACH remains on the calibrated
-world-frame grasp axis; excessive lateral misalignment, overshoot, or an
-unexpectedly distant target changes the external policy to a failed hold
-state. These are state-machine safety guards, not evidence of a successful
-physical grasp.
+settle before each Cartesian command. `PickLiftPolicy` owns PREGRASP, ALIGN,
+APPROACH, CLOSE, VERIFY, LIFT, HOLD, and FAILED. ALIGN and APPROACH recompute
+bounded target-relative Cartesian increments from the latest observation at
+10 Hz. CLOSE uses only limited gripper actuation and measured bilateral
+contact. VERIFY issues bounded lift increments until physical support contact
+is absent, preventing a table-supported false positive. LIFT and HOLD fail on
+lost bilateral contact, support recontact, or any unexpected target contact.
+No phase mutates simulator state or attaches the target.
 
 ### PlanningQuery
 
@@ -201,10 +207,15 @@ dense edge checks, dual-layer clearance, pose IK with independent endpoint
 validation, and bounded differential-IK steps for online Cartesian commands.
 Before each online command, observed free-body poses are synchronized from the
 latest runtime observation into this separate context; fixed observed bodies
-remain at their independently loaded scene poses. A differential-IK result is
-globally scaled to preserve its joint-space direction, then the complete edge
-is densely checked. These queries do not run RRT, TOPPRA, or advance the real
-simulation context.
+remain at their independently loaded scene poses. Once bilateral contact is
+observed, the task supplies a planning-only carried-body relation. The query
+then checks the target together with the robot against the table and other
+environment geometry without welding or changing the physical Plant. Explicit
+finger-target and target-support contacts may have only the configured bounded
+penetration tolerance; all other pairs retain strict nonpenetration. A
+differential-IK result is globally scaled to preserve its joint-space
+direction, then the complete edge is densely checked. These queries do not
+run RRT, TOPPRA, or advance the real simulation context.
 
 ### EpisodeRunner
 
@@ -326,8 +337,8 @@ The DMD finalizer is deny-by-default: only `ObservedBodySpec(write_back=True)`
 free bodies are updated, and the input DMD is never overwritten. A
 Drake-independent adapter mock and the real Zerith adapter both have contract
 coverage. Retiring the compatibility runtime still requires an equivalent
-replacement regression. Physical APPROACH, CLOSE, LIFT, and stable bilateral
-grasp remain intentionally unvalidated.
+replacement regression. Physical APPROACH, CLOSE, VERIFY, LIFT, and a stable
+bilateral 8 cm-plus grasp have passed three consecutive full-reset episodes.
 
 An architecture regression scans the generic core for current robot and scene
 identifiers and rejects imports from the Zerith adapter. The deprecated local

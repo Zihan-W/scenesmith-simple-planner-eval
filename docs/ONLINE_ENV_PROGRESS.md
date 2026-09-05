@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
 Last updated: 2026-09-05
-Current phase: Phase 7 — Manual PREGRASP Acceptance Gate
+Current phase: Phase 7 — Physical PickLift Complete
 
 ## Product Goal
 
@@ -37,6 +37,9 @@ Current phase: Phase 7 — Manual PREGRASP Acceptance Gate
 * `5e155eb` Complete online environment API audit
 * `d5b8c8b` Report online action safety decisions
 * `64aec13` Expand action decision contract coverage
+* `73cc979` Make online Cartesian safety carry-aware
+* `f752c4d` Implement observation-driven physical PickLift
+* `d9e4e4a` Tune Zerith servos for physical grasping
 
 ## Current Validated State
 
@@ -51,10 +54,13 @@ Current phase: Phase 7 — Manual PREGRASP Acceptance Gate
 * PREGRASP manually accepted
 * PICK_HOME → PREGRASP direct edge validated
 * Online PREGRASP execution passed 3/3 resets
-* No robot penetration
+* Physical PickLift execution passed 3/3 independent resets
+* APPROACH is observation-driven at 10 Hz
+* CLOSE establishes distinct left- and right-finger contact
+* VERIFY rejects support-assisted lift
+* LIFT raises the target more than 8 cm and holds it for more than 3 s
+* Carried-target planning checks include table and environment geometry
 * No sustained torque saturation
-* Gripper remained open
-* Red box was not contacted or moved
 
 ## Current PREGRASP Metrics
 
@@ -83,6 +89,80 @@ Read from `output/zerith_pick_eval/*.json` on 2026-09-04:
 * Red-box translation during PREGRASP episode: `1.9876752782681098e-05 m`
 * Final gripper width: `0.07999975975522111 m`
 
+## Phase 7 Physical PickLift Results
+
+The accepted PREGRASP was followed by online ALIGN, APPROACH, CLOSE, VERIFY,
+LIFT, and HOLD phases. Every Cartesian increment was computed from the latest
+observation and submitted at the 10 Hz policy boundary. The implementation
+does not read a precomputed trajectory and does not weld, attach, teleport, or
+otherwise mutate the target during an episode.
+
+Formal regression command:
+
+```bash
+MPLCONFIGDIR=/tmp/matplotlib-cache PYTHONDONTWRITEBYTECODE=1 \
+.venv/bin/python -B scripts/run_zerith_online_example.py pick-lift \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml \
+    /root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000/package.xml \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/zerith_pick_eval/phase7_pick_lift_regression \
+  --episodes 3 \
+  --seed 100 \
+  --max-steps 1200 \
+  --maximum-joint-step 0.1 \
+  --maximum-cartesian-joint-step 0.02 \
+  --closed-width 0 \
+  --record-html \
+  --write-final-dmd
+```
+
+Seeds 100, 101, and 102 produced identical accepted results:
+
+* successful episodes: `3/3`
+* termination reason: `lift_held`
+* policy steps: `276`
+* simulated episode time: `27.6 s`
+* final target lift: `0.10297279002063764 m`
+* stable hold: `3.0999999999993832 s`
+* bilateral finger contact: `true`
+* support contact: `false`
+* unexpected target contacts: none
+* policy steps with torque saturation: `0`
+* minimum reported robot-related signed distance:
+  `-0.000006723019314256343 m`
+
+The accepted coupled inverse-dynamics servo uses the model effort limits with
+shoulder pitch/roll gains `(kp, kd) = (320, 36)`, shoulder yaw `(160, 26)`,
+elbow `(240, 32)`, wrist `(1000, 64)`, and finger `(2500, 100)`. These values
+were selected from physical contact regressions rather than by increasing
+global friction.
+
+The small negative signed distance is an allowed physical finger-target
+contact and is below the configured `0.0001 m` contact penetration bound; it
+is not an unlisted collision. Each episode directory contains `summary.json`,
+`trace.csv`, `simulation.html`, and `final.dmd.yaml` under
+`output/zerith_pick_eval/phase7_pick_lift_regression/`.
+
+Two earlier unsuccessful physical runs are retained under
+`output/zerith_pick_eval/phase7_pick_lift_diagnostics/`. Seed 80 records a
+contact-load tracking stall before servo-target rebasing. Seed 81 records a
+12.1 mm center lift that correctly failed because a box edge still contacted
+the table. Both failures terminated as `support_breakaway_timeout` and include
+`failure.json` and `trace.csv`.
+
+An independent external process also completed one direct public-policy
+period: reset seed 200, `HoldAction`, one `step()`, and exactly `0.1 s` of
+simulation. Its JSON and CSV are under
+`output/zerith_pick_eval/phase7_external_client_smoke/`.
+
+Validation completed after the physical regression:
+
+```text
+unittest discover: 64 passed
+public API contract tests: 9 passed
+```
+
 ## Phase 0 Audit
 
 All validated code was split into the three checkpoint commits listed above.
@@ -100,7 +180,8 @@ does not cover this repository.
 
 * `scripts/simulate_zerith_safe_pregrasp.py` is obsolete and must not be included in active entry points.
 * Earlier rail-zero PICK_HOME/PREGRASP results are obsolete.
-* APPROACH, CLOSE, VERIFY_GRASP and LIFT have not been validated.
+* Earlier pre-Phase-7 APPROACH and support-breakaway failures are retained as
+  diagnostics and are superseded by the three successful physical episodes.
 
 ## Phase 1 Public Contract
 
@@ -512,7 +593,7 @@ largest reported step error was `0.013955 rad`.
 * [x] Phase 4: implement Task, ContactPolicy and PlanningQuery
 * [x] Phase 5: implement EpisodeRunner and DMD finalizer
 * [x] Phase 6: add external policy, BT and TAMP examples
-* [ ] Phase 7: run PickLift integration test
+* [x] Phase 7: run PickLift integration test
 * [x] Phase 8: documentation, API audit and clean worktree
 
 ## Definition of Done Audit
@@ -534,8 +615,8 @@ largest reported step error was `0.013955 rad`.
 8. **Pass:** selective final-DMD write/reload has unit and real Drake evidence.
 9. **Pass:** Hold, JointStep, and PickLift policies remain outside environment
    core; BT and TAMP handoffs use the same typed action boundary.
-10. **Pending:** physical PickLift has not passed bilateral contact, 8 cm lift,
-    3 s hold, and three consecutive episodes.
+10. **Pass:** physical PickLift passed bilateral contact, more than 8 cm lift,
+    more than 3 s stable hold, and three consecutive full-reset episodes.
 11. **Pass:** tests, README, JSON, CSV, real Meshcat HTML, and final-DMD example
     commands and artifacts exist.
 12. **Pass:** milestone commits are separated and `git status --short` is empty
@@ -545,13 +626,12 @@ largest reported step error was `0.013955 rad`.
 
 * No trusted rail velocity or force parameters.
 * Robot portability has structural mock coverage but no second real adapter.
-* Physical PickLift has not yet been completed.
-* PREGRASP needs the requested manual front, side, and top-view acceptance
-  before any physical APPROACH or CLOSE command may run.
+* The current physical result is calibrated for the fixed-base, fixed-rail
+  Zerith pick scene; cross-scene and second-robot validation remain future
+  portability work.
 
 ## Next Action
 
-Present the open-gripper PREGRASP execution in Meshcat for manual front, side,
-and top-view acceptance. Do not issue APPROACH or CLOSE commands until that
-review is complete. After approval, resume Phase 7 with the final-centimeters
-online approach and bilateral-contact grasp test.
+Review the saved three-episode HTML and diagnostics. Further work should begin
+as a separate phase, such as online placement or a second robot adapter; it is
+not required for the completed PickLift acceptance gate.
