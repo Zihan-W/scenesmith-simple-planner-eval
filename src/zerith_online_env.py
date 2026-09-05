@@ -487,7 +487,11 @@ class ZerithOnlineEnv:
             self._simulator.get_mutable_context()
         )
 
-    def _set_initial_configuration(self, plant_context) -> None:
+    def _set_initial_configuration(
+        self,
+        plant_context,
+        initial_body_poses: Mapping[tuple[str, str], Pose] | None = None,
+    ) -> None:
         """Set episode initial state before Simulator.Initialize()."""
         positions = self.plant.GetPositions(plant_context).copy()
         for joint, value in zip(
@@ -503,7 +507,9 @@ class ZerithOnlineEnv:
         positions[self._gripper_joints[1].position_start()] = 0.0
         self.plant.SetPositions(plant_context, positions)
 
-        for (model_name, body_name), pose in self._initial_body_poses.items():
+        body_poses = dict(self._initial_body_poses)
+        body_poses.update(initial_body_poses or {})
+        for (model_name, body_name), pose in body_poses.items():
             model_instance = self.plant.GetModelInstanceByName(model_name)
             body = self.plant.GetBodyByName(body_name, model_instance)
             quaternion = np.asarray(pose.quaternion_wxyz, dtype=float)
@@ -525,7 +531,10 @@ class ZerithOnlineEnv:
                 continue
             joint.Lock(plant_context)
 
-    def reset(self) -> dict[str, Any]:
+    def reset(
+        self,
+        initial_body_poses: Mapping[tuple[str, str], Pose] | None = None,
+    ) -> dict[str, Any]:
         """Reset the episode and return the initial observation.
 
         State is assigned only before the new simulator is initialized; no
@@ -533,7 +542,7 @@ class ZerithOnlineEnv:
         """
         root_context = self.diagram.CreateDefaultContext()
         plant_context = self.plant.GetMyMutableContextFromRoot(root_context)
-        self._set_initial_configuration(plant_context)
+        self._set_initial_configuration(plant_context, initial_body_poses)
         self._desired_q_left = self._q_home.copy()
         self._desired_gripper_width = GRIPPER_MAX_OPENING
         self._done = False

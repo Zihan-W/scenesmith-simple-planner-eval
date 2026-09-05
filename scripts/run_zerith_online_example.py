@@ -17,6 +17,7 @@ from src.online_manipulation import (  # noqa: E402
     JointStepPolicyConfig,
     NullTask,
     ObservedBodySpec,
+    PlanarPoseRandomizationSpec,
     PickLiftPolicy,
     PickLiftPolicyConfig,
     PickLiftTask,
@@ -25,13 +26,10 @@ from src.online_manipulation import (  # noqa: E402
     ScenarioSpec,
     TimingConfig,
     VisualizationConfig,
-    build_planning_query,
-    run_episodes,
-)
-from src.online_manipulation.adapters.zerith import (  # noqa: E402
-    ZerithRobotAdapter,
-    make_legacy_zerith_online_environment,
+    ZerithEnvironmentConfig,
+    make_env,
     make_zerith_robot_spec,
+    run_episodes,
 )
 from src.zerith_robot_config import (  # noqa: E402
     PICK_RAIL_POSITION_METERS,
@@ -100,6 +98,18 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--lift-distance", type=float, default=0.1)
     parser.add_argument("--cartesian-step", type=float, default=0.003)
     parser.add_argument(
+        "--target-xy-jitter-m",
+        type=float,
+        default=0.0,
+        help="Symmetric reset-time target X/Y offset range.",
+    )
+    parser.add_argument(
+        "--target-yaw-jitter-deg",
+        type=float,
+        default=0.0,
+        help="Symmetric reset-time target yaw offset range in degrees.",
+    )
+    parser.add_argument(
         "--maximum-alignment-error",
         type=float,
         default=0.015,
@@ -161,6 +171,10 @@ def main() -> None:
     args = _parse_args()
     if args.episodes < 1:
         raise ValueError("episodes must be positive")
+    if args.target_xy_jitter_m < 0.0:
+        raise ValueError("target-xy-jitter-m must be nonnegative")
+    if args.target_yaw_jitter_deg < 0.0:
+        raise ValueError("target-yaw-jitter-deg must be nonnegative")
     pregrasp_json = (
         args.pregrasp_json.resolve()
         if args.pregrasp_json is not None
@@ -192,8 +206,19 @@ def main() -> None:
         rail_position=PICK_RAIL_POSITION_METERS,
         q_home_left=q_home,
     )
-    adapter = ZerithRobotAdapter(robot_spec)
     target_qualified_name = f"{TARGET_MODEL_NAME}::{TARGET_BODY_NAME}"
+    xy_jitter = args.target_xy_jitter_m
+    yaw_jitter = np.deg2rad(args.target_yaw_jitter_deg)
+    pose_randomizations = ()
+    if xy_jitter > 0.0 or yaw_jitter > 0.0:
+        pose_randomizations = (
+            PlanarPoseRandomizationSpec(
+                observation_name=TARGET_OBSERVATION_NAME,
+                x_offset_range_m=(-xy_jitter, xy_jitter),
+                y_offset_range_m=(-xy_jitter, xy_jitter),
+                yaw_offset_range_rad=(-yaw_jitter, yaw_jitter),
+            ),
+        )
     scenario = ScenarioSpec(
         dmd_path=args.scene_dmd.resolve(),
         package_xmls=(
@@ -208,6 +233,7 @@ def main() -> None:
                 write_back=True,
             ),
         ),
+        pose_randomizations=pose_randomizations,
         visualization=VisualizationConfig(
             enabled=args.meshcat or args.record_html,
             port=args.meshcat_port,
@@ -216,7 +242,6 @@ def main() -> None:
         output_directory=args.output_root.resolve(),
     )
 
-    planning_query = None
     task = NullTask()
     if args.policy == "hold":
         policy = HoldPolicy()
@@ -227,11 +252,6 @@ def main() -> None:
         )
         default_max_steps = 20
     else:
-        planning_query = build_planning_query(
-            scenario=scenario,
-            robot_adapter=adapter,
-            timing=timing,
-        )
         finger_bodies = tuple(
             f"{robot_spec.model_instance_name}::{name}"
             for name in (
@@ -277,19 +297,25 @@ def main() -> None:
         default_max_steps = 600
 
     max_steps = args.max_steps or default_max_steps
-    env = make_legacy_zerith_online_environment(
-        scenario=scenario,
-        adapter=adapter,
-        timing=timing,
-        target_model_name=TARGET_MODEL_NAME,
-        target_body_name=TARGET_BODY_NAME,
-        episode_duration=(max_steps + 1) * timing.policy_dt,
-        max_joint_delta=args.maximum_joint_step,
-        maximum_cartesian_joint_delta=(
-            args.maximum_cartesian_joint_step
+    env = make_env(
+        ZerithEnvironmentConfig(
+            scenario=scenario,
+            robot_model_dir=args.robot_model_dir.resolve(),
+            robot_xyz=ROBOT_BASE_XYZ_METERS,
+            robot_yaw_deg=ROBOT_BASE_YAW_DEG,
+            rail_position=PICK_RAIL_POSITION_METERS,
+            q_home_left=tuple(q_home),
+            timing=timing,
+            target_model_name=TARGET_MODEL_NAME,
+            target_body_name=TARGET_BODY_NAME,
+            episode_duration=(max_steps + 1) * timing.policy_dt,
+            max_joint_delta=args.maximum_joint_step,
+            maximum_cartesian_joint_delta=(
+                args.maximum_cartesian_joint_step
+            ),
+            task=task,
+            enable_planning_query=args.policy == "pick-lift",
         ),
-        planning_query=planning_query,
-        task=task,
     )
     if env.backend.runtime.meshcat is not None:
         print(f"Meshcat URL: {env.backend.runtime.meshcat.web_url()}")

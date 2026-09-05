@@ -93,6 +93,34 @@ class ObservedBodySpec:
 
 
 @dataclasses.dataclass(frozen=True)
+class PlanarPoseRandomizationSpec:
+    """Reset-time world-X/Y and yaw offsets for one observed free body."""
+
+    observation_name: str
+    x_offset_range_m: tuple[float, float] = (0.0, 0.0)
+    y_offset_range_m: tuple[float, float] = (0.0, 0.0)
+    yaw_offset_range_rad: tuple[float, float] = (0.0, 0.0)
+
+    def __post_init__(self) -> None:
+        """Validate finite, ordered offset ranges."""
+        if not self.observation_name:
+            raise ValueError("Randomized observation_name must be nonempty")
+        for name in (
+            "x_offset_range_m",
+            "y_offset_range_m",
+            "yaw_offset_range_rad",
+        ):
+            values = tuple(float(value) for value in getattr(self, name))
+            if len(values) != 2 or not all(
+                math.isfinite(value) for value in values
+            ):
+                raise ValueError(f"{name} must contain two finite values")
+            if values[0] > values[1]:
+                raise ValueError(f"{name} lower bound exceeds upper bound")
+            object.__setattr__(self, name, values)
+
+
+@dataclasses.dataclass(frozen=True)
 class ScenarioSpec:
     """Scene paths and runtime options independent of any robot or task.
 
@@ -107,6 +135,7 @@ class ScenarioSpec:
         default_factory=dict
     )
     observed_bodies: tuple[ObservedBodySpec, ...] = ()
+    pose_randomizations: tuple[PlanarPoseRandomizationSpec, ...] = ()
     contact_parameters: Mapping[str, float] = dataclasses.field(
         default_factory=dict
     )
@@ -130,6 +159,22 @@ class ScenarioSpec:
         if len(set(observation_names)) != len(observation_names):
             raise ValueError("Observed body names must be unique")
         object.__setattr__(self, "observed_bodies", observed_bodies)
+        randomizations = tuple(self.pose_randomizations)
+        randomized_names = tuple(
+            randomization.observation_name
+            for randomization in randomizations
+        )
+        if len(set(randomized_names)) != len(randomized_names):
+            raise ValueError("Pose randomization names must be unique")
+        unknown_randomizations = set(randomized_names) - set(
+            observation_names
+        )
+        if unknown_randomizations:
+            raise ValueError(
+                "Pose randomizations are not declared as observed bodies: "
+                f"{sorted(unknown_randomizations)}"
+            )
+        object.__setattr__(self, "pose_randomizations", randomizations)
         initial_object_poses = dict(self.initial_object_poses)
         unknown_initial_poses = (
             initial_object_poses.keys() - set(observation_names)

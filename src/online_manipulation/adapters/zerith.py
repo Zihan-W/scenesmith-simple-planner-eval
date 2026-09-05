@@ -1,5 +1,6 @@
 """Zerith-specific model, joint, gripper, and legacy-runtime adapter."""
 
+import dataclasses
 import math
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping, Sequence
@@ -33,7 +34,10 @@ from src.online_manipulation.observations import (
     RobotObservation,
     SpatialVelocity,
 )
-from src.online_manipulation.planning import PlanningQuery
+from src.online_manipulation.planning import (
+    PlanningQuery,
+    build_planning_query,
+)
 from src.online_manipulation.protocols import ContactPolicy, Task
 from src.online_manipulation.specs import (
     GripperSpec,
@@ -86,6 +90,40 @@ def _yaw_pose(xyz: Sequence[float], yaw_deg: float) -> Pose:
     return Pose(
         translation,
         (math.cos(half_yaw), 0.0, 0.0, math.sin(half_yaw)),
+    )
+
+
+def _planar_offset_pose(
+    pose: Pose,
+    *,
+    x_offset_m: float,
+    y_offset_m: float,
+    yaw_offset_rad: float,
+) -> Pose:
+    """Apply one world-frame planar reset offset to a public pose."""
+    quaternion = np.asarray(pose.quaternion_wxyz, dtype=float)
+    quaternion /= np.linalg.norm(quaternion)
+    yaw_quaternion = np.asarray(
+        (
+            math.cos(0.5 * yaw_offset_rad),
+            0.0,
+            0.0,
+            math.sin(0.5 * yaw_offset_rad),
+        )
+    )
+    left_w, left_xyz = yaw_quaternion[0], yaw_quaternion[1:]
+    right_w, right_xyz = quaternion[0], quaternion[1:]
+    rotated = np.concatenate((
+        [left_w * right_w - left_xyz @ right_xyz],
+        left_w * right_xyz
+        + right_w * left_xyz
+        + np.cross(left_xyz, right_xyz),
+    ))
+    translation = np.asarray(pose.translation_m, dtype=float)
+    translation[:2] += (x_offset_m, y_offset_m)
+    return Pose(
+        tuple(float(value) for value in translation),
+        tuple(float(value) for value in rotated),
     )
 
 
@@ -737,9 +775,43 @@ class LegacyZerithRuntimeBackend:
         """Expose legacy controller diagnostics during migration."""
         return self.runtime.control_log
 
-    def reset(self) -> tuple[Observation, dict]:
-        """Reset runtime and translator state, then normalize observation."""
+    def reset(
+        self,
+        rng: np.random.Generator,
+    ) -> tuple[Observation, dict]:
+        """Reset runtime, apply configured randomization, and normalize."""
         self.runtime.reset()
+        randomization = {}
+        if self.scenario.pose_randomizations:
+            nominal_observation = self._observation()
+            specs_by_name = {
+                spec.observation_name: spec
+                for spec in self.observed_bodies
+            }
+            body_pose_overrides = {}
+            for spec in self.scenario.pose_randomizations:
+                x_offset = float(rng.uniform(*spec.x_offset_range_m))
+                y_offset = float(rng.uniform(*spec.y_offset_range_m))
+                yaw_offset = float(rng.uniform(*spec.yaw_offset_range_rad))
+                pose = _planar_offset_pose(
+                    nominal_observation.objects[
+                        spec.observation_name
+                    ].pose,
+                    x_offset_m=x_offset,
+                    y_offset_m=y_offset,
+                    yaw_offset_rad=yaw_offset,
+                )
+                body_spec = specs_by_name[spec.observation_name]
+                body_pose_overrides[
+                    (body_spec.model_instance_name, body_spec.body_name)
+                ] = pose
+                randomization[spec.observation_name] = {
+                    "x_offset_m": x_offset,
+                    "y_offset_m": y_offset,
+                    "yaw_offset_rad": yaw_offset,
+                    "pose": pose.as_dict(),
+                }
+            self.runtime.reset(initial_body_poses=body_pose_overrides)
         self.action_translator.reset()
         observation = self._observation()
         self.action_translator.update_from_observation(observation)
@@ -751,6 +823,7 @@ class LegacyZerithRuntimeBackend:
             ),
             "minimum_collision_distance_m": distance,
             "minimum_collision_distance_is_lower_bound": is_lower_bound,
+            "episode_randomization": randomization,
         }
 
     def step(
@@ -1017,3 +1090,98 @@ def make_legacy_zerith_online_environment(
         maximum_cartesian_joint_delta=maximum_cartesian_joint_delta,
     )
     return OnlineManipulationEnv(backend, task=task)
+
+
+@dataclasses.dataclass(frozen=True)
+class ZerithEnvironmentConfig:
+    """Public composition config for the current Zerith runtime adapter."""
+
+    scenario: ScenarioSpec
+    robot_model_dir: Path
+    robot_xyz: tuple[float, float, float]
+    robot_yaw_deg: float
+    rail_position: float
+    q_home_left: tuple[float, ...]
+    timing: TimingConfig = dataclasses.field(default_factory=TimingConfig)
+    episode_duration: float = 30.0
+    max_joint_delta: float = 0.1
+    maximum_cartesian_joint_delta: float | None = None
+    target_model_name: str | None = None
+    target_body_name: str = "base_link"
+    task: Task | None = None
+    enable_planning_query: bool = False
+
+    def __post_init__(self) -> None:
+        """Normalize paths and sequences and validate runtime limits."""
+        object.__setattr__(self, "robot_model_dir", Path(self.robot_model_dir))
+        object.__setattr__(
+            self,
+            "robot_xyz",
+            tuple(float(value) for value in self.robot_xyz),
+        )
+        object.__setattr__(
+            self,
+            "q_home_left",
+            tuple(float(value) for value in self.q_home_left),
+        )
+        if len(self.robot_xyz) != 3:
+            raise ValueError("robot_xyz must contain three values")
+        if len(self.q_home_left) != len(LEFT_ARM_SERVO_CONFIGS):
+            raise ValueError("q_home_left must contain seven values")
+        scalars = (
+            self.robot_yaw_deg,
+            self.rail_position,
+            self.episode_duration,
+            self.max_joint_delta,
+        )
+        if not all(math.isfinite(value) for value in scalars):
+            raise ValueError("Zerith environment values must be finite")
+        if self.episode_duration <= 0.0 or self.max_joint_delta <= 0.0:
+            raise ValueError("Episode duration and joint delta must be positive")
+        if (
+            self.maximum_cartesian_joint_delta is not None
+            and (
+                not math.isfinite(self.maximum_cartesian_joint_delta)
+                or self.maximum_cartesian_joint_delta <= 0.0
+            )
+        ):
+            raise ValueError(
+                "maximum_cartesian_joint_delta must be positive"
+            )
+        if not self.target_body_name:
+            raise ValueError("target_body_name must be nonempty")
+
+    def build_environment(self) -> OnlineManipulationEnv:
+        """Build the public environment without exposing Drake internals."""
+        adapter = ZerithRobotAdapter(
+            make_zerith_robot_spec(
+                robot_model_dir=self.robot_model_dir,
+                robot_xyz=self.robot_xyz,
+                robot_yaw_deg=self.robot_yaw_deg,
+                rail_position=self.rail_position,
+                q_home_left=self.q_home_left,
+            )
+        )
+        planning_query = (
+            build_planning_query(
+                scenario=self.scenario,
+                robot_adapter=adapter,
+                timing=self.timing,
+            )
+            if self.enable_planning_query
+            else None
+        )
+        return make_legacy_zerith_online_environment(
+            scenario=self.scenario,
+            adapter=adapter,
+            timing=self.timing,
+            target_model_name=self.target_model_name,
+            target_body_name=self.target_body_name,
+            episode_duration=self.episode_duration,
+            max_joint_delta=self.max_joint_delta,
+            maximum_cartesian_joint_delta=(
+                self.maximum_cartesian_joint_delta
+            ),
+            planning_query=planning_query,
+            task=self.task,
+        )

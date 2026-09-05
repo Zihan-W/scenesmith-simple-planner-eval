@@ -32,6 +32,7 @@ from src.online_manipulation.planning import (
     PlanningQuery,
     build_planning_query,
 )
+from src.online_manipulation.factory import make_env
 from src.online_manipulation.policies import (
     HoldPolicy,
     JointStepPolicy,
@@ -48,6 +49,7 @@ from src.online_manipulation.environment import OnlineManipulationEnv
 from src.online_manipulation.dmd_finalizer import write_updated_dmd
 from src.online_manipulation.protocols import (
     ContactPolicy,
+    EnvironmentConfig,
     OnlineEnvironment,
     Policy,
     RobotAdapter,
@@ -58,6 +60,7 @@ from src.online_manipulation.specs import (
     GripperSpec,
     JointSpec,
     ObservedBodySpec,
+    PlanarPoseRandomizationSpec,
     RobotSpec,
     ScenarioSpec,
     TimingConfig,
@@ -67,6 +70,11 @@ from src.online_manipulation.tasks import (
     NullTask,
     PickLiftTask,
     PickLiftTaskConfig,
+)
+from src.online_manipulation.adapters.zerith import (
+    ZerithEnvironmentConfig,
+    ZerithRobotAdapter,
+    make_zerith_robot_spec,
 )
 
 PUBLIC_API_VERSION = "0.1"
@@ -83,6 +91,7 @@ __all__ = [
     "ConfigurationCheck",
     "DifferentialIkResult",
     "EdgeCheck",
+    "EnvironmentConfig",
     "EpisodeResult",
     "FREE_MOTION_CONTACT_POLICY",
     "GripperAction",
@@ -102,6 +111,7 @@ __all__ = [
     "OnlineManipulationEnv",
     "OnlineEnvironment",
     "PairContactPolicy",
+    "PlanarPoseRandomizationSpec",
     "PickLiftTask",
     "PickLiftTaskConfig",
     "PickLiftPolicy",
@@ -109,6 +119,8 @@ __all__ = [
     "Policy",
     "PlanningQuery",
     "build_planning_query",
+    "make_env",
+    "make_zerith_robot_spec",
     "write_updated_dmd",
     "run_episode",
     "run_episodes",
@@ -123,4 +135,6 @@ __all__ = [
     "TaskEvaluation",
     "TimingConfig",
     "VisualizationConfig",
+    "ZerithEnvironmentConfig",
+    "ZerithRobotAdapter",
 ]

@@ -58,8 +58,10 @@ class _FakeRuntimeBackend:
     def __init__(self) -> None:
         self.time_s = 0.0
         self.actions = []
+        self.reset_sample = None
 
-    def reset(self):
+    def reset(self, rng):
+        self.reset_sample = int(rng.integers(1_000_000))
         self.time_s = 0.0
         self.actions.clear()
         return _observation(self.time_s), {"backend_reset": True}
@@ -90,6 +92,17 @@ class OnlineManipulationEnvTest(unittest.TestCase):
         self.assertEqual(info["task_reset"], {"task_name": "null"})
         self.assertEqual(observation.task["task_name"], "null")
 
+    def test_reset_seed_controls_backend_randomization(self) -> None:
+        backend = _FakeRuntimeBackend()
+        env = OnlineManipulationEnv(backend)
+        env.reset(seed=29)
+        first_sample = backend.reset_sample
+        env.step(HoldAction())
+        env.reset(seed=29)
+        self.assertEqual(backend.reset_sample, first_sample)
+        env.reset(seed=30)
+        self.assertNotEqual(backend.reset_sample, first_sample)
+
     def test_step_forwards_typed_action_and_reports_truncation(self) -> None:
         backend = _FakeRuntimeBackend()
         env = OnlineManipulationEnv(backend)
@@ -119,7 +132,8 @@ class OnlineManipulationEnvTest(unittest.TestCase):
         class LiftBackend(_FakeRuntimeBackend):
             """Expose a target lifted after the first policy step."""
 
-            def reset(self):
+            def reset(self, rng):
+                del rng
                 self.time_s = 0.0
                 self.actions.clear()
                 return _observation(0.0, target_height_m=0.5), {}
@@ -176,7 +190,8 @@ class OnlineManipulationEnvTest(unittest.TestCase):
         class SupportedLiftBackend(_FakeRuntimeBackend):
             """Expose a lifted target that remains supported by the table."""
 
-            def reset(self):
+            def reset(self, rng):
+                del rng
                 self.time_s = 0.0
                 self.actions.clear()
                 return _observation(0.0, target_height_m=0.5), {}

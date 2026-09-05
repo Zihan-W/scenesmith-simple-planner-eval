@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="portable_test_box">
+    <link name="base_link">
+      <inertial>
+        <mass>0.2</mass>
+        <inertia>
+          <ixx>0.0003333333</ixx>
+          <iyy>0.0003333333</iyy>
+          <izz>0.0003333333</izz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <box><size>0.1 0.1 0.1</size></box>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.6 0.9 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <box><size>0.1 0.1 0.1</size></box>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

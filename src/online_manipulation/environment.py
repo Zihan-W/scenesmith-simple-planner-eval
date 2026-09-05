@@ -15,7 +15,10 @@ from src.online_manipulation.tasks import NullTask
 class RuntimeBackend(Protocol):
     """Internal bridge implemented by a concrete Drake runtime."""
 
-    def reset(self) -> tuple[Observation, dict]:
+    def reset(
+        self,
+        rng: np.random.Generator,
+    ) -> tuple[Observation, dict]:
         """Reset backend state and return a normalized observation."""
 
     def step(
@@ -70,7 +73,7 @@ class OnlineManipulationEnv:
     def reset(self, seed: int | None = None) -> tuple[Observation, dict]:
         """Reset all runtime state and record the caller-provided seed."""
         self._rng = np.random.default_rng(seed)
-        observation, info = self._backend.reset()
+        observation, info = self._backend.reset(self._rng)
         self._observation = observation
         task_reset = self._task.reset(self, self._rng)
         self._observation = dataclasses.replace(

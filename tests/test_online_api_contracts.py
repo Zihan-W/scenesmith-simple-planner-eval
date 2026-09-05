@@ -9,6 +9,7 @@ from src.online_manipulation import (
     PUBLIC_API_VERSION,
     CompositeAction,
     ContactObservation,
+    EnvironmentConfig,
     GripperAction,
     GripperSpec,
     HoldAction,
@@ -17,6 +18,8 @@ from src.online_manipulation import (
     ObjectObservation,
     ObservedBodySpec,
     Observation,
+    OnlineEnvironment,
+    PlanarPoseRandomizationSpec,
     Pose,
     RobotAdapter,
     RobotObservation,
@@ -26,6 +29,7 @@ from src.online_manipulation import (
     Task,
     TaskEvaluation,
     TimingConfig,
+    make_env,
 )
 
 
@@ -90,6 +94,117 @@ class _FakeAdapter:
 
     def gripper_position_targets(self, width_m: float):
         return {"finger_left": -0.5 * width_m, "finger_right": 0.5 * width_m}
+
+
+class _ThreeJointMockAdapter:
+    """RobotAdapter proving the contract has no seven-axis assumption."""
+
+    def __init__(self) -> None:
+        joints = tuple(
+            JointSpec(
+                f"axis_{index}",
+                "revolute",
+                -1.0,
+                1.0,
+                2.0,
+                3.0,
+                10.0,
+                2.0,
+            )
+            for index in range(3)
+        )
+        self._spec = RobotSpec(
+            name="three_axis_mock",
+            model_instance_name="three_axis_model",
+            package_name="three_axis_package",
+            model_path=Path("models/mock/three_axis.urdf"),
+            base_link_name="root",
+            base_pose=_pose(),
+            controlled_joints=joints,
+            locked_joint_positions={},
+            end_effector_frame_name="tip",
+            home_positions=(0.0, 0.0, 0.0),
+            gripper=None,
+        )
+
+    @property
+    def spec(self) -> RobotSpec:
+        return self._spec
+
+    def add_model(self, parser):
+        del parser
+        return "three_axis_model"
+
+    def configure_model(self, plant, model_instance) -> None:
+        del plant, model_instance
+
+    def initialize_state(self, plant, plant_context, model_instance) -> None:
+        del plant, plant_context, model_instance
+
+    def make_robot_observation(
+        self,
+        plant,
+        plant_context,
+        model_instance,
+        controller_state,
+    ) -> RobotObservation:
+        del plant, plant_context, model_instance, controller_state
+        pose = _pose()
+        twist = _twist()
+        return RobotObservation(
+            joint_names=self.spec.controlled_joint_names,
+            q=(0.0, 0.0, 0.0),
+            v=(0.0, 0.0, 0.0),
+            q_commanded=(0.0, 0.0, 0.0),
+            torque_commanded=(0.0, 0.0, 0.0),
+            torque_applied=(0.0, 0.0, 0.0),
+            torque_saturated=(False, False, False),
+            end_effector_pose=pose,
+            end_effector_twist=twist,
+        )
+
+    def gripper_position_targets(self, width_m: float):
+        del width_m
+        return {}
+
+
+class _PublicEnvironment:
+    """Small environment returned by the public composition contract."""
+
+    def reset(self, seed=None):
+        return Observation(0.0, _robot_observation(), {}, (), {}), {
+            "seed": seed,
+        }
+
+    def step(self, action):
+        del action
+        return (
+            Observation(0.1, _robot_observation(), {}, (), {}),
+            0.0,
+            False,
+            False,
+            {},
+        )
+
+    def write_updated_scenario(self, output_path):
+        del output_path
+        return ()
+
+    def finalize_episode(self):
+        return {"success": False}
+
+    def start_recording(self):
+        return None
+
+    def save_recording(self, output_path):
+        del output_path
+
+
+class _PublicEnvironmentConfig:
+    """Minimal EnvironmentConfig implementation for factory testing."""
+
+    def build_environment(self):
+        return _PublicEnvironment()
 
 
 class _AllowNone:
@@ -179,6 +294,34 @@ class PublicContractTest(unittest.TestCase):
         self.assertIsInstance(_FakeAdapter(), RobotAdapter)
         self.assertIsInstance(_FakeTask(), Task)
 
+    def test_mock_adapter_has_arbitrary_dofs_and_no_gripper(self) -> None:
+        adapter = _ThreeJointMockAdapter()
+        self.assertIsInstance(adapter, RobotAdapter)
+        self.assertEqual(adapter.spec.controlled_joint_names, (
+            "axis_0",
+            "axis_1",
+            "axis_2",
+        ))
+        self.assertIsNone(adapter.spec.gripper)
+        self.assertEqual(
+            len(adapter.make_robot_observation(None, None, None, {}).q),
+            3,
+        )
+
+    def test_make_env_accepts_only_the_public_config_contract(self) -> None:
+        config = _PublicEnvironmentConfig()
+        self.assertIsInstance(config, EnvironmentConfig)
+        env = make_env(config)
+        self.assertIsInstance(env, OnlineEnvironment)
+        observation, info = env.reset(seed=0)
+        action = HoldAction()
+        observation, reward, terminated, truncated, _ = env.step(action)
+        self.assertEqual(info["seed"], 0)
+        self.assertAlmostEqual(observation.time_s, 0.1)
+        self.assertEqual(reward, 0.0)
+        self.assertFalse(terminated)
+        self.assertFalse(truncated)
+
     def test_observation_uses_generic_object_mapping(self) -> None:
         observation = Observation(
             time_s=0.1,
@@ -211,6 +354,23 @@ class PublicContractTest(unittest.TestCase):
             ),
         )
         self.assertEqual(scenario.initial_object_poses["object"], _pose())
+
+    def test_pose_randomization_requires_a_declared_observed_body(self):
+        randomization = PlanarPoseRandomizationSpec(
+            observation_name="object",
+            x_offset_range_m=(-0.01, 0.01),
+        )
+        with self.assertRaisesRegex(ValueError, "observed bodies"):
+            ScenarioSpec(
+                dmd_path=Path("scene.dmd.yaml"),
+                pose_randomizations=(randomization,),
+            )
+        scenario = ScenarioSpec(
+            dmd_path=Path("scene.dmd.yaml"),
+            observed_bodies=(ObservedBodySpec("object", "model", "body"),),
+            pose_randomizations=(randomization,),
+        )
+        self.assertEqual(scenario.pose_randomizations, (randomization,))
 
 
 if __name__ == "__main__":

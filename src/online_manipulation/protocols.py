@@ -142,3 +142,11 @@ class OnlineEnvironment(Protocol):
 
     def save_recording(self, output_path: Path) -> None:
         """Save the active visualization recording."""
+
+
+@runtime_checkable
+class EnvironmentConfig(Protocol):
+    """Public composition-root contract consumed by ``make_env``."""
+
+    def build_environment(self) -> OnlineEnvironment:
+        """Build and return one environment through public configuration."""

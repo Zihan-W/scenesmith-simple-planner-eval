@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>online_env_minimal_scene</name>
+  <version>0.1.0</version>
+  <description>Portable minimal scene for online environment handoff tests.</description>
+  <maintainer email="noreply@example.com">SceneSmith</maintainer>
+  <license>BSD-3-Clause</license>
+</package>
