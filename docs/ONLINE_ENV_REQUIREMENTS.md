@@ -1,7 +1,7 @@
 # Online Manipulation Environment Requirements
 
 Status: Accepted implementation requirements
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-06
 
 你现在的任务不是继续开发一个写死的红盒抓取脚本，而是完成一个可交付给其他同事使用的在线机器人仿真环境。
 
@@ -14,12 +14,7 @@ Last reviewed: 2026-09-04
 实现位于 Drake 与上层策略之间的通用执行层：
 
 ```python
-env = OnlineManipulationEnv(
-    scenario=scenario_spec,
-    robot=robot_spec,
-    task=task_spec,
-    timing=timing_config,
-)
+env = make_env(config)
 
 obs, info = env.reset(seed=0)
 
@@ -307,6 +302,8 @@ result = run_episode(
 * 多 episode；
 * 每次完整 reset；
 * 结果目录不互相覆盖。
+* reset-time 随机化由 seed 确定并写入结果；
+* 固定初态重复性和随机扰动鲁棒性分别汇总，不能混用一个指标。
 
 这将作为后续 benchmark 的基础。
 
@@ -358,6 +355,10 @@ class MyPolicy:
 * 如何批量运行 benchmark；
 * 如何保存最终 DMD。
 
+还必须提供一个可从仓库外工作目录运行的示例。该示例只允许从
+`src.online_manipulation` 公共入口导入，不得读取 Drake Context、内部关节
+索引或 runtime/backend 私有对象。
+
 不要实现完整 BT 或 TAMP，只提供稳定接口和最小接入示例。
 
 ## 十、Definition of Done
@@ -376,6 +377,8 @@ class MyPolicy:
 10. PickLift 作为端到端物理测试运行；
 11. 测试、README、JSON/CSV/HTML 示例齐全；
 12. Git 提交清晰且最终工作树干净。
+13. 第二个可复现场景无需修改 Environment 源码即可运行。
+14. MockRobotAdapter 证明核心不假定 7 轴、Zerith link、夹爪或固定动作维度。
 
 优先级始终是：
 

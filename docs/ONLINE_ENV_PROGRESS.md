@@ -1,7 +1,7 @@
 # Online Manipulation Environment Progress
 
-Last updated: 2026-09-05
-Current phase: Phase 7 — Physical PickLift Complete
+Last updated: 2026-09-06
+Current phase: Phase 8 — Handoff and Portability Validated
 
 ## Product Goal
 
@@ -40,6 +40,8 @@ Current phase: Phase 7 — Physical PickLift Complete
 * `73cc979` Make online Cartesian safety carry-aware
 * `f752c4d` Implement observation-driven physical PickLift
 * `d9e4e4a` Tune Zerith servos for physical grasping
+* `d898456` Add portable seeded environment composition
+* `52202b5` Validate benchmark and DMD portability
 
 ## Current Validated State
 
@@ -55,6 +57,8 @@ Current phase: Phase 7 — Physical PickLift Complete
 * PICK_HOME → PREGRASP direct edge validated
 * Online PREGRASP execution passed 3/3 resets
 * Physical PickLift execution passed 3/3 independent resets
+* Physical PickLift visual review accepted on 2026-09-06 with no observed
+  visual anomalies
 * APPROACH is observation-driven at 10 Hz
 * CLOSE establishes distinct left- and right-finger contact
 * VERIFY rejects support-assisted lift
@@ -162,6 +166,11 @@ Validation completed after the physical regression:
 unittest discover: 64 passed
 public API contract tests: 9 passed
 ```
+
+The saved PickLift Meshcat recording was manually reviewed on 2026-09-06.
+The approach, bilateral grasp, support breakaway, lift, and stable hold were
+accepted with no visual anomaly. This closes the Phase 7 manual acceptance
+gate; Phase 8 does not add PLACE or any new grasp motion.
 
 ## Phase 0 Audit
 
@@ -451,7 +460,7 @@ settling, calibrated-axis motion, and rejection without a close command.
 This checkpoint only validates policy logic. It has not been executed past
 PREGRASP in the physical Drake scene and makes no PickLift success claim.
 
-## Phase 8 API Audit
+## Pre-Phase-8 API Audit
 
 Scenario initialization is now effective rather than declarative. Initial
 free-body poses are keyed by public observation name and applied consistently
@@ -513,6 +522,147 @@ SCENE_ROOT=/root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000
   output/online_examples/phase8_artifacts/episode_000_seed_41/final.dmd.yaml \
   --scene-package-xml "$SCENE_ROOT/package.xml" \
   --duration 3
+```
+
+## Phase 8 Handoff and Portability Validation
+
+The Phase 7 PickLift recording received manual visual acceptance on
+2026-09-06. No visual anomaly was observed during approach, bilateral grasp,
+support breakaway, lift, or stable hold. This result was recorded before
+starting Phase 8.
+
+### Architecture and public caller
+
+Five automated boundary tests verify that generic Environment, controller,
+runner, planning, protocol, and specification modules contain no current
+scene identifiers, Zerith joint/link/gripper identifiers, or PickLift stage
+state. PickLift stages remain in `PickLiftPolicy`; target and contact success
+rules remain in `PickLiftTask`. The legacy robot-specific runtime remains
+behind `LegacyZerithRuntimeBackend` and is documented as a migration boundary,
+not as public Environment API.
+
+`make_env(config)` and the `EnvironmentConfig` protocol are now public.
+`examples/online_manipulation/public_api_client.py` imports only
+`src.online_manipulation`. It was run from `/tmp`, outside the repository,
+against `models/online_env_minimal_scene/scene.dmd.yaml`:
+
+```text
+seed=0
+action=HoldAction
+simulation_time_s=0.10000000000000002
+joint_count=9
+objects=[portable_object]
+action_status=accepted
+```
+
+The portable scene uses only package URIs and repository-owned files. It ran
+`ZerithRobotAdapter + NullTask + HoldPolicy` without an Environment source
+change.
+
+### RobotAdapter and reset contracts
+
+A three-joint, gripper-free `MockRobotAdapter` passes the runtime-checkable
+RobotAdapter contract. Its observation and action dimensions are derived from
+its RobotSpec, not from a seven-joint constant or a Zerith link name. This is
+structural portability evidence; no second physical robot adapter or IIWA
+dynamics smoke is claimed.
+
+Real-Drake tests on the portable scene verify that:
+
+* resetting twice with the same seed restores robot state, held controller
+  targets, and the free-body pose exactly;
+* a different seed changes the configured X/Y/yaw target randomization and
+  observed initial pose;
+* randomization is applied only before Simulator initialization;
+* two headless episodes get isolated directories and complete aggregate files;
+* machine-readable unsuccessful episodes retain `termination_reason` and
+  `failure.json`.
+
+### Benchmark evidence
+
+Fixed-initial-state PickLift command:
+
+```bash
+MPLCONFIGDIR=/tmp/scenesmith-mpl PYTHONDONTWRITEBYTECODE=1 \
+.venv/bin/python -B scripts/run_zerith_online_example.py pick-lift \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml \
+    /root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000/package.xml \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/online_env_phase8/fixed_pick_lift \
+  --episodes 3 --seed 300 --max-steps 1200 \
+  --maximum-joint-step 0.1 --maximum-cartesian-joint-step 0.02 \
+  --closed-width 0 --record-html --write-final-dmd
+```
+
+The root aggregate declares `evaluation_mode=fixed_initial_state`. Seeds 300,
+301, and 302 produced identical results:
+
+* success: `3/3`, reason `lift_held`;
+* policy steps: `276` each;
+* target lift: `0.10297279002063764 m`;
+* stable hold: `3.0999999999993832 s`;
+* bilateral contact true, support contact false, no unexpected contacts;
+* torque-saturated policy steps: `0`;
+* minimum robot-related signed distance: `-6.723019314256343e-06 m`.
+
+Each fixed episode contains `summary.json`, `trace.csv`, `simulation.html`,
+and `final.dmd.yaml`. The root contains `benchmark_episodes.csv` and
+`benchmark_summary.json`.
+
+Randomized-initial-state PickLift command:
+
+```bash
+MPLCONFIGDIR=/tmp/scenesmith-mpl PYTHONDONTWRITEBYTECODE=1 \
+.venv/bin/python -B scripts/run_zerith_online_example.py pick-lift \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml \
+    /root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000/package.xml \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/online_env_phase8/randomized_pick_lift \
+  --episodes 3 --seed 400 --max-steps 1200 \
+  --maximum-joint-step 0.1 --maximum-cartesian-joint-step 0.02 \
+  --closed-width 0 --target-xy-jitter-m 0.003 \
+  --target-yaw-jitter-deg 2 --write-final-dmd
+```
+
+The root aggregate declares `evaluation_mode=randomized_initial_state`.
+This result is reported separately from fixed-state repeatability:
+
+* success: `2/3`;
+* seed 400: X `-1.805 mm`, Y `+0.671 mm`, yaw `+1.909°`, success in 302 steps;
+* seed 401: X `+1.160 mm`, Y `-0.692 mm`, yaw `-1.767°`, success in 290 steps;
+* seed 402: X `-1.411 mm`, Y `+2.213 mm`, yaw `-1.033°`, failed in VERIFY;
+* both successes lifted more than 10.26 cm and held for 3.1 s with no torque
+  saturation, support contact, or unexpected target contact.
+
+Seed 402 correctly terminated as
+`policy_failed:support_breakaway_timeout`. It retained bilateral finger
+contact but lifted the box center only `5.414 mm`; coffee-table support contact
+remained present through all 100 VERIFY steps. Of those steps, 84 upward
+Cartesian commands were rejected by the planning nonpenetration guard. The
+worst recorded proposed-edge distance was `-0.217087 mm`, exceeding the
+configured `0.1 mm` allowed-contact penetration. Fifteen steps were accepted
+with joint-delta scaling and no torque saturation. The current EdgeCheck trace
+does not identify the nearest geometry pair, so pair-level attribution remains
+unverified. The failure is preserved in `failure.json`, `trace.csv`, and the
+final DMD; no friction, attachment, pose teleport, or success threshold was
+changed to hide it.
+
+### DMD finalizer and test suite
+
+A real-Drake round-trip test writes the randomized portable free body to a new
+DMD, verifies the input bytes are unchanged, rebuilds an environment from the
+output DMD, and recovers the same world translation and quaternion. Only
+`ObservedBodySpec(write_back=True)` bodies are eligible.
+
+Final validation on 2026-09-06:
+
+```text
+unittest discover: 77 passed
+public API contract tests: 12 passed
+architecture boundary tests: 5 passed
+real handoff/portability tests: 4 passed
 ```
 
 ## Phase 0 Reproducible Commands
@@ -617,21 +767,24 @@ largest reported step error was `0.013955 rad`.
    core; BT and TAMP handoffs use the same typed action boundary.
 10. **Pass:** physical PickLift passed bilateral contact, more than 8 cm lift,
     more than 3 s stable hold, and three consecutive full-reset episodes.
-11. **Pass:** tests, README, JSON, CSV, real Meshcat HTML, and final-DMD example
-    commands and artifacts exist.
+11. **Pass:** 77 tests, README, JSON, CSV, real Meshcat HTML, aggregate files,
+    failure diagnostics, and final-DMD artifacts exist.
 12. **Pass:** milestone commits are separated and `git status --short` is empty
     after documentation commit.
 
 ## Current Blockers
 
 * No trusted rail velocity or force parameters.
-* Robot portability has structural mock coverage but no second real adapter.
-* The current physical result is calibrated for the fixed-base, fixed-rail
-  Zerith pick scene; cross-scene and second-robot validation remain future
-  portability work.
+* Robot portability has three-joint, gripper-free structural mock coverage but
+  no second real adapter or IIWA dynamics smoke.
+* The portable second DMD is validated with NullTask/HoldPolicy. Physical
+  PickLift remains calibrated for the fixed-base, fixed-rail Zerith scene.
+* The ±3 mm XY / ±2° yaw randomized PickLift result is 2/3. Seed 402 exposes a
+  planning nonpenetration rejection during support breakaway; the exact nearest
+  geometry pair is not currently present in EdgeCheck diagnostics.
 
 ## Next Action
 
-Review the saved three-episode HTML and diagnostics. Further work should begin
-as a separate phase, such as online placement or a second robot adapter; it is
-not required for the completed PickLift acceptance gate.
+Await final Phase 8 human confirmation. Do not create `online-env-v0.1` yet.
+PLACE, mobile-base control, rail dynamics, a second real RobotAdapter, and
+broader randomized robustness belong to later phases.

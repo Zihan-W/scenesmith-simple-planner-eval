@@ -191,9 +191,9 @@ height can be rejected because the right wrist intersects the table even when
 the left-arm solve itself is well conditioned.
 
 > **Calibration status:** This task fixes `daogui_joint=0.4 m`. PREGRASP and
-> the online path are validated only up to the open-gripper PREGRASP pose;
-> APPROACH, gripper closure, and grasp execution are intentionally out of
-> scope.
+> the physical online APPROACH, CLOSE, VERIFY, LIFT, and three-second HOLD
+> have passed three independent resets. PLACE, mobile-base control, and rail
+> dynamics remain out of scope.
 
 First search the generic collision-regression posture `q_safe_home`:
 
@@ -295,6 +295,23 @@ object with `reset()` and `act()` methods; it does not receive a Drake Context
 and does not modify the environment:
 
 ```python
+from src.online_manipulation import HoldPolicy, make_env
+
+env = make_env(config)
+observation, info = env.reset(seed=0)
+policy = HoldPolicy()
+policy.reset(observation, info)
+observation, reward, terminated, truncated, info = env.step(
+    policy.act(observation)
+)
+```
+
+[`examples/online_manipulation/public_api_client.py`](examples/online_manipulation/public_api_client.py)
+is a repository-external-style client: it uses only public imports and runs a
+portable second DMD without accessing Drake Context, private backends, or
+joint indices.
+
+```python
 from src.online_manipulation import JointDeltaAction, run_episode
 
 
@@ -360,7 +377,27 @@ python -B scripts/run_zerith_online_example.py joint-step \
 Each episode gets a distinct directory containing `summary.json` and
 `trace.csv`. Add `--record-html` for `simulation.html` and
 `--write-final-dmd` for a reloadable `final.dmd.yaml`. Output directories are
-never silently overwritten.
+never silently overwritten. Batch roots also contain
+`benchmark_episodes.csv` and `benchmark_summary.json`.
+
+Use separate roots for fixed-state repeatability and randomized robustness.
+The runner labels each aggregate `fixed_initial_state` or
+`randomized_initial_state`. For example, the following samples the target once
+per reset using the episode seed:
+
+```bash
+python -B scripts/run_zerith_online_example.py pick-lift \
+  output/zerith_pick_eval/zerith_pick_eval.dmd.yaml \
+  --scene-package-xml <scene-root>/package.xml \
+  --pick-home-json output/zerith_pick_eval/pick_home.json \
+  --output-root output/randomized_pick_lift \
+  --episodes 3 --seed 400 \
+  --target-xy-jitter-m 0.003 --target-yaw-jitter-deg 2
+```
+
+The sampled offsets and resulting object pose are stored in `reset_info`;
+randomization occurs before simulator initialization and never teleports an
+object during `step()`.
 
 ### Behavior Tree tick
 

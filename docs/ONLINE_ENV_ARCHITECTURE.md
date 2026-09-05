@@ -1,6 +1,6 @@
 # Online Manipulation Environment Architecture
 
-Status: Physical PickLift validated; Phase 8 API boundaries retained
+Status: Phase 8 handoff and portability validated
 Source of truth: `docs/ONLINE_ENV_REQUIREMENTS.md`
 
 ## 0. Migration Baseline
@@ -46,6 +46,22 @@ with `PUBLIC_API_VERSION = "0.1"`. Version 0.1 is additive: the existing
 `ZerithOnlineEnv` entry points remain supported while the new environment
 delegates to them through an Adapter. Compatibility code may be removed only
 after the real Adapter regression covers the existing PREGRASP behavior.
+
+Phase 8 adds one public composition root:
+
+```python
+from src.online_manipulation import make_env
+
+env = make_env(config)
+observation, info = env.reset(seed=0)
+observation, reward, terminated, truncated, info = env.step(action)
+```
+
+`config` implements the public `EnvironmentConfig` protocol. The current real
+implementation is `ZerithEnvironmentConfig`; callers do not construct a Drake
+Diagram, access a Context, or resolve joint indices. A repository-external
+smoke client is provided at
+`examples/online_manipulation/public_api_client.py`.
 
 目标接口：
 
@@ -133,6 +149,11 @@ to the simulation and independent planning contexts. The Zerith runtime
 currently supports positive `penetration_allowance_m` and
 `stiction_tolerance_m_s` contact parameters. Unknown parameter names fail
 explicitly.
+
+`PlanarPoseRandomizationSpec` optionally samples world-X, world-Y, and yaw
+offsets once during `reset(seed=...)`, before `Simulator.Initialize()`. The
+sampled values and resulting pose are returned in `reset_info` and recorded by
+EpisodeRunner. No object pose is changed during `step()`.
 
 ### Controller
 
@@ -232,6 +253,11 @@ If a Policy or environment step raises, EpisodeRunner writes a partial trace,
 exception metadata, and the current optional Meshcat recording before
 re-raising the original exception. It never converts an execution exception
 into a successful or silently truncated episode.
+
+`run_episodes()` additionally writes `benchmark_episodes.csv` and
+`benchmark_summary.json`. The aggregate declares `fixed_initial_state` or
+`randomized_initial_state`; callers should run these as separate output roots
+and report them as separate metrics.
 
 ## 4. Action Model
 
@@ -344,3 +370,126 @@ An architecture regression scans the generic core for current robot and scene
 identifiers and rejects imports from the Zerith adapter. The deprecated local
 PREGRASP prototype has one exact `.gitignore` entry; it is neither deleted nor
 tracked.
+
+The current physical backend remains the explicitly named
+`LegacyZerithRuntimeBackend`, which wraps the robot-specific
+`ZerithOnlineEnv`. It is owned by the Zerith adapter integration boundary and
+is not part of the generic Environment API. A three-joint, gripper-free mock
+adapter verifies the public contract, but a second real robot adapter has not
+been validated. Retiring the compatibility backend is a later migration, not
+part of Phase 8.
+
+## 11. Colleague Handoff Recipes
+
+### Public construction and one policy step
+
+Use only the package entry point:
+
+```python
+from src.online_manipulation import HoldPolicy, make_env
+
+env = make_env(config)
+observation, info = env.reset(seed=0)
+policy = HoldPolicy()
+policy.reset(observation, info)
+action = policy.act(observation)
+observation, reward, terminated, truncated, info = env.step(action)
+```
+
+Run the repository-owned second-scene example from any working directory:
+
+```bash
+PYTHONPATH=/path/to/scenesmith-simple-planner-eval \
+  /path/to/scenesmith-simple-planner-eval/.venv/bin/python -B \
+  /path/to/scenesmith-simple-planner-eval/examples/online_manipulation/public_api_client.py
+```
+
+### Custom Policy
+
+```python
+from src.online_manipulation import JointDeltaAction
+
+
+class MyPolicy:
+    def reset(self, observation, info):
+        del observation, info
+
+    def act(self, observation):
+        joint = observation.robot.joint_names[0]
+        return JointDeltaAction((joint,), (0.001,))
+```
+
+### Custom Task
+
+```python
+from src.online_manipulation import FREE_MOTION_CONTACT_POLICY, TaskEvaluation
+
+
+class MyTask:
+    def reset(self, env, rng):
+        del env, rng
+        return {"task_name": "my_task"}
+
+    def observe(self, env):
+        return {"time_s": env.observation.time_s}
+
+    def evaluate(self, env):
+        done = env.observation.time_s >= 1.0
+        reason = "goal_reached" if done else "running"
+        return TaskEvaluation(terminated=done, success=done, reason=reason)
+
+    def allowed_contacts(self, env, action):
+        del env, action
+        return FREE_MOTION_CONTACT_POLICY
+
+    def finalize(self, env):
+        return {"success": env.observation.time_s >= 1.0}
+```
+
+### Behavior Tree tick
+
+A BT leaf owns its state and advances exactly one policy period per tick:
+
+```python
+def tick(env, policy, observation):
+    return env.step(policy.act(observation))
+```
+
+The importable `JointTargetLeaf` example shows RUNNING/SUCCESS/FAILURE mapping
+without introducing a BT framework.
+
+### TAMP handoff
+
+Create a `PlanningQuery` from the public `build_planning_query()` function,
+synchronize the current `observation.objects`, validate the configuration and
+edge, and only then send typed actions through `env.step()`. The
+`execute_validated_joint_goal()` example implements this boundary without path
+search or TOPPRA.
+
+### Replace a scene
+
+Create a new `ScenarioSpec(dmd_path=..., package_xmls=...,
+observed_bodies=...)` and pass it into the robot environment config. The
+portable example scene is `models/online_env_minimal_scene/scene.dmd.yaml`;
+switching to it requires no Environment source edit.
+
+### Batch benchmark and final DMD
+
+```python
+from pathlib import Path
+from src.online_manipulation import run_episodes
+
+results = run_episodes(
+    env=env,
+    policy=policy,
+    seeds=(0, 1, 2),
+    max_steps=300,
+    output_root=Path("output/my_benchmark"),
+    write_final_dmd=True,
+)
+env.write_updated_scenario(Path("output/final.dmd.yaml"))
+```
+
+Each episode has independent JSON/CSV artifacts. The root aggregate is
+machine-readable, and only `ObservedBodySpec(write_back=True)` objects are
+written to a new reloadable DMD.
