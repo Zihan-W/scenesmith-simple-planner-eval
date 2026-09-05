@@ -94,15 +94,21 @@ class _TerminalDiagnosticPolicy(_Policy):
 class _Environment:
     """Two-step deterministic online environment used by runner tests."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, report_randomization: bool = False) -> None:
         self.time_s = 0.0
         self.reset_count = 0
+        self.report_randomization = report_randomization
 
     def reset(self, seed=None):
         self.time_s = 0.0
         self.reset_count += 1
         return _observation(0.0, saturated=False), {
             "seed": seed,
+            "episode_randomization": (
+                {"box": {"x_offset_m": 0.001 * float(seed or 0)}}
+                if self.report_randomization
+                else {}
+            ),
             "minimum_collision_distance_m": 0.02,
             "minimum_collision_distance_is_lower_bound": False,
         }
@@ -153,7 +159,7 @@ class EpisodeRunnerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "episode"
             result = run_episode(
-                env=_Environment(),
+                env=_Environment(report_randomization=True),
                 policy=_Policy(),
                 seed=9,
                 max_steps=4,
@@ -180,6 +186,12 @@ class EpisodeRunnerTest(unittest.TestCase):
                 1,
             )
             self.assertEqual(len(result.summary["contact_events"]), 1)
+            self.assertAlmostEqual(
+                result.summary["reset_info"]["episode_randomization"][
+                    "box"
+                ]["x_offset_m"],
+                0.009,
+            )
             self.assertEqual(result.summary["updated_bodies"], ["box"])
             for name in (
                 "summary.json",
@@ -245,7 +257,7 @@ class EpisodeRunnerTest(unittest.TestCase):
 
     def test_run_episodes_resets_and_uses_unique_directories(self):
         with tempfile.TemporaryDirectory() as directory:
-            env = _Environment()
+            env = _Environment(report_randomization=True)
             policy = _Policy()
             results = run_episodes(
                 env=env,
@@ -263,6 +275,76 @@ class EpisodeRunnerTest(unittest.TestCase):
             self.assertTrue(
                 (Path(directory) / "episode_001_seed_7" / "summary.json").is_file()
             )
+            aggregate = json.loads(
+                (Path(directory) / "benchmark_summary.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(aggregate["episode_count"], 2)
+            self.assertEqual(aggregate["success_count"], 2)
+            self.assertEqual(
+                aggregate["evaluation_mode"],
+                "randomized_initial_state",
+            )
+            self.assertEqual(
+                [episode["seed"] for episode in aggregate["episodes"]],
+                [3, 7],
+            )
+            with (
+                Path(directory) / "benchmark_episodes.csv"
+            ).open(encoding="utf-8") as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(len(rows), 2)
+            self.assertAlmostEqual(
+                json.loads(rows[0]["episode_randomization_json"])["box"][
+                    "x_offset_m"
+                ],
+                0.003,
+            )
+
+    def test_run_episodes_requires_at_least_one_seed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "at least one"):
+                run_episodes(
+                    env=_Environment(),
+                    policy=_Policy(),
+                    seeds=(),
+                    max_steps=2,
+                    output_root=Path(directory) / "benchmark",
+                )
+
+    def test_benchmark_failure_reason_is_machine_readable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            results = run_episodes(
+                env=_Environment(),
+                policy=_Policy(),
+                seeds=(12,),
+                max_steps=1,
+                output_root=Path(directory),
+            )
+            self.assertFalse(results[0].success)
+            aggregate = json.loads(
+                (Path(directory) / "benchmark_summary.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(aggregate["failure_count"], 1)
+            self.assertEqual(
+                aggregate["evaluation_mode"],
+                "fixed_initial_state",
+            )
+            self.assertEqual(
+                aggregate["episodes"][0]["termination_reason"],
+                "max_steps",
+            )
+            failure = json.loads(
+                (
+                    Path(directory)
+                    / "episode_000_seed_12"
+                    / "failure.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(failure["termination_reason"], "max_steps")
 
     def test_nonempty_output_directory_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

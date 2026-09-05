@@ -362,6 +362,7 @@ def run_episode(
             ),
         },
         "contact_events": contact_events,
+        "reset_info": _jsonable(reset_info),
         "initial_object_poses": initial_object_poses,
         "final_object_poses": _object_poses(observation),
         "task": _jsonable(final_task),
@@ -417,10 +418,13 @@ def run_episodes(
     record_html: bool = False,
     write_final_dmd: bool = False,
 ) -> tuple[EpisodeResult, ...]:
-    """Run multiple fully reset episodes into non-overlapping directories."""
+    """Run reset-isolated episodes and write machine-readable aggregates."""
+    if not seeds:
+        raise ValueError("seeds must contain at least one episode seed")
+    destination = _prepare_output_directory(output_root)
     results = []
     for index, seed in enumerate(seeds):
-        episode_directory = Path(output_root) / (
+        episode_directory = destination / (
             f"episode_{index:03d}_seed_{int(seed)}"
         )
         results.append(
@@ -434,4 +438,71 @@ def run_episodes(
                 write_final_dmd=write_final_dmd,
             )
         )
-    return tuple(results)
+    result_tuple = tuple(results)
+    aggregate_rows = [
+        {
+            "episode_index": index,
+            "seed": result.summary["seed"],
+            "success": result.summary["success"],
+            "termination_reason": result.summary["termination_reason"],
+            "policy_steps": result.summary["policy_steps"],
+            "episode_time_s": result.summary["episode_time_s"],
+            "minimum_collision_distance_m": result.summary[
+                "minimum_collision_distance_m"
+            ],
+            "maximum_tracking_error": result.summary[
+                "maximum_tracking_error"
+            ],
+            "randomized_initial_state": bool(
+                result.summary["reset_info"].get(
+                    "episode_randomization",
+                    {},
+                )
+            ),
+            "episode_randomization_json": json.dumps(
+                result.summary["reset_info"].get(
+                    "episode_randomization",
+                    {},
+                ),
+                separators=(",", ":"),
+            ),
+            "initial_object_poses_json": json.dumps(
+                result.summary["initial_object_poses"],
+                separators=(",", ":"),
+            ),
+        }
+        for index, result in enumerate(result_tuple)
+    ]
+    aggregate_csv = destination / "benchmark_episodes.csv"
+    with aggregate_csv.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=tuple(aggregate_rows[0].keys()),
+        )
+        writer.writeheader()
+        writer.writerows(aggregate_rows)
+    randomization_flags = {
+        row["randomized_initial_state"] for row in aggregate_rows
+    }
+    if randomization_flags == {True}:
+        evaluation_mode = "randomized_initial_state"
+    elif randomization_flags == {False}:
+        evaluation_mode = "fixed_initial_state"
+    else:
+        evaluation_mode = "mixed_initial_state"
+    aggregate = {
+        "evaluation_mode": evaluation_mode,
+        "episode_count": len(result_tuple),
+        "success_count": sum(result.success for result in result_tuple),
+        "failure_count": sum(not result.success for result in result_tuple),
+        "success_rate": (
+            sum(result.success for result in result_tuple)
+            / len(result_tuple)
+        ),
+        "episodes": aggregate_rows,
+    }
+    (destination / "benchmark_summary.json").write_text(
+        json.dumps(_jsonable(aggregate), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return result_tuple
