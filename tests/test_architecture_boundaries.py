@@ -88,30 +88,33 @@ class ArchitectureBoundaryTest(unittest.TestCase):
             self.assertNotIn("zerith_online_env", source, filename)
 
     def test_external_client_imports_only_public_online_api(self) -> None:
-        path = (
-            REPOSITORY_ROOT
-            / "examples"
-            / "online_manipulation"
-            / "public_api_client.py"
-        )
-        source = path.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        project_imports = [
-            node.module
-            for node in ast.walk(tree)
-            if isinstance(node, ast.ImportFrom)
-            and node.module is not None
-            and node.module.startswith("src.")
-        ]
-        self.assertEqual(project_imports, ["src.online_manipulation"])
-        for marker in (
-            "pydrake",
-            ".backend",
-            ".runtime",
-            "plant_context",
-            "position_start",
+        examples = REPOSITORY_ROOT / "examples" / "online_manipulation"
+        for filename in (
+            "public_api_client.py",
+            "camera_public_api_client.py",
         ):
-            self.assertNotIn(marker, source)
+            source = (examples / filename).read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            project_imports = [
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom)
+                and node.module is not None
+                and node.module.startswith("src.")
+            ]
+            self.assertEqual(
+                project_imports,
+                ["src.online_manipulation"],
+                filename,
+            )
+            for marker in (
+                "pydrake",
+                ".backend",
+                ".runtime",
+                "plant_context",
+                "position_start",
+            ):
+                self.assertNotIn(marker, source, filename)
 
 
 if __name__ == "__main__":

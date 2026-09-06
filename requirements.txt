@@ -4,3 +4,4 @@ networkx==3.4.2
 tqdm==4.67.1
 scipy==1.15.3
 manipulation==2025.10.20
+pillow==12.3.0
