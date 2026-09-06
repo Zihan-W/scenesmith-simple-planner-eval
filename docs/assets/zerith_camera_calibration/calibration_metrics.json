@@ -1,0 +1,835 @@
+{
+  "coordinate_convention": {
+    "optical_x": "image right",
+    "optical_y": "image down",
+    "optical_z": "forward"
+  },
+  "simulation_camera_intrinsics": true,
+  "cameras": {
+    "head_camera": {
+      "parent_frame": "neck_pitch_link",
+      "extrinsics": {
+        "X_parent_camera_mount": [
+          [
+            -3.552713678800501e-15,
+            -0.20791178555975948,
+            0.9781475805957672,
+            0.0675568573382885
+          ],
+          [
+            -1.0000000000000002,
+            5.551115123125783e-16,
+            -3.3861802251067274e-15,
+            0.0324999999999979
+          ],
+          [
+            0.0,
+            -0.9781475805957671,
+            -0.20791178555975964,
+            -0.0363332072227294
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "X_mount_camera_optical": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "X_parent_camera_optical": [
+          [
+            -3.552713678800501e-15,
+            -0.2079117855597596,
+            0.9781475805957671,
+            0.0675568573382885
+          ],
+          [
+            -1.0,
+            6.661338147750939e-16,
+            -3.3861802251067274e-15,
+            0.0324999999999979
+          ],
+          [
+            0.0,
+            -0.9781475805957671,
+            -0.20791178555975964,
+            -0.0363332072227294
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "intrinsics": {
+        "width": 320,
+        "height": 240,
+        "focal_x_px": 207.84609690826528,
+        "focal_y_px": 207.84609690826528,
+        "center_x_px": 159.5,
+        "center_y_px": 119.5,
+        "fov_y_rad": 1.0471975511965976,
+        "near_m": 0.05,
+        "far_m": 10.0
+      },
+      "validity": {
+        "non_background_pixel_fraction": 0.025065104166666668,
+        "finite_depth_pixel_fraction": 0.025065104166666668,
+        "visible_labels": [
+          {
+            "label": 1,
+            "body": "center_target::base_link",
+            "pixel_count": 625
+          },
+          {
+            "label": 2,
+            "body": "right_target::base_link",
+            "pixel_count": 650
+          },
+          {
+            "label": 3,
+            "body": "down_target::base_link",
+            "pixel_count": 650
+          }
+        ],
+        "timestamp_s": 0.0,
+        "X_world_camera_optical": [
+          [
+            -3.552713678800501e-15,
+            -0.20791178555975953,
+            0.9781475805957671,
+            0.21935685751112435
+          ],
+          [
+            -1.0,
+            6.661338147750939e-16,
+            -3.3306690738754696e-15,
+            0.032500002292960455
+          ],
+          [
+            -5.551115123125783e-17,
+            -0.9781475805957671,
+            -0.20791178555975964,
+            1.238966792777271
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "targets": {
+        "center_target": {
+          "expected_camera_xyz_m": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            -4.300829322526493e-14,
+            -5.004948442774157e-13,
+            1.0000000000000047
+          ],
+          "expected_pixel_uv": [
+            159.49999999999105,
+            119.49999999989598
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              147,
+              107,
+              171,
+              131
+            ],
+            "center_uv": [
+              159.0,
+              119.0
+            ],
+            "pixel_count": 625
+          },
+          "pixel_error_px": 0.7071067811066613,
+          "expected_front_depth_m": 0.9900000000000047,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.479553176115701e-07,
+          "render_label": 1,
+          "rgb_at_expected_pixel": [
+            230,
+            13,
+            13
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        },
+        "right_target": {
+          "expected_camera_xyz_m": [
+            0.2,
+            0.0,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            0.199999999999957,
+            -5.006336221554938e-13,
+            1.0000000000000053
+          ],
+          "expected_pixel_uv": [
+            201.0692193816439,
+            119.49999999989595
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              188,
+              107,
+              213,
+              131
+            ],
+            "center_uv": [
+              200.5,
+              119.0
+            ],
+            "pixel_count": 650
+          },
+          "pixel_error_px": 0.7576349413371963,
+          "expected_front_depth_m": 0.9900000000000053,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.4795531694543627e-07,
+          "render_label": 2,
+          "rgb_at_expected_pixel": [
+            13,
+            230,
+            13
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        },
+        "down_target": {
+          "expected_camera_xyz_m": [
+            0.0,
+            0.15,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            -4.288935085384253e-14,
+            0.15000000000012811,
+            1.0000000000001017
+          ],
+          "expected_pixel_uv": [
+            159.49999999999108,
+            150.67691453626324
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              147,
+              138,
+              171,
+              163
+            ],
+            "center_uv": [
+              159.0,
+              150.5
+            ],
+            "pixel_count": 650
+          },
+          "pixel_error_px": 0.5303760487920932,
+          "expected_front_depth_m": 0.9900000000001017,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.4795522057807773e-07,
+          "render_label": 3,
+          "rgb_at_expected_pixel": [
+            13,
+            26,
+            230
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        }
+      },
+      "passed": true
+    },
+    "left_wrist_camera": {
+      "parent_frame": "left_wrist_pitch_link",
+      "extrinsics": {
+        "X_parent_camera_mount": [
+          [
+            -3.673205103638111e-06,
+            -0.4225923050966791,
+            0.9063198903585772,
+            0.11933
+          ],
+          [
+            -0.9999999999932541,
+            1.552268211413299e-06,
+            -3.3290988465939364e-06,
+            0.009
+          ],
+          [
+            1.1102230246251565e-16,
+            -0.9063198903646914,
+            -0.4225923050995304,
+            0.060373
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "X_mount_camera_optical": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "X_parent_camera_optical": [
+          [
+            -3.673205103638111e-06,
+            -0.4225923050966791,
+            0.9063198903585772,
+            0.11933
+          ],
+          [
+            -0.9999999999932541,
+            1.552268211413299e-06,
+            -3.3290988465939364e-06,
+            0.009
+          ],
+          [
+            1.1102230246251565e-16,
+            -0.9063198903646914,
+            -0.4225923050995304,
+            0.060373
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "intrinsics": {
+        "width": 320,
+        "height": 240,
+        "focal_x_px": 207.84609690826528,
+        "focal_y_px": 207.84609690826528,
+        "center_x_px": 159.5,
+        "center_y_px": 119.5,
+        "fov_y_rad": 1.0471975511965976,
+        "near_m": 0.05,
+        "far_m": 10.0
+      },
+      "validity": {
+        "non_background_pixel_fraction": 0.1085546875,
+        "finite_depth_pixel_fraction": 0.1085546875,
+        "visible_labels": [
+          {
+            "label": 1,
+            "body": "center_target::base_link",
+            "pixel_count": 625
+          },
+          {
+            "label": 2,
+            "body": "right_target::base_link",
+            "pixel_count": 650
+          },
+          {
+            "label": 3,
+            "body": "down_target::base_link",
+            "pixel_count": 650
+          },
+          {
+            "label": 15,
+            "body": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+            "pixel_count": 3167
+          },
+          {
+            "label": 16,
+            "body": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link",
+            "pixel_count": 3245
+          }
+        ],
+        "timestamp_s": 0.0,
+        "X_world_camera_optical": [
+          [
+            -3.673205103638111e-06,
+            -0.42259230509667917,
+            0.9063198903585771,
+            0.550129999
+          ],
+          [
+            -0.9999999999932541,
+            1.5522682115243214e-06,
+            -3.3290988465384252e-06,
+            0.18899895000000003
+          ],
+          [
+            0.0,
+            -0.9063198903646914,
+            -0.4225923050995304,
+            0.81267779
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "targets": {
+        "center_target": {
+          "expected_camera_xyz_m": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            1.5320888843025181e-13,
+            2.4715735309928153e-13,
+            1.0000000000005824
+          ],
+          "expected_pixel_uv": [
+            159.50000000003183,
+            119.50000000005137
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              147,
+              107,
+              171,
+              131
+            ],
+            "center_uv": [
+              159.0,
+              119.0
+            ],
+            "pixel_count": 625
+          },
+          "pixel_error_px": 0.7071067812453821,
+          "expected_front_depth_m": 0.9900000000005824,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.4795473985150807e-07,
+          "render_label": 1,
+          "rgb_at_expected_pixel": [
+            230,
+            13,
+            13
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        },
+        "right_target": {
+          "expected_camera_xyz_m": [
+            0.2,
+            0.0,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            0.19999999999950252,
+            2.384976135072053e-13,
+            1.0000000000006013
+          ],
+          "expected_pixel_uv": [
+            201.06921938152465,
+            119.50000000004957
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              188,
+              107,
+              213,
+              131
+            ],
+            "center_uv": [
+              200.5,
+              119.0
+            ],
+            "pixel_count": 650
+          },
+          "pixel_error_px": 0.7576349413489778,
+          "expected_front_depth_m": 0.9900000000006013,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.4795472097771665e-07,
+          "render_label": 2,
+          "rgb_at_expected_pixel": [
+            13,
+            230,
+            13
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        },
+        "down_target": {
+          "expected_camera_xyz_m": [
+            0.0,
+            0.15,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            3.849852877217518e-13,
+            0.14999999999982,
+            0.9999999999998337
+          ],
+          "expected_pixel_uv": [
+            159.50000000008,
+            150.67691453620756
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              147,
+              138,
+              171,
+              163
+            ],
+            "center_uv": [
+              159.0,
+              150.5
+            ],
+            "pixel_count": 650
+          },
+          "pixel_error_px": 0.5303760488573592,
+          "expected_front_depth_m": 0.9899999999998337,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.4795548858591587e-07,
+          "render_label": 3,
+          "rgb_at_expected_pixel": [
+            13,
+            26,
+            230
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        }
+      },
+      "passed": true
+    },
+    "right_wrist_camera": {
+      "parent_frame": "right_wrist_pitch_link",
+      "extrinsics": {
+        "X_parent_camera_mount": [
+          [
+            -3.673205103638111e-06,
+            -0.4225923050966791,
+            0.9063198903585772,
+            0.11933
+          ],
+          [
+            -0.9999999999932541,
+            1.552268211413299e-06,
+            -3.3290988465939364e-06,
+            0.0090006
+          ],
+          [
+            1.1102230246251565e-16,
+            -0.9063198903646914,
+            -0.4225923050995304,
+            0.060373
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "X_mount_camera_optical": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "X_parent_camera_optical": [
+          [
+            -3.673205103638111e-06,
+            -0.4225923050966791,
+            0.9063198903585772,
+            0.11933
+          ],
+          [
+            -0.9999999999932541,
+            1.552268211413299e-06,
+            -3.3290988465939364e-06,
+            0.0090006
+          ],
+          [
+            1.1102230246251565e-16,
+            -0.9063198903646914,
+            -0.4225923050995304,
+            0.060373
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "intrinsics": {
+        "width": 320,
+        "height": 240,
+        "focal_x_px": 207.84609690826528,
+        "focal_y_px": 207.84609690826528,
+        "center_x_px": 159.5,
+        "center_y_px": 119.5,
+        "fov_y_rad": 1.0471975511965976,
+        "near_m": 0.05,
+        "far_m": 10.0
+      },
+      "validity": {
+        "non_background_pixel_fraction": 0.1085546875,
+        "finite_depth_pixel_fraction": 0.1085546875,
+        "visible_labels": [
+          {
+            "label": 1,
+            "body": "center_target::base_link",
+            "pixel_count": 625
+          },
+          {
+            "label": 2,
+            "body": "right_target::base_link",
+            "pixel_count": 650
+          },
+          {
+            "label": 3,
+            "body": "down_target::base_link",
+            "pixel_count": 650
+          },
+          {
+            "label": 26,
+            "body": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_left_finger_link",
+            "pixel_count": 3167
+          },
+          {
+            "label": 27,
+            "body": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_right_finger_link",
+            "pixel_count": 3245
+          }
+        ],
+        "timestamp_s": 0.0,
+        "X_world_camera_optical": [
+          [
+            -3.673205103638111e-06,
+            -0.42259230509667917,
+            0.9063198903585771,
+            0.55013
+          ],
+          [
+            -0.9999999999932541,
+            1.5522682115243214e-06,
+            -3.3290988465384252e-06,
+            -0.17100045
+          ],
+          [
+            0.0,
+            -0.9063198903646914,
+            -0.4225923050995304,
+            0.812673
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "targets": {
+        "center_target": {
+          "expected_camera_xyz_m": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            1.5318113327815286e-13,
+            2.472128642505128e-13,
+            1.0000000000005824
+          ],
+          "expected_pixel_uv": [
+            159.50000000003183,
+            119.50000000005139
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              147,
+              107,
+              171,
+              131
+            ],
+            "center_uv": [
+              159.0,
+              119.0
+            ],
+            "pixel_count": 625
+          },
+          "pixel_error_px": 0.7071067812453921,
+          "expected_front_depth_m": 0.9900000000005824,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.4795473985150807e-07,
+          "render_label": 1,
+          "rgb_at_expected_pixel": [
+            230,
+            13,
+            13
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        },
+        "right_target": {
+          "expected_camera_xyz_m": [
+            0.2,
+            0.0,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            0.1999999999995025,
+            2.3855312465843657e-13,
+            1.000000000000601
+          ],
+          "expected_pixel_uv": [
+            201.06921938152468,
+            119.50000000004958
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              188,
+              107,
+              213,
+              131
+            ],
+            "center_uv": [
+              200.5,
+              119.0
+            ],
+            "pixel_count": 650
+          },
+          "pixel_error_px": 0.7576349413490086,
+          "expected_front_depth_m": 0.9900000000006011,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.4795472119976125e-07,
+          "render_label": 2,
+          "rgb_at_expected_pixel": [
+            13,
+            230,
+            13
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        },
+        "down_target": {
+          "expected_camera_xyz_m": [
+            0.0,
+            0.15,
+            1.0
+          ],
+          "measured_camera_xyz_m": [
+            3.8495753256965287e-13,
+            0.14999999999982006,
+            0.9999999999998336
+          ],
+          "expected_pixel_uv": [
+            159.50000000008,
+            150.6769145362076
+          ],
+          "actual_label_bbox": {
+            "xyxy": [
+              147,
+              138,
+              171,
+              163
+            ],
+            "center_uv": [
+              159.0,
+              150.5
+            ],
+            "pixel_count": 650
+          },
+          "pixel_error_px": 0.5303760488573687,
+          "expected_front_depth_m": 0.9899999999998336,
+          "actual_depth_m": 0.9900002479553223,
+          "depth_error_m": 2.479554886969382e-07,
+          "render_label": 3,
+          "rgb_at_expected_pixel": [
+            13,
+            26,
+            230
+          ],
+          "rgb_depth_label_aligned": true,
+          "passed": true
+        }
+      },
+      "passed": true
+    }
+  },
+  "passed": true
+}

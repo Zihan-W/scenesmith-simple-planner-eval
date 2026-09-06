@@ -126,7 +126,7 @@ Phase 0 基线已拆分为以下 checkpoint，后续里程碑必须持续复现�
 * 控制器增益；
 * 碰撞分组；
 * home configuration。
-* 零个或多个 `CameraSpec`，包括父 frame、固定外参、仿真内参、更新周期和 modalities。
+* 零个或多个 `CameraSpec`，包括父 frame、机械 mount 外参、mount-to-optical 外参、仿真内参、更新周期和 modalities。
 
 先实现 `ZerithRobotAdapter`。
 
@@ -224,6 +224,7 @@ camera = obs.sensors["stable_camera_name"]
 camera.rgb          # H x W x 3 uint8, sRGB
 camera.depth        # H x W float32, meters
 camera.label        # H x W int16, Drake render labels
+camera.label_names  # render-label integer -> qualified body name
 camera.timestamp_s  # capture time in simulation seconds
 camera.pose         # world-from-optical-frame pose at capture time
 camera.intrinsics   # explicit simulation pinhole calibration
@@ -236,6 +237,13 @@ camera.intrinsics   # explicit simulation pinhole calibration
 Task 可以按稳定名称读取所需 sensor，但 Environment 核心不得包含相机名称、
 Zerith frame 或当前任务的 sensor 选择。无可信硬件标定时，内参必须明确标为
 simulation camera intrinsics。
+
+`CameraSpec` 必须显式给出 `X_parent_camera_mount` 和
+`X_mount_camera_optical`；不得把机器人 URDF link frame 默认为 Drake optical
+frame。实现必须保存并可检查最终组合
+`X_parent_camera_optical = X_parent_camera_mount @ X_mount_camera_optical`。
+相机几何验收必须使用已知三维目标的理论投影、实际 label 包围盒、米制深度和
+RGB/depth/label 对齐，不得只检查数组非空或两个场景图像不同。
 
 ## 四、为 BT/TAMP 提供查询接口
 

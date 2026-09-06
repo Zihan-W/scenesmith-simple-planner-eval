@@ -1,0 +1,277 @@
+{
+  "configuration": {
+    "robot_base_xyz_m": [
+      2.65,
+      2.95,
+      0.1815
+    ],
+    "robot_base_yaw_deg": 180.0,
+    "rail_position_m": 0.4,
+    "neck_pitch_rad": 0.0,
+    "left_arm_state": "PREGRASP"
+  },
+  "cameras": {
+    "head_camera": {
+      "validity": {
+        "non_background_pixel_fraction": 1.0,
+        "finite_depth_pixel_fraction": 1.0,
+        "visible_labels": [
+          {
+            "label": 1,
+            "body": "room_geometry_living_room::room_geometry_body_link",
+            "pixel_count": 29958
+          },
+          {
+            "label": 2,
+            "body": "living_room_rug_0::base_link",
+            "pixel_count": 5974
+          },
+          {
+            "label": 3,
+            "body": "living_room_sofa_0::base_link",
+            "pixel_count": 23259
+          },
+          {
+            "label": 4,
+            "body": "living_room_coffee_table_0::base_link",
+            "pixel_count": 6409
+          },
+          {
+            "label": 18,
+            "body": "living_room_artwork_0::base_link",
+            "pixel_count": 10657
+          },
+          {
+            "label": 24,
+            "body": "living_room_hardcover_book_0::base_link",
+            "pixel_count": 543
+          }
+        ],
+        "timestamp_s": 0.0,
+        "X_world_camera_optical": [
+          [
+            3.774758283725532e-15,
+            0.20791178555975953,
+            -0.9781475805957669,
+            2.4306431424888753
+          ],
+          [
+            0.9999999999999999,
+            -6.661338147750939e-16,
+            3.552713678800501e-15,
+            2.91749999770704
+          ],
+          [
+            0.0,
+            -0.9781475805957669,
+            -0.20791178555975942,
+            1.1889667927772707
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pick_target_bbox": null,
+      "coffee_table_bbox": {
+        "xyxy": [
+          94,
+          181,
+          238,
+          239
+        ],
+        "center_uv": [
+          166.0,
+          210.0
+        ],
+        "pixel_count": 6409
+      }
+    },
+    "left_wrist_camera": {
+      "validity": {
+        "non_background_pixel_fraction": 1.0,
+        "finite_depth_pixel_fraction": 1.0,
+        "visible_labels": [
+          {
+            "label": 2,
+            "body": "living_room_rug_0::base_link",
+            "pixel_count": 2469
+          },
+          {
+            "label": 3,
+            "body": "living_room_sofa_0::base_link",
+            "pixel_count": 1845
+          },
+          {
+            "label": 4,
+            "body": "living_room_coffee_table_0::base_link",
+            "pixel_count": 61977
+          },
+          {
+            "label": 23,
+            "body": "living_room_box_0::base_link",
+            "pixel_count": 4097
+          },
+          {
+            "label": 39,
+            "body": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+            "pixel_count": 3167
+          },
+          {
+            "label": 40,
+            "body": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link",
+            "pixel_count": 3245
+          }
+        ],
+        "timestamp_s": 0.0,
+        "X_world_camera_optical": [
+          [
+            0.3122327020877421,
+            0.6404457023119231,
+            -0.7016694678672966,
+            2.1147003878052644
+          ],
+          [
+            0.9499732546479679,
+            -0.2165840554253231,
+            0.2250381354105746,
+            2.715496283442777
+          ],
+          [
+            -0.0078457122388364,
+            -0.7368314931690343,
+            -0.6760309131051312,
+            0.6171444798632335
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pick_target_bbox": {
+        "xyxy": [
+          140,
+          63,
+          214,
+          140
+        ],
+        "center_uv": [
+          177.0,
+          101.5
+        ],
+        "pixel_count": 4097
+      },
+      "coffee_table_bbox": {
+        "xyxy": [
+          0,
+          0,
+          319,
+          239
+        ],
+        "center_uv": [
+          159.5,
+          119.5
+        ],
+        "pixel_count": 61977
+      }
+    },
+    "right_wrist_camera": {
+      "validity": {
+        "non_background_pixel_fraction": 1.0,
+        "finite_depth_pixel_fraction": 1.0,
+        "visible_labels": [
+          {
+            "label": 1,
+            "body": "room_geometry_living_room::room_geometry_body_link",
+            "pixel_count": 1926
+          },
+          {
+            "label": 2,
+            "body": "living_room_rug_0::base_link",
+            "pixel_count": 6486
+          },
+          {
+            "label": 3,
+            "body": "living_room_sofa_0::base_link",
+            "pixel_count": 31240
+          },
+          {
+            "label": 4,
+            "body": "living_room_coffee_table_0::base_link",
+            "pixel_count": 29091
+          },
+          {
+            "label": 24,
+            "body": "living_room_hardcover_book_0::base_link",
+            "pixel_count": 849
+          },
+          {
+            "label": 25,
+            "body": "living_room_vase_0::base_link",
+            "pixel_count": 796
+          },
+          {
+            "label": 50,
+            "body": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_left_finger_link",
+            "pixel_count": 3167
+          },
+          {
+            "label": 51,
+            "body": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_right_finger_link",
+            "pixel_count": 3245
+          }
+        ],
+        "timestamp_s": 0.0,
+        "X_world_camera_optical": [
+          [
+            3.673205103416066e-06,
+            0.4225923050966791,
+            -0.906319890358577,
+            2.0998699999999997
+          ],
+          [
+            0.9999999999932538,
+            -1.552268211746366e-06,
+            3.3290988467049587e-06,
+            3.1210004500000004
+          ],
+          [
+            0.0,
+            -0.9063198903646912,
+            -0.42259230509952994,
+            0.7626729999999999
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pick_target_bbox": null,
+      "coffee_table_bbox": {
+        "xyxy": [
+          0,
+          86,
+          262,
+          239
+        ],
+        "center_uv": [
+          131.0,
+          162.5
+        ],
+        "pixel_count": 29091
+      }
+    }
+  },
+  "left_wrist_target_visible": true,
+  "head_workspace_visible": true,
+  "passed": true
+}

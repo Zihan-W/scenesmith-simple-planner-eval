@@ -65,6 +65,8 @@ the fixed-base Zerith PickLift integration with the rail fixed at `0.4 m`.
 * `6158ca8` Generate renderable Zerith OBJ meshes
 * `0032680` Add sampled robot-mounted camera observations
 * `2e3e203` Add external camera API example
+* `92ed77b` Calibrate Zerith camera optical geometry
+* `0427031` Add numerical Zerith camera calibration scenes
 
 ## Current Validated State
 
@@ -119,16 +121,41 @@ Validated behavior:
 * an external client runs from `/tmp`, saves RGB/depth, reads the image in its
   Policy, and advances one accepted HoldAction.
 
-The focused camera suite passed 16 tests. The complete repository suite passed
-96 tests in 214.281 seconds. A post-change, camera-disabled fixed PickLift
-regression also passed 1/1 at seed 500 (`lift_held`, 276 policy steps), with
-JSON, CSV, and final-DMD artifacts under
-`output/online_env_v02_camera_disabled_picklift`.
+The original camera suite passed 16 tests. After geometric calibration was
+added, the complete repository suite passed 105 tests in 301.877 seconds. A
+post-calibration, camera-disabled fixed PickLift regression also passed 1/1 at
+seed 500 (`lift_held`, 276 policy steps), with JSON, CSV, and final-DMD
+artifacts under `output/online_env_v02_camera_calibrated_picklift`.
 
-The two real rendered RGB samples are stored in `docs/assets`; the variant
-scene changes both RGB and metric depth while retaining the same camera mount
-and intrinsics. No target detection, visual policy, PLACE, mobile-base
-control, or rail dynamics was added.
+The initial minimal-scene images did not contain a recognizable calibration
+target and failed human visual review. That gap has now been addressed with
+explicit mechanical-mount and optical transforms plus three self-contained
+camera-specific calibration DMDs.
+
+For every Zerith camera, the red center target projects within 0.708 px of the
+principal point, the green right target appears 41.5 px to its right, and the
+blue down target appears 31.5 px below it. Maximum measured theoretical-to-
+label-bbox error is 0.758 px. Each 0.02 m thick target centered at optical
+Z=1.0 m has measured front depth 0.990000248 m, within 0.25 micrometers of the
+expected 0.99 m. RGB color, metric depth, and render label agree at every
+target's theoretical pixel.
+
+At the real PickLift PREGRASP with neck pitch fixed at its URDF zero:
+
+* left wrist camera sees the red box with a 75×78 px label bbox and 4097 px;
+* head camera sees the coffee-table work area with 6409 label pixels;
+* right wrist camera sees the table, book, vase, sofa, and gripper but not the
+  red box, which is expected because the right arm is not used for this task;
+* all three images have finite metric depth across the room-filled view;
+* no fixed neck-pitch adjustment is required for this PickLift scene.
+
+RGB, depth-color, label-color, raw geometry metrics, visible label sets,
+timestamps, and world poses are stored under
+`docs/assets/zerith_camera_calibration` and
+`docs/assets/zerith_picklift_pregrasp`.
+
+No target detection, visual policy, PLACE, mobile-base control, or rail
+dynamics was added.
 
 ## Current PREGRASP Metrics
 

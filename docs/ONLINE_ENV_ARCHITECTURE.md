@@ -153,6 +153,14 @@ does not contain Zerith camera frame names. A disabled camera is not added to
 the Drake Diagram, and when no cameras are enabled the renderer is not
 registered.
 
+Camera geometry is an explicit two-transform chain. `parent_frame` names the
+robot link used for attachment, `X_parent_camera_mount` records the mechanical
+mount, and `X_mount_camera_optical` maps that mount to Drake's +X-right,
++Y-down, +Z-forward optical frame. `CameraSpec` requires both transforms and
+exposes their composition as `X_parent_camera_optical`; identity is never an
+implicit generic default. Zerith fixed neck/right-arm poses can be selected by
+RobotAdapter configuration without adding joint names to Environment core.
+
 Scenario initial object poses are keyed by public observation name and applied
 to the simulation and independent planning contexts. The Zerith runtime
 currently supports positive `penetration_allowance_m` and
@@ -321,7 +329,9 @@ Each `CameraObservation` contains optional RGB/depth/label arrays, capture
 timestamp, world-from-optical pose, and explicit simulation pinhole
 intrinsics. RGB is H×W×3 `uint8`; depth is H×W `float32` meters; labels are
 H×W `int16`. Drake uses 0 or infinity for invalid depth pixels, depending on
-which depth boundary was exceeded. Returned arrays are immutable snapshots.
+which depth boundary was exceeded. `label_names` maps render-label integers to
+model-qualified body names. Returned arrays and the label mapping are
+immutable snapshots.
 
 ## 6. Timing Contract
 

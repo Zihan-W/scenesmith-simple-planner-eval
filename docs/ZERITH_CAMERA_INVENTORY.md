@@ -29,6 +29,68 @@ joints. The current fixed-base left-arm environment locks the rail at 0.4 m
 and locks the body, neck, and right-arm joints; that runtime choice does not
 change the URDF kinematic chain.
 
+## Mechanical mount and optical frame
+
+`CameraSpec.parent_frame` is now the direct parent link in the table above.
+The fixed joint origin is stored as `X_parent_camera_mount`; it is no longer
+hidden by attaching a Drake sensor to the camera child link. A separate
+`X_mount_camera_optical` is required for every generic `CameraSpec`, and the
+runtime composes:
+
+```text
+X_parent_camera_optical = X_parent_camera_mount @ X_mount_camera_optical
+```
+
+For these three URDF links, the mesh geometry and fixed-joint orientation show
+that the camera child-link axes already use the optical convention: the broad
+camera body spans local X/Y, lies primarily behind local Z=0, and its small
+positive-Z face points along the rendered viewing direction. Therefore the
+Zerith Adapter explicitly sets `X_mount_camera_optical = Identity`. This is a
+Zerith simulation calibration choice verified below, not a default supplied
+by `CameraSpec` and not a claim about factory hardware calibration.
+
+The resulting transforms are:
+
+```text
+left_wrist_pitch_link -> left camera optical
+[[-0.000003673, -0.422592305,  0.906319890, 0.1193300],
+ [-1.000000000,  0.000001552, -0.000003329, 0.0090000],
+ [ 0.000000000, -0.906319890, -0.422592305, 0.0603730],
+ [ 0.000000000,  0.000000000,  0.000000000, 1.0000000]]
+
+right_wrist_pitch_link -> right camera optical
+[[-0.000003673, -0.422592305,  0.906319890, 0.1193300],
+ [-1.000000000,  0.000001552, -0.000003329, 0.0090006],
+ [ 0.000000000, -0.906319890, -0.422592305, 0.0603730],
+ [ 0.000000000,  0.000000000,  0.000000000, 1.0000000]]
+
+neck_pitch_link -> head camera optical
+[[-0.000000000, -0.207911786,  0.978147581,  0.067556857],
+ [-1.000000000,  0.000000000, -0.000000000,  0.032500000],
+ [ 0.000000000, -0.978147581, -0.207911786, -0.036333207],
+ [ 0.000000000,  0.000000000,  0.000000000,  1.000000000]]
+```
+
+## Numerical projection validation
+
+The self-contained DMDs in `models/zerith_camera_calibration` place a red
+target at optical `(0, 0, 1.0) m`, a green target at `(0.2, 0, 1.0) m`, and a
+blue target at `(0, 0.15, 1.0) m`. All target plates are 0.02 m thick, so their
+front face is at Z=0.99 m.
+
+All three cameras produced the same projection result:
+
+| Target | Theoretical pixel (u,v) | Label bbox center (u,v) | Error (px) | Measured front depth (m) |
+| --- | --- | --- | --- | --- |
+| center | `(159.500, 119.500)` | `(159.0, 119.0)` | `0.707107` | `0.990000248` |
+| right | `(201.069, 119.500)` | `(200.5, 119.0)` | `0.757635` | `0.990000248` |
+| down | `(159.500, 150.677)` | `(159.0, 150.5)` | `0.530376` | `0.990000248` |
+
+The expected pixel of every target simultaneously contains its dominant RGB
+channel, its own render label, and finite metric depth. Full matrices,
+bounding boxes, visible labels, and per-camera metrics are recorded in
+`docs/assets/zerith_camera_calibration/calibration_metrics.json`.
+
 ## Simulation camera assumptions
 
 Neither URDF contains `<sensor>` or Gazebo camera elements. It therefore
@@ -36,8 +98,7 @@ provides no verifiable hardware resolution, focal lengths, field of view,
 principal point, clipping/depth range, distortion model, frame rate, latency,
 or camera optical calibration.
 
-`make_zerith_camera_specs()` uses each URDF camera link as the simulation
-optical frame (`X_camera_link_camera = identity`) and configures these defaults:
+`make_zerith_camera_specs()` configures these defaults:
 
 * resolution: 320×240 pixels;
 * vertical field of view: 60 degrees;
@@ -48,7 +109,14 @@ optical frame (`X_camera_link_camera = identity`) and configures these defaults:
 * modalities: RGB, 32-bit floating-point depth, and 16-bit render label.
 
 These are **simulation camera intrinsics**, not hardware specifications.
-Drake's optical convention is +X right, +Y down, and +Z forward. The identity
-link-to-optical assumption produces a useful forward/downward view in the
-tested Zerith model, but it must be replaced with measured calibration before
-claiming hardware correspondence.
+Drake's optical convention is +X right, +Y down, and +Z forward. Hardware
+intrinsics, distortion, latency, and any measured hardware mount correction
+remain unknown and must be supplied before claiming real-camera
+correspondence.
+
+At the validated PickLift PREGRASP, the zero neck-pitch pose already sees the
+coffee-table work area (6409 table-label pixels). The left wrist camera sees
+the red target clearly (4097 target-label pixels). A forced neck-pitch offset
+is therefore not needed for this scene. `locked_joint_position_overrides`
+remains available in `ZerithEnvironmentConfig` for a scene that genuinely
+needs a different fixed neck pose.

@@ -61,6 +61,47 @@ Two recorded examples are available for visual review:
 * [minimal scene](assets/head_camera_minimal_scene.png)
 * [camera variant scene](assets/head_camera_camera_variant.png)
 
+`CameraSpec` keeps the mechanical and optical transforms separate. The public
+label image is accompanied by `camera.label_names`, an immutable mapping from
+integer labels to model-qualified body names.
+
+Run the self-contained three-camera geometric calibration without any
+SceneSmith output assets:
+
+```bash
+PYTHONPATH=/root/workspace/scenesmith-simple-planner-eval MPLCONFIGDIR=/tmp/matplotlib-cache MESA_SHADER_CACHE_DIR=/tmp/mesa-cache /root/workspace/scenesmith-simple-planner-eval/.venv/bin/python /root/workspace/scenesmith-simple-planner-eval/scripts/validate_zerith_camera_geometry.py --repository-root /root/workspace/scenesmith-simple-planner-eval --output-dir /tmp/zerith-camera-calibration
+```
+
+Success prints `{"calibration": true}`. The output contains RGB, raw depth in
+meters, depth-color, label-color, and `calibration_metrics.json` for all three
+cameras.
+
+Validated calibration images:
+
+| Camera | RGB | Depth color | Label color |
+| --- | --- | --- | --- |
+| head | [RGB](assets/zerith_camera_calibration/head_camera_rgb.png) | [depth](assets/zerith_camera_calibration/head_camera_depth_color.png) | [label](assets/zerith_camera_calibration/head_camera_label_color.png) |
+| left wrist | [RGB](assets/zerith_camera_calibration/left_wrist_camera_rgb.png) | [depth](assets/zerith_camera_calibration/left_wrist_camera_depth_color.png) | [label](assets/zerith_camera_calibration/left_wrist_camera_label_color.png) |
+| right wrist | [RGB](assets/zerith_camera_calibration/right_wrist_camera_rgb.png) | [depth](assets/zerith_camera_calibration/right_wrist_camera_depth_color.png) | [label](assets/zerith_camera_calibration/right_wrist_camera_label_color.png) |
+
+Validated PickLift PREGRASP images, which require the external assets described
+below:
+
+| Camera | RGB | Depth color | Label color |
+| --- | --- | --- | --- |
+| head | [RGB](assets/zerith_picklift_pregrasp/head_camera_rgb.png) | [depth](assets/zerith_picklift_pregrasp/head_camera_depth_color.png) | [label](assets/zerith_picklift_pregrasp/head_camera_label_color.png) |
+| left wrist | [RGB](assets/zerith_picklift_pregrasp/left_wrist_camera_rgb.png) | [depth](assets/zerith_picklift_pregrasp/left_wrist_camera_depth_color.png) | [label](assets/zerith_picklift_pregrasp/left_wrist_camera_label_color.png) |
+| right wrist | [RGB](assets/zerith_picklift_pregrasp/right_wrist_camera_rgb.png) | [depth](assets/zerith_picklift_pregrasp/right_wrist_camera_depth_color.png) | [label](assets/zerith_picklift_pregrasp/right_wrist_camera_label_color.png) |
+
+Regenerate both calibration and PickLift PREGRASP validation outputs with the
+assets currently used on this machine:
+
+```bash
+PYTHONPATH=/root/workspace/scenesmith-simple-planner-eval MPLCONFIGDIR=/tmp/matplotlib-cache MESA_SHADER_CACHE_DIR=/tmp/mesa-cache /root/workspace/scenesmith-simple-planner-eval/.venv/bin/python /root/workspace/scenesmith-simple-planner-eval/scripts/validate_zerith_camera_geometry.py --repository-root /root/workspace/scenesmith-simple-planner-eval --output-dir /tmp/zerith-camera-geometry-review --picklift-dmd /root/workspace/scenesmith-simple-planner-eval/output/zerith_pick_eval/zerith_pick_eval.dmd.yaml --picklift-scene-package-xml /root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000/package.xml --pick-home-json /root/workspace/scenesmith-simple-planner-eval/output/zerith_pick_eval/pick_home.json --picklift-additional-package-xml /root/workspace/scenesmith-simple-planner-eval/models/zerith_pick_eval/package.xml --neck-pitch-rad 0.0
+```
+
+The validated result prints `{"calibration": true, "picklift": true}`.
+
 ## Validated PickLift
 
 The complete PickLift demonstration depends on a SceneSmith-generated scene
