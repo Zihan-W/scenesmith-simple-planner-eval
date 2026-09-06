@@ -3,6 +3,7 @@
 import dataclasses
 import math
 from collections.abc import Mapping, Sequence
+from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -276,6 +277,7 @@ class CameraObservation:
     rgb: np.ndarray | None = None
     depth: np.ndarray | None = None
     label: np.ndarray | None = None
+    label_names: Mapping[int, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate modality dimensions, dtypes, and frame time."""
@@ -317,6 +319,16 @@ class CameraObservation:
         )
         if self.rgb is None and self.depth is None and self.label is None:
             raise ValueError("CameraObservation requires at least one modality")
+        label_names = {
+            int(label): str(name) for label, name in self.label_names.items()
+        }
+        if any(not name for name in label_names.values()):
+            raise ValueError("Camera label names must be nonempty")
+        object.__setattr__(
+            self,
+            "label_names",
+            MappingProxyType(label_names),
+        )
 
     def as_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible sensor observation."""
@@ -328,6 +340,9 @@ class CameraObservation:
             "rgb": None if self.rgb is None else self.rgb.tolist(),
             "depth": None if self.depth is None else self.depth.tolist(),
             "label": None if self.label is None else self.label.tolist(),
+            "label_names": {
+                str(label): name for label, name in self.label_names.items()
+            },
         }
 
 

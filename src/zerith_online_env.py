@@ -17,6 +17,7 @@ import numpy as np
 
 from pydrake.all import (
     AddMultibodyPlantSceneGraph,
+    BodyIndex,
     CameraInfo,
     ClippingRange,
     DepthRange,
@@ -185,6 +186,7 @@ class ZerithOnlineEnv:
         realtime_rate: float = 0.0,
         meshcat: Meshcat | None = None,
         servo_joint_specs: Sequence[JointSpec] | None = None,
+        locked_joint_positions: Mapping[str, float] | None = None,
         camera_specs: Sequence[CameraSpec] = (),
         renderer_spec: RendererSpec = RendererSpec(),
     ):
@@ -280,6 +282,10 @@ class ZerithOnlineEnv:
             if servo_joint_specs is not None
             else None
         )
+        self._locked_joint_positions = {
+            str(name): float(value)
+            for name, value in (locked_joint_positions or {}).items()
+        }
         self._camera_specs = tuple(
             camera for camera in camera_specs if camera.enabled
         )
@@ -367,6 +373,7 @@ class ZerithOnlineEnv:
             )
 
         self.plant.Finalize()
+        self._render_label_names = self._collect_render_label_names()
         self._arm_joints = tuple(
             self.plant.GetJointByName(config.name, self._zerith)
             for config in LEFT_ARM_SERVO_CONFIGS
@@ -450,9 +457,11 @@ class ZerithOnlineEnv:
                     parent_body.index()
                 )
                 X_BP = parent_frame.GetFixedPoseInBodyFrame()
-                X_PC = RigidTransform(
-                    Quaternion(camera_spec.X_parent_camera.quaternion_wxyz),
-                    camera_spec.X_parent_camera.translation_m,
+                X_PO = RigidTransform(
+                    Quaternion(
+                        camera_spec.X_parent_camera_optical.quaternion_wxyz
+                    ),
+                    camera_spec.X_parent_camera_optical.translation_m,
                 )
                 camera_info = CameraInfo(
                     camera_spec.width,
@@ -471,7 +480,7 @@ class ZerithOnlineEnv:
                 )
                 continuous_sensor = RgbdSensor(
                     parent_id,
-                    X_BP @ X_PC,
+                    X_BP @ X_PO,
                     depth_camera,
                     False,
                 )
@@ -602,8 +611,36 @@ class ZerithOnlineEnv:
                 rgb=rgb,
                 depth=depth,
                 label=label,
+                label_names=(
+                    self._render_label_names if label is not None else {}
+                ),
             )
         return observations
+
+    def _collect_render_label_names(self) -> dict[int, str]:
+        """Map Drake render labels to model-qualified body names."""
+        inspector = self.scene_graph.model_inspector()
+        names = {}
+        for index in range(self.plant.num_bodies()):
+            body = self.plant.get_body(BodyIndex(index))
+            frame_id = self.plant.GetBodyFrameIdOrThrow(body.index())
+            model_name = self.plant.GetModelInstanceName(
+                body.model_instance()
+            )
+            qualified_name = f"{model_name}::{body.name()}"
+            for geometry_id in inspector.GetGeometries(
+                frame_id,
+                Role.kPerception,
+            ):
+                properties = inspector.GetPerceptionProperties(geometry_id)
+                label = int(properties.GetProperty("label", "id"))
+                previous = names.setdefault(label, qualified_name)
+                if previous != qualified_name:
+                    raise RuntimeError(
+                        f"Render label {label} names both {previous} and "
+                        f"{qualified_name}"
+                    )
+        return names
 
     def _plant_context(self):
         """Return mutable plant context owned by the active simulator."""
@@ -627,6 +664,13 @@ class ZerithOnlineEnv:
         ):
             positions[joint.position_start()] = value
         positions[self._rail_joint.position_start()] = self._rail_position
+        for name, value in self._locked_joint_positions.items():
+            joint = self.plant.GetJointByName(name, self._zerith)
+            if joint.num_positions() != 1:
+                raise ValueError(
+                    f"Locked joint {name} must have one position coordinate"
+                )
+            positions[joint.position_start()] = value
         # The Zerith finger joints are open at zero. Moving the left finger
         # negative and the right finger positive closes the gripper.
         positions[self._gripper_joints[0].position_start()] = 0.0

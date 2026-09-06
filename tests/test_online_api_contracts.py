@@ -386,8 +386,18 @@ class PublicContractTest(unittest.TestCase):
     def test_mock_adapter_can_declare_zero_or_multiple_cameras(self) -> None:
         self.assertEqual(_ThreeJointMockAdapter().spec.cameras, ())
         cameras = (
-            CameraSpec("camera_a", "frame_a"),
-            CameraSpec("camera_b", "frame_b"),
+            CameraSpec(
+                "camera_a",
+                "frame_a",
+                Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
+                Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
+            ),
+            CameraSpec(
+                "camera_b",
+                "frame_b",
+                Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
+                Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
+            ),
         )
         self.assertEqual(_ThreeJointMockAdapter(cameras).spec.cameras, cameras)
 

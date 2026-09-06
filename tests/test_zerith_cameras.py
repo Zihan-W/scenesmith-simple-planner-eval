@@ -12,6 +12,7 @@ from src.online_manipulation import (
     NullTask,
     ObservedBodySpec,
     PlanarPoseRandomizationSpec,
+    Pose,
     ScenarioSpec,
     ZerithEnvironmentConfig,
     make_env,
@@ -32,6 +33,7 @@ def _config(
     modalities: tuple[str, ...] = ("rgb", "depth", "label"),
     q_home_left: tuple[float, ...] = (0.0,) * 7,
     randomize_marker: bool = False,
+    locked_joint_position_overrides: dict[str, float] | None = None,
 ) -> ZerithEnvironmentConfig:
     """Return a self-contained camera test configuration."""
     return ZerithEnvironmentConfig(
@@ -69,6 +71,9 @@ def _config(
         q_home_left=q_home_left,
         episode_duration=1.0,
         task=NullTask(),
+        locked_joint_position_overrides=(
+            locked_joint_position_overrides or {}
+        ),
         cameras=make_zerith_camera_specs(
             enabled_names=camera_names,
             width=64,
@@ -98,12 +103,16 @@ class ZerithCameraTest(unittest.TestCase):
         self.assertEqual(
             {camera.name: camera.parent_frame for camera in cameras},
             {
-                "left_wrist_camera": "left_jaw_camera_link",
-                "right_wrist_camera": "right_jaw_camera_link",
-                "head_camera": "neck_camera_link",
+                "left_wrist_camera": "left_wrist_pitch_link",
+                "right_wrist_camera": "right_wrist_pitch_link",
+                "head_camera": "neck_pitch_link",
             },
         )
         self.assertTrue(all(camera.enabled for camera in cameras))
+        identity = Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+        self.assertTrue(
+            all(camera.X_mount_camera_optical == identity for camera in cameras)
+        )
 
     def test_reset_returns_deterministic_real_camera_frame(self) -> None:
         env = make_env(_config())
@@ -276,6 +285,61 @@ class ZerithCameraTest(unittest.TestCase):
         )
         self.assertGreater(
             np.linalg.norm(moved_translation - initial_translation),
+            1e-4,
+        )
+
+    def test_head_camera_world_pose_follows_configured_neck_pitch(self):
+        level_env = make_env(_config(camera_names=("head_camera",)))
+        pitched_env = make_env(
+            _config(
+                camera_names=("head_camera",),
+                locked_joint_position_overrides={
+                    "neck_pitch_joint": 0.3,
+                },
+            )
+        )
+        level, _ = level_env.reset(seed=0)
+        pitched, _ = pitched_env.reset(seed=0)
+
+        level_pose = level.sensors["head_camera"].pose
+        pitched_pose = pitched.sensors["head_camera"].pose
+
+        self.assertGreater(
+            np.linalg.norm(
+                np.asarray(pitched_pose.translation_m)
+                - np.asarray(level_pose.translation_m)
+            ),
+            1e-4,
+        )
+        self.assertGreater(
+            np.linalg.norm(
+                np.asarray(pitched_pose.quaternion_wxyz)
+                - np.asarray(level_pose.quaternion_wxyz)
+            ),
+            1e-4,
+        )
+
+    def test_right_wrist_camera_follows_configured_right_arm_joint(self):
+        initial_env = make_env(_config(camera_names=("right_wrist_camera",)))
+        moved_env = make_env(
+            _config(
+                camera_names=("right_wrist_camera",),
+                locked_joint_position_overrides={
+                    "right_shoulder_pitch_joint": 0.3,
+                },
+            )
+        )
+        initial, _ = initial_env.reset(seed=0)
+        moved, _ = moved_env.reset(seed=0)
+
+        initial_pose = initial.sensors["right_wrist_camera"].pose
+        moved_pose = moved.sensors["right_wrist_camera"].pose
+
+        self.assertGreater(
+            np.linalg.norm(
+                np.asarray(moved_pose.translation_m)
+                - np.asarray(initial_pose.translation_m)
+            ),
             1e-4,
         )
 

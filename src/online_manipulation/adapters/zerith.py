@@ -94,6 +94,21 @@ def _yaw_pose(xyz: Sequence[float], yaw_deg: float) -> Pose:
     )
 
 
+def _xyz_rpy_pose(
+    xyz: Sequence[float],
+    rpy: Sequence[float],
+) -> Pose:
+    """Build a public pose from one URDF xyz/rpy fixed-joint origin."""
+    if len(xyz) != 3 or len(rpy) != 3:
+        raise ValueError("xyz and rpy must each contain three values")
+    return _drake_pose(
+        RigidTransform(
+            RollPitchYaw(*tuple(float(value) for value in rpy)),
+            tuple(float(value) for value in xyz),
+        )
+    )
+
+
 def _planar_offset_pose(
     pose: Pose,
     *,
@@ -174,6 +189,7 @@ def make_zerith_robot_spec(
     rail_position: float,
     q_home_left: Sequence[float],
     cameras: Sequence[CameraSpec] = (),
+    locked_joint_position_overrides: Mapping[str, float] | None = None,
 ) -> RobotSpec:
     """Create the calibrated fixed-rail, left-arm Zerith specification."""
     model_dir = Path(robot_model_dir).resolve()
@@ -203,6 +219,27 @@ def make_zerith_robot_spec(
         for name in joints_by_name
         if name not in controlled_names
     }
+    overrides = {
+        str(name): float(value)
+        for name, value in (locked_joint_position_overrides or {}).items()
+    }
+    unknown_overrides = overrides.keys() - locked_positions.keys()
+    if unknown_overrides:
+        raise ValueError(
+            "Locked-joint overrides do not name locked Zerith joints: "
+            f"{sorted(unknown_overrides)}"
+        )
+    for name, value in overrides.items():
+        limit = joints_by_name[name].find("limit")
+        if limit is None:
+            raise ValueError(f"Locked joint {name} has no limits")
+        if (
+            not math.isfinite(value)
+            or value < float(limit.attrib["lower"])
+            or value > float(limit.attrib["upper"])
+        ):
+            raise ValueError(f"Locked-joint override violates {name} limits")
+    locked_positions.update(overrides)
     root = ET.parse(urdf_path).getroot()
     model_instance_name = root.attrib["name"]
     return RobotSpec(
@@ -250,13 +287,33 @@ def make_zerith_camera_specs(
     intrinsics or update rates. These values therefore describe simulation
     cameras and are not asserted to match the physical robot.
     """
+    # Each entry is copied from the corresponding fixed joint in the upstream
+    # URDF: public name, direct parent link, xyz, and rpy. The child camera-link
+    # axes already follow Drake's optical convention. That explicit identity
+    # mount-to-optical transform is verified by projection tests; it is not a
+    # default assumption for arbitrary CameraSpec instances.
     mounts = (
-        ("left_wrist_camera", "left_jaw_camera_link"),
-        ("right_wrist_camera", "right_jaw_camera_link"),
-        ("head_camera", "neck_camera_link"),
+        (
+            "left_wrist_camera",
+            "left_wrist_pitch_link",
+            (0.11933, 0.009, 0.060373),
+            (-2.0071, 0.0, -1.5708),
+        ),
+        (
+            "right_wrist_camera",
+            "right_wrist_pitch_link",
+            (0.11933, 0.0090006, 0.060373),
+            (-2.0071, 0.0, -1.5708),
+        ),
+        (
+            "head_camera",
+            "neck_pitch_link",
+            (0.0675568573382885, 0.0324999999999979, -0.0363332072227294),
+            (-1.78023593389281, 0.0, -1.5707963267949),
+        ),
     )
     requested = frozenset(enabled_names)
-    available = frozenset(name for name, _ in mounts)
+    available = frozenset(name for name, *_ in mounts)
     unknown = requested - available
     if unknown:
         raise ValueError(f"Unknown Zerith cameras: {sorted(unknown)}")
@@ -264,6 +321,8 @@ def make_zerith_camera_specs(
         CameraSpec(
             name=name,
             parent_frame=parent_frame,
+            X_parent_camera_mount=_xyz_rpy_pose(xyz, rpy),
+            X_mount_camera_optical=_drake_pose(RigidTransform()),
             width=width,
             height=height,
             fov_y_rad=fov_y_rad,
@@ -273,7 +332,7 @@ def make_zerith_camera_specs(
             modalities=tuple(modalities),
             enabled=name in requested,
         )
-        for name, parent_frame in mounts
+        for name, parent_frame, xyz, rpy in mounts
     )
 
 
@@ -1143,6 +1202,7 @@ def make_legacy_zerith_environment(
         realtime_rate=scenario.visualization.realtime_rate,
         meshcat=meshcat,
         servo_joint_specs=adapter.spec.controlled_joints,
+        locked_joint_positions=adapter.spec.locked_joint_positions,
         camera_specs=adapter.spec.cameras,
         renderer_spec=scenario.renderer,
     )
@@ -1200,6 +1260,9 @@ class ZerithEnvironmentConfig:
     task: Task | None = None
     enable_planning_query: bool = False
     cameras: tuple[CameraSpec, ...] = ()
+    locked_joint_position_overrides: Mapping[str, float] = dataclasses.field(
+        default_factory=dict
+    )
 
     def __post_init__(self) -> None:
         """Normalize paths and sequences and validate runtime limits."""
@@ -1241,6 +1304,11 @@ class ZerithEnvironmentConfig:
         if not self.target_body_name:
             raise ValueError("target_body_name must be nonempty")
         object.__setattr__(self, "cameras", tuple(self.cameras))
+        object.__setattr__(
+            self,
+            "locked_joint_position_overrides",
+            dict(self.locked_joint_position_overrides),
+        )
 
     def build_environment(self) -> OnlineManipulationEnv:
         """Build the public environment without exposing Drake internals."""
@@ -1252,6 +1320,9 @@ class ZerithEnvironmentConfig:
                 rail_position=self.rail_position,
                 q_home_left=self.q_home_left,
                 cameras=self.cameras,
+                locked_joint_position_overrides=(
+                    self.locked_joint_position_overrides
+                ),
             )
         )
         planning_query = (

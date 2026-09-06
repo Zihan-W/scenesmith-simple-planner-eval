@@ -28,6 +28,18 @@ def _joint() -> JointSpec:
     return JointSpec("joint", "revolute", -1.0, 1.0, 2.0, 3.0, 4.0, 0.5)
 
 
+def _camera(name: str, parent_frame: str, **kwargs) -> CameraSpec:
+    """Return a camera with explicit identity mount transforms."""
+    identity = Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+    return CameraSpec(
+        name=name,
+        parent_frame=parent_frame,
+        X_parent_camera_mount=identity,
+        X_mount_camera_optical=identity,
+        **kwargs,
+    )
+
+
 def _robot_spec(cameras: tuple[CameraSpec, ...]) -> RobotSpec:
     """Return a minimal robot declaration with configurable cameras."""
     return RobotSpec(
@@ -49,7 +61,7 @@ class CameraApiTest(unittest.TestCase):
     """Validate robot-owned camera metadata and public image schemas."""
 
     def test_camera_spec_computes_simulation_intrinsics(self) -> None:
-        camera = CameraSpec(
+        camera = _camera(
             name="wrist",
             parent_frame="tool",
             width=64,
@@ -70,11 +82,33 @@ class CameraApiTest(unittest.TestCase):
         self.assertAlmostEqual(intrinsics.center_y_px, 23.5)
         self.assertEqual(camera.modalities, ("rgb", "depth"))
 
+    def test_camera_spec_composes_mount_and_optical_transforms(self) -> None:
+        camera = CameraSpec(
+            name="wrist",
+            parent_frame="tool",
+            X_parent_camera_mount=Pose(
+                (1.0, 0.0, 0.0),
+                (math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5)),
+            ),
+            X_mount_camera_optical=Pose(
+                (1.0, 0.0, 0.0),
+                (1.0, 0.0, 0.0, 0.0),
+            ),
+        )
+
+        composed = camera.X_parent_camera_optical
+
+        np.testing.assert_allclose(composed.translation_m, (1.0, 1.0, 0.0))
+        np.testing.assert_allclose(
+            composed.quaternion_wxyz,
+            camera.X_parent_camera_mount.quaternion_wxyz,
+        )
+
     def test_robot_spec_accepts_zero_or_multiple_cameras(self) -> None:
         self.assertEqual(_robot_spec(()).cameras, ())
         cameras = (
-            CameraSpec("head", "head_link"),
-            CameraSpec("wrist", "tool", enabled=False),
+            _camera("head", "head_link"),
+            _camera("wrist", "tool", enabled=False),
         )
         self.assertEqual(_robot_spec(cameras).cameras, cameras)
 
@@ -82,13 +116,13 @@ class CameraApiTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "camera names must be unique"):
             _robot_spec(
                 (
-                    CameraSpec("camera", "frame_a"),
-                    CameraSpec("camera", "frame_b"),
+                    _camera("camera", "frame_a"),
+                    _camera("camera", "frame_b"),
                 )
             )
 
     def test_camera_observation_enforces_shape_dtype_and_metric_depth(self):
-        spec = CameraSpec(
+        spec = _camera(
             "camera",
             "frame",
             width=4,
@@ -118,15 +152,30 @@ class CameraApiTest(unittest.TestCase):
         self.assertFalse(observation.rgb.flags.writeable)
         self.assertFalse(observation.depth.flags.writeable)
 
+    def test_camera_observation_exposes_immutable_label_names(self) -> None:
+        spec = _camera("camera", "frame", width=2, height=2)
+        observation = CameraObservation(
+            frame="camera",
+            timestamp_s=0.0,
+            pose=Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
+            intrinsics=spec.intrinsics,
+            label=np.ones((2, 2), dtype=np.int16),
+            label_names={1: "object::base_link"},
+        )
+
+        self.assertEqual(observation.label_names[1], "object::base_link")
+        with self.assertRaises(TypeError):
+            observation.label_names[2] = "other::base_link"
+
     def test_invalid_camera_contracts_fail_loudly(self) -> None:
         with self.assertRaisesRegex(ValueError, "Unsupported camera"):
-            CameraSpec("camera", "frame", modalities=("thermal",))
+            _camera("camera", "frame", modalities=("thermal",))
         with self.assertRaisesRegex(TypeError, "rgb must have dtype"):
             CameraObservation(
                 frame="frame",
                 timestamp_s=0.0,
                 pose=Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
-                intrinsics=CameraSpec(
+                intrinsics=_camera(
                     "camera", "frame", width=2, height=2
                 ).intrinsics,
                 rgb=np.zeros((2, 2, 3), dtype=np.float32),

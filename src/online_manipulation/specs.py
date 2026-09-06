@@ -16,6 +16,46 @@ def _positive(value: float, name: str) -> float:
     return result
 
 
+def _normalized_quaternion(
+    quaternion_wxyz: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    """Return a unit quaternion for rigid-transform composition."""
+    norm = math.sqrt(sum(value * value for value in quaternion_wxyz))
+    return tuple(value / norm for value in quaternion_wxyz)
+
+
+def _compose_poses(X_AB: Pose, X_BC: Pose) -> Pose:
+    """Compose two public rigid poses without depending on Drake types."""
+    aw, ax, ay, az = _normalized_quaternion(X_AB.quaternion_wxyz)
+    bw, bx, by, bz = _normalized_quaternion(X_BC.quaternion_wxyz)
+    quaternion = (
+        aw * bw - ax * bx - ay * by - az * bz,
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+    )
+    x, y, z = X_BC.translation_m
+    tx = 2.0 * (ay * z - az * y)
+    ty = 2.0 * (az * x - ax * z)
+    tz = 2.0 * (ax * y - ay * x)
+    rotated = (
+        x + aw * tx + ay * tz - az * ty,
+        y + aw * ty + az * tx - ax * tz,
+        z + aw * tz + ax * ty - ay * tx,
+    )
+    return Pose(
+        tuple(
+            parent + offset
+            for parent, offset in zip(
+                X_AB.translation_m,
+                rotated,
+                strict=True,
+            )
+        ),
+        quaternion,
+    )
+
+
 @dataclasses.dataclass(frozen=True)
 class TimingConfig:
     """Physics, controller, and policy periods in seconds."""
@@ -291,16 +331,12 @@ class GripperSpec:
 
 @dataclasses.dataclass(frozen=True)
 class CameraSpec:
-    """Robot-owned camera mounting and simulation imaging parameters."""
+    """Robot-owned mount-to-optical geometry and simulation imaging data."""
 
     name: str
     parent_frame: str
-    X_parent_camera: Pose = dataclasses.field(
-        default_factory=lambda: Pose(
-            (0.0, 0.0, 0.0),
-            (1.0, 0.0, 0.0, 0.0),
-        )
-    )
+    X_parent_camera_mount: Pose
+    X_mount_camera_optical: Pose
     width: int = 320
     height: int = 240
     fov_y_rad: float = math.radians(60.0)
@@ -338,6 +374,19 @@ class CameraSpec:
         if unknown:
             raise ValueError(f"Unsupported camera modalities: {sorted(unknown)}")
         object.__setattr__(self, "modalities", modalities)
+
+    @property
+    def X_parent_camera_optical(self) -> Pose:
+        """Return the composed parent-frame to Drake optical-frame pose."""
+        return _compose_poses(
+            self.X_parent_camera_mount,
+            self.X_mount_camera_optical,
+        )
+
+    @property
+    def X_parent_camera(self) -> Pose:
+        """Return the final optical pose using the v0.2-compatible name."""
+        return self.X_parent_camera_optical
 
     @property
     def intrinsics(self) -> CameraIntrinsics:
