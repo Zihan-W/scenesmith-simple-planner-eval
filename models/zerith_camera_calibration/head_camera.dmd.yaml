@@ -1,0 +1,28 @@
+directives:
+- add_model:
+    name: center_target
+    file: package://zerith_camera_calibration/center_target.sdf
+- add_weld:
+    parent: world
+    child: center_target::base_link
+    X_PC:
+      translation: [1.197504438107, 0.032500002293, 1.031055007218]
+      rotation: !Rpy { deg: [-102.000005549589, 0.0, -90.0] }
+- add_model:
+    name: right_target
+    file: package://zerith_camera_calibration/right_target.sdf
+- add_weld:
+    parent: world
+    child: right_target::base_link
+    X_PC:
+      translation: [1.197504438107, -0.167499997707, 1.031055007218]
+      rotation: !Rpy { deg: [-102.000005549589, 0.0, -90.0] }
+- add_model:
+    name: down_target
+    file: package://zerith_camera_calibration/down_target.sdf
+- add_weld:
+    parent: world
+    child: down_target::base_link
+    X_PC:
+      translation: [1.166317670273, 0.032500002293, 0.884332870128]
+      rotation: !Rpy { deg: [-102.000005549589, 0.0, -90.0] }

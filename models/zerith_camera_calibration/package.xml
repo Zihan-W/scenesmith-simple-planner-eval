@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>zerith_camera_calibration</name>
+  <version>0.1.0</version>
+  <description>Self-contained projection targets for Zerith simulation cameras.</description>
+  <maintainer email="noreply@example.com">SceneSmith</maintainer>
+  <license>MIT</license>
+</package>
