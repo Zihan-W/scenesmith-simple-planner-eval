@@ -1,5 +1,5 @@
 {
-  "converter_version": 3,
+  "converter_version": 4,
   "dipan_collision_proxy": "three_boxes",
   "expected_collision_geometry_count": 53,
   "mesh_count": 35,

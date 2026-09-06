@@ -26,7 +26,7 @@ EXPECTED_MESH_COUNT = 35
 EXPECTED_SOURCE_MESH_REFERENCE_COUNT = 70
 EXPECTED_OUTPUT_MESH_REFERENCE_COUNT = 57
 EXPECTED_COLLISION_GEOMETRY_COUNT = 53
-CONVERTER_VERSION = 3
+CONVERTER_VERSION = 4
 DIPAN_COLLISION_BOXES = (
     {
         "name": "dipan_lower_base",
@@ -202,11 +202,13 @@ def _convert_mesh(source_mesh: Path, output_mesh: Path) -> None:
         raise TypeError(f"Expected one triangle mesh in {source_mesh}")
 
     output_mesh.parent.mkdir(parents=True, exist_ok=True)
-    mesh.export(output_mesh)
+    mesh.export(output_mesh, include_normals=True)
 
     converted_mesh = trimesh.load_mesh(output_mesh, process=False)
     if not isinstance(converted_mesh, trimesh.Trimesh):
         raise TypeError(f"Expected one triangle mesh in {output_mesh}")
+    if not _obj_declares_normals(output_mesh):
+        raise ValueError(f"Converted OBJ has no vertex normals: {output_mesh}")
     if not np.allclose(mesh.bounds, converted_mesh.bounds, rtol=0.0, atol=1e-8):
         raise ValueError(
             f"Mesh bounds changed during conversion: {source_mesh} -> {output_mesh}"
@@ -221,10 +223,18 @@ def _validate_converted_mesh(source_mesh: Path, output_mesh: Path) -> None:
         raise TypeError(f"Expected one triangle mesh in {source_mesh}")
     if not isinstance(converted, trimesh.Trimesh):
         raise TypeError(f"Expected one triangle mesh in {output_mesh}")
+    if not _obj_declares_normals(output_mesh):
+        raise ValueError(f"Converted OBJ has no vertex normals: {output_mesh}")
     if not np.allclose(source.bounds, converted.bounds, rtol=0.0, atol=1e-8):
         raise ValueError(
             f"Mesh bounds differ: {source_mesh} -> {output_mesh}"
         )
+
+
+def _obj_declares_normals(path: Path) -> bool:
+    """Return whether an OBJ file contains at least one normal declaration."""
+    with path.open(encoding="utf-8") as stream:
+        return any(line.startswith("vn ") for line in stream)
 
 
 def _rewrite_urdf(

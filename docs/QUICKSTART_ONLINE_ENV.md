@@ -13,7 +13,7 @@ The generated Drake OBJ meshes must exist before the first run. Generate them
 from the checked-out Zerith submodule with this command:
 
 ```bash
-python scripts/convert_zerith_for_drake.py --source-model-dir external/Zerith_Model/ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02 --output-model-dir models/zerith_drake
+python scripts/convert_zerith_for_drake.py
 ```
 
 ## Minimal public API smoke test
