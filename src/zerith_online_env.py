@@ -8,6 +8,7 @@ physics_dt.
 
 import csv
 import dataclasses
+import math
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Sequence
@@ -16,17 +17,26 @@ import numpy as np
 
 from pydrake.all import (
     AddMultibodyPlantSceneGraph,
+    CameraInfo,
+    ClippingRange,
+    DepthRange,
+    DepthRenderCamera,
     DiagramBuilder,
     LoadModelDirectives,
+    MakeRenderEngineVtk,
     Meshcat,
     MeshcatVisualizer,
     MeshcatVisualizerParams,
     Parser,
     ProcessModelDirectives,
     Quaternion,
+    RenderCameraCore,
+    RenderEngineVtkParams,
     RigidTransform,
     Role,
     RollPitchYaw,
+    RgbdSensor,
+    RgbdSensorDiscrete,
     Simulator,
 )
 
@@ -35,8 +45,8 @@ from src.online_manipulation.drake_utils import (
     register_package_xml,
     set_free_body_world_pose,
 )
-from src.online_manipulation.observations import Pose
-from src.online_manipulation.specs import JointSpec
+from src.online_manipulation.observations import CameraObservation, Pose
+from src.online_manipulation.specs import CameraSpec, JointSpec, RendererSpec
 from src.zerith_grasp_geometry import add_left_grasp_frame
 from src.zerith_robot_config import (
     ROBOT_BASE_XYZ_METERS,
@@ -175,6 +185,8 @@ class ZerithOnlineEnv:
         realtime_rate: float = 0.0,
         meshcat: Meshcat | None = None,
         servo_joint_specs: Sequence[JointSpec] | None = None,
+        camera_specs: Sequence[CameraSpec] = (),
+        renderer_spec: RendererSpec = RendererSpec(),
     ):
         """Build the Drake diagram and initialize immutable model metadata."""
         self._scene_dmd = Path(scene_dmd).resolve()
@@ -268,6 +280,10 @@ class ZerithOnlineEnv:
             if servo_joint_specs is not None
             else None
         )
+        self._camera_specs = tuple(
+            camera for camera in camera_specs if camera.enabled
+        )
+        self._renderer_spec = renderer_spec
         if self._servo_joint_specs is not None and tuple(
             spec.name for spec in self._servo_joint_specs
         ) != tuple(config.name for config in ALL_SERVO_CONFIGS):
@@ -416,6 +432,66 @@ class ZerithOnlineEnv:
         ):
             raise ValueError("q_home violates a left-arm joint position limit")
 
+        self._camera_systems = {}
+        if self._camera_specs:
+            if self._renderer_spec.engine != "vtk":
+                raise ValueError("Only the vtk renderer is currently supported")
+            self.scene_graph.AddRenderer(
+                self._renderer_spec.name,
+                MakeRenderEngineVtk(RenderEngineVtkParams()),
+            )
+            for camera_spec in self._camera_specs:
+                parent_frame = self.plant.GetFrameByName(
+                    camera_spec.parent_frame,
+                    self._zerith,
+                )
+                parent_body = parent_frame.body()
+                parent_id = self.plant.GetBodyFrameIdOrThrow(
+                    parent_body.index()
+                )
+                X_BP = parent_frame.GetFixedPoseInBodyFrame()
+                X_PC = RigidTransform(
+                    Quaternion(camera_spec.X_parent_camera.quaternion_wxyz),
+                    camera_spec.X_parent_camera.translation_m,
+                )
+                camera_info = CameraInfo(
+                    camera_spec.width,
+                    camera_spec.height,
+                    camera_spec.fov_y_rad,
+                )
+                core = RenderCameraCore(
+                    self._renderer_spec.name,
+                    camera_info,
+                    ClippingRange(camera_spec.near_m, camera_spec.far_m),
+                    RigidTransform(),
+                )
+                depth_camera = DepthRenderCamera(
+                    core,
+                    DepthRange(camera_spec.near_m, camera_spec.far_m),
+                )
+                continuous_sensor = RgbdSensor(
+                    parent_id,
+                    X_BP @ X_PC,
+                    depth_camera,
+                    False,
+                )
+                sensor = builder.AddSystem(
+                    RgbdSensorDiscrete(
+                        continuous_sensor,
+                        period=camera_spec.update_period_s,
+                        render_label_image="label" in camera_spec.modalities,
+                    )
+                )
+                sensor.set_name(camera_spec.name)
+                builder.Connect(
+                    self.scene_graph.get_query_output_port(),
+                    sensor.query_object_input_port(),
+                )
+                self._camera_systems[camera_spec.name] = (
+                    camera_spec,
+                    sensor,
+                )
+
         if self.meshcat is not None:
             MeshcatVisualizer.AddToBuilder(
                 builder,
@@ -478,6 +554,56 @@ class ZerithOnlineEnv:
             "torque_applied": sample.applied_torque.copy(),
             "torque_saturated": sample.saturated.copy(),
         }
+
+    @property
+    def sensor_observations(self) -> dict[str, CameraObservation]:
+        """Return the latest sampled-and-held public camera observations."""
+        if self._simulator is None:
+            raise RuntimeError("Call reset() before reading camera sensors")
+        root_context = self._simulator.get_context()
+        observations = {}
+        for name, (spec, sensor) in self._camera_systems.items():
+            context = sensor.GetMyContextFromRoot(root_context)
+            modalities = spec.modalities
+            rgb = None
+            if "rgb" in modalities:
+                rgba = sensor.color_image_output_port().Eval(context).data
+                rgb = np.asarray(rgba[:, :, :3], dtype=np.uint8)
+            depth = None
+            if "depth" in modalities:
+                depth_data = sensor.depth_image_32F_output_port().Eval(
+                    context
+                ).data
+                depth = np.asarray(depth_data[:, :, 0], dtype=np.float32)
+            label = None
+            if "label" in modalities:
+                label_data = sensor.label_image_output_port().Eval(context).data
+                label = np.asarray(label_data[:, :, 0], dtype=np.int16)
+            simulation_time = float(root_context.get_time())
+            # RgbdSensorDiscrete samples at offset zero and holds for exactly
+            # update_period_s. Derive the capture time from that public
+            # schedule so observation time remains stable across Drake builds.
+            sample_index = math.floor(
+                (simulation_time + 1e-12) / spec.update_period_s
+            )
+            timestamp = sample_index * spec.update_period_s
+            X_WC = sensor.body_pose_in_world_output_port().Eval(context)
+            observations[name] = CameraObservation(
+                frame=name,
+                timestamp_s=timestamp,
+                pose=Pose(
+                    tuple(float(value) for value in X_WC.translation()),
+                    tuple(
+                        float(value)
+                        for value in X_WC.rotation().ToQuaternion().wxyz()
+                    ),
+                ),
+                intrinsics=spec.intrinsics,
+                rgb=rgb,
+                depth=depth,
+                label=label,
+            )
+        return observations
 
     def _plant_context(self):
         """Return mutable plant context owned by the active simulator."""
@@ -553,6 +679,10 @@ class ZerithOnlineEnv:
         self._simulator.set_target_realtime_rate(self.realtime_rate)
         self._update_servo()
         self._simulator.Initialize()
+        # Process sample-and-hold camera events scheduled at t=0 so reset()
+        # always returns a real first frame rather than zero-filled defaults.
+        if self._camera_systems:
+            self._simulator.AdvanceTo(0.0)
         self.diagram.ForcedPublish(self._simulator.get_context())
         return self._observation()
 

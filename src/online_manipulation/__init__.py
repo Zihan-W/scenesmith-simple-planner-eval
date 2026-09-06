@@ -78,10 +78,11 @@ from src.online_manipulation.tasks import (
 from src.online_manipulation.adapters.zerith import (
     ZerithEnvironmentConfig,
     ZerithRobotAdapter,
+    make_zerith_camera_specs,
     make_zerith_robot_spec,
 )
 
-PUBLIC_API_VERSION = "0.1"
+PUBLIC_API_VERSION = "0.2.dev1"
 
 __all__ = [
     "PUBLIC_API_VERSION",
@@ -127,6 +128,7 @@ __all__ = [
     "PlanningQuery",
     "build_planning_query",
     "make_env",
+    "make_zerith_camera_specs",
     "make_zerith_robot_spec",
     "write_updated_dmd",
     "run_episode",

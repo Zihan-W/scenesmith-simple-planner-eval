@@ -40,6 +40,7 @@ from src.online_manipulation.planning import (
 )
 from src.online_manipulation.protocols import ContactPolicy, Task
 from src.online_manipulation.specs import (
+    CameraSpec,
     GripperSpec,
     JointSpec,
     ObservedBodySpec,
@@ -172,6 +173,7 @@ def make_zerith_robot_spec(
     robot_yaw_deg: float,
     rail_position: float,
     q_home_left: Sequence[float],
+    cameras: Sequence[CameraSpec] = (),
 ) -> RobotSpec:
     """Create the calibrated fixed-rail, left-arm Zerith specification."""
     model_dir = Path(robot_model_dir).resolve()
@@ -227,6 +229,51 @@ def make_zerith_robot_spec(
                 f"{model_instance_name}::left_shoulder_roll_link",
             ),
         ),
+        cameras=tuple(cameras),
+    )
+
+
+def make_zerith_camera_specs(
+    *,
+    enabled_names: Sequence[str] = (),
+    width: int = 320,
+    height: int = 240,
+    fov_y_rad: float = math.radians(60.0),
+    near_m: float = 0.05,
+    far_m: float = 10.0,
+    update_period_s: float = 0.05,
+    modalities: Sequence[str] = ("rgb", "depth", "label"),
+) -> tuple[CameraSpec, ...]:
+    """Return Zerith camera mounts with explicit simulation intrinsics.
+
+    The upstream URDF provides three rigid camera links but no sensor
+    intrinsics or update rates. These values therefore describe simulation
+    cameras and are not asserted to match the physical robot.
+    """
+    mounts = (
+        ("left_wrist_camera", "left_jaw_camera_link"),
+        ("right_wrist_camera", "right_jaw_camera_link"),
+        ("head_camera", "neck_camera_link"),
+    )
+    requested = frozenset(enabled_names)
+    available = frozenset(name for name, _ in mounts)
+    unknown = requested - available
+    if unknown:
+        raise ValueError(f"Unknown Zerith cameras: {sorted(unknown)}")
+    return tuple(
+        CameraSpec(
+            name=name,
+            parent_frame=parent_frame,
+            width=width,
+            height=height,
+            fov_y_rad=fov_y_rad,
+            near_m=near_m,
+            far_m=far_m,
+            update_period_s=update_period_s,
+            modalities=tuple(modalities),
+            enabled=name in requested,
+        )
+        for name, parent_frame in mounts
     )
 
 
@@ -1020,6 +1067,7 @@ class LegacyZerithRuntimeBackend:
             objects=objects,
             contacts=contacts,
             task={},
+            sensors=self.runtime.sensor_observations,
         )
 
 
@@ -1095,6 +1143,8 @@ def make_legacy_zerith_environment(
         realtime_rate=scenario.visualization.realtime_rate,
         meshcat=meshcat,
         servo_joint_specs=adapter.spec.controlled_joints,
+        camera_specs=adapter.spec.cameras,
+        renderer_spec=scenario.renderer,
     )
 
 
@@ -1149,6 +1199,7 @@ class ZerithEnvironmentConfig:
     target_body_name: str = "base_link"
     task: Task | None = None
     enable_planning_query: bool = False
+    cameras: tuple[CameraSpec, ...] = ()
 
     def __post_init__(self) -> None:
         """Normalize paths and sequences and validate runtime limits."""
@@ -1189,6 +1240,7 @@ class ZerithEnvironmentConfig:
             )
         if not self.target_body_name:
             raise ValueError("target_body_name must be nonempty")
+        object.__setattr__(self, "cameras", tuple(self.cameras))
 
     def build_environment(self) -> OnlineManipulationEnv:
         """Build the public environment without exposing Drake internals."""
@@ -1199,6 +1251,7 @@ class ZerithEnvironmentConfig:
                 robot_yaw_deg=self.robot_yaw_deg,
                 rail_position=self.rail_position,
                 q_home_left=self.q_home_left,
+                cameras=self.cameras,
             )
         )
         planning_query = (

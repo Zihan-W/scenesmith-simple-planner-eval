@@ -1,0 +1,25 @@
+directives:
+- add_model:
+    name: portable_floor
+    file: package://online_env_minimal_scene/floor.sdf
+    default_free_body_pose:
+      base_link:
+        base_frame: world
+        translation: [0.0, 0.0, -0.05]
+        rotation: !Rpy { deg: [0.0, 0.0, 0.0] }
+- add_model:
+    name: portable_test_box
+    file: package://online_env_minimal_scene/movable_box.sdf
+    default_free_body_pose:
+      base_link:
+        base_frame: world
+        translation: [1.5, 0.0, 0.05]
+        rotation: !Rpy { deg: [0.0, 0.0, 0.0] }
+- add_model:
+    name: camera_marker
+    file: package://online_env_minimal_scene/camera_marker.sdf
+    default_free_body_pose:
+      base_link:
+        base_frame: world
+        translation: [1.5, 0.0, 0.5]
+        rotation: !Rpy { deg: [0.0, 0.0, 0.0] }

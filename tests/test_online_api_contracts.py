@@ -7,6 +7,7 @@ import numpy as np
 
 from src.online_manipulation import (
     PUBLIC_API_VERSION,
+    CameraSpec,
     CompositeAction,
     ContactObservation,
     EnvironmentConfig,
@@ -100,7 +101,7 @@ class _FakeAdapter:
 class _ThreeJointMockAdapter:
     """RobotAdapter proving the contract has no seven-axis assumption."""
 
-    def __init__(self) -> None:
+    def __init__(self, cameras: tuple[CameraSpec, ...] = ()) -> None:
         joints = tuple(
             JointSpec(
                 f"axis_{index}",
@@ -126,6 +127,7 @@ class _ThreeJointMockAdapter:
             end_effector_frame_name="tip",
             home_positions=(0.0, 0.0, 0.0),
             gripper=None,
+            cameras=cameras,
         )
 
     @property
@@ -330,7 +332,7 @@ class PublicContractTest(unittest.TestCase):
     """Validate stable public action, observation, and protocol behavior."""
 
     def test_public_api_version_is_explicit(self) -> None:
-        self.assertEqual(PUBLIC_API_VERSION, "0.1")
+        self.assertEqual(PUBLIC_API_VERSION, "0.2.dev1")
 
     def test_default_timing_has_expected_integer_schedule(self) -> None:
         timing = TimingConfig()
@@ -380,6 +382,14 @@ class PublicContractTest(unittest.TestCase):
             len(adapter.make_robot_observation(None, None, None, {}).q),
             3,
         )
+
+    def test_mock_adapter_can_declare_zero_or_multiple_cameras(self) -> None:
+        self.assertEqual(_ThreeJointMockAdapter().spec.cameras, ())
+        cameras = (
+            CameraSpec("camera_a", "frame_a"),
+            CameraSpec("camera_b", "frame_b"),
+        )
+        self.assertEqual(_ThreeJointMockAdapter(cameras).spec.cameras, cameras)
 
     def test_mock_adapter_drives_environment_with_named_partial_action(self):
         adapter = _ThreeJointMockAdapter()
