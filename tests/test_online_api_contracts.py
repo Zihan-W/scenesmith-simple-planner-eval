@@ -429,10 +429,11 @@ class PublicContractTest(unittest.TestCase):
         payload = observation.as_dict()
         self.assertEqual(
             set(payload),
-            {"time", "robot", "objects", "contacts", "task"},
+            {"time", "robot", "objects", "contacts", "task", "sensors"},
         )
         self.assertIn("arbitrary_object", payload["objects"])
         self.assertNotIn("red_box_pose", payload)
+        self.assertEqual(payload["sensors"], {})
 
     def test_initial_pose_requires_a_declared_observed_body(self) -> None:
         with self.assertRaisesRegex(ValueError, "observed bodies"):

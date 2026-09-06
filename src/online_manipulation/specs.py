@@ -5,7 +5,7 @@ import math
 from collections.abc import Mapping
 from pathlib import Path
 
-from src.online_manipulation.observations import Pose
+from src.online_manipulation.observations import CameraIntrinsics, Pose
 
 
 def _positive(value: float, name: str) -> float:
@@ -69,6 +69,21 @@ class VisualizationConfig:
             raise ValueError("port must be within [1, 65535]")
         if not math.isfinite(self.realtime_rate) or self.realtime_rate < 0.0:
             raise ValueError("realtime_rate must be finite and nonnegative")
+
+
+@dataclasses.dataclass(frozen=True)
+class RendererSpec:
+    """Scenario-owned render engine selection for robot-mounted sensors."""
+
+    name: str = "online_environment_renderer"
+    engine: str = "vtk"
+
+    def __post_init__(self) -> None:
+        """Validate the stable renderer name and supported engine."""
+        if not self.name:
+            raise ValueError("Renderer name must be nonempty")
+        if self.engine != "vtk":
+            raise ValueError("Only the vtk renderer is currently supported")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -142,6 +157,7 @@ class ScenarioSpec:
     visualization: VisualizationConfig = dataclasses.field(
         default_factory=VisualizationConfig
     )
+    renderer: RendererSpec = dataclasses.field(default_factory=RendererSpec)
     output_directory: Path | None = None
 
     def __post_init__(self) -> None:
@@ -274,6 +290,73 @@ class GripperSpec:
 
 
 @dataclasses.dataclass(frozen=True)
+class CameraSpec:
+    """Robot-owned camera mounting and simulation imaging parameters."""
+
+    name: str
+    parent_frame: str
+    X_parent_camera: Pose = dataclasses.field(
+        default_factory=lambda: Pose(
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0, 0.0),
+        )
+    )
+    width: int = 320
+    height: int = 240
+    fov_y_rad: float = math.radians(60.0)
+    near_m: float = 0.05
+    far_m: float = 10.0
+    update_period_s: float = 0.05
+    modalities: tuple[str, ...] = ("rgb", "depth", "label")
+    enabled: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate one portable camera declaration."""
+        if not self.name or not self.parent_frame:
+            raise ValueError("Camera name and parent_frame must be nonempty")
+        if self.width < 1 or self.height < 1:
+            raise ValueError("Camera dimensions must be positive")
+        scalar_values = (
+            self.fov_y_rad,
+            self.near_m,
+            self.far_m,
+            self.update_period_s,
+        )
+        if not all(math.isfinite(value) for value in scalar_values):
+            raise ValueError("Camera scalar values must be finite")
+        if not 0.0 < self.fov_y_rad < math.pi:
+            raise ValueError("Camera fov_y_rad must lie within (0, pi)")
+        if self.near_m <= 0.0 or self.near_m >= self.far_m:
+            raise ValueError("Camera range must satisfy 0 < near < far")
+        if self.update_period_s <= 0.0:
+            raise ValueError("Camera update_period_s must be positive")
+        modalities = tuple(self.modalities)
+        allowed = frozenset(("rgb", "depth", "label"))
+        if not modalities or len(set(modalities)) != len(modalities):
+            raise ValueError("Camera modalities must be nonempty and unique")
+        unknown = set(modalities) - allowed
+        if unknown:
+            raise ValueError(f"Unsupported camera modalities: {sorted(unknown)}")
+        object.__setattr__(self, "modalities", modalities)
+
+    @property
+    def intrinsics(self) -> CameraIntrinsics:
+        """Return the configured simulation pinhole calibration."""
+        focal = 0.5 * self.height / math.tan(0.5 * self.fov_y_rad)
+        return CameraIntrinsics(
+            width=self.width,
+            height=self.height,
+            focal_x_px=focal,
+            focal_y_px=focal,
+            center_x_px=0.5 * self.width - 0.5,
+            center_y_px=0.5 * self.height - 0.5,
+            fov_y_rad=self.fov_y_rad,
+            near_m=self.near_m,
+            far_m=self.far_m,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
 class RobotSpec:
     """Robot description consumed by a RobotAdapter implementation."""
 
@@ -289,6 +372,7 @@ class RobotSpec:
     home_positions: tuple[float, ...]
     gripper: GripperSpec | None = None
     safety_exempt_body_pairs: tuple[tuple[str, str], ...] = ()
+    cameras: tuple[CameraSpec, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate robot names, mappings, and ordered home positions."""
@@ -338,6 +422,13 @@ class RobotSpec:
         object.__setattr__(self, "controlled_joints", joints)
         object.__setattr__(self, "home_positions", home)
         object.__setattr__(self, "safety_exempt_body_pairs", safety_pairs)
+        cameras = tuple(self.cameras)
+        if any(not isinstance(camera, CameraSpec) for camera in cameras):
+            raise TypeError("RobotSpec cameras must be CameraSpec instances")
+        camera_names = tuple(camera.name for camera in cameras)
+        if len(set(camera_names)) != len(camera_names):
+            raise ValueError("RobotSpec camera names must be unique")
+        object.__setattr__(self, "cameras", cameras)
 
     @property
     def controlled_joint_names(self) -> tuple[str, ...]:

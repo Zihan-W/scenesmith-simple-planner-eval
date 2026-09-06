@@ -15,6 +15,8 @@ from src.online_manipulation.contact import (
     PairContactPolicy,
 )
 from src.online_manipulation.observations import (
+    CameraIntrinsics,
+    CameraObservation,
     ContactObservation,
     ObjectObservation,
     Observation,
@@ -57,11 +59,13 @@ from src.online_manipulation.protocols import (
     TaskEvaluation,
 )
 from src.online_manipulation.specs import (
+    CameraSpec,
     GripperSpec,
     JointSpec,
     ObservedBodySpec,
     PlanarPoseRandomizationSpec,
     RobotSpec,
+    RendererSpec,
     ScenarioSpec,
     TimingConfig,
     VisualizationConfig,
@@ -82,6 +86,9 @@ PUBLIC_API_VERSION = "0.1"
 __all__ = [
     "PUBLIC_API_VERSION",
     "CartesianDeltaAction",
+    "CameraIntrinsics",
+    "CameraObservation",
+    "CameraSpec",
     "CarriedBody",
     "ClearanceMetrics",
     "CollisionPair",
@@ -129,6 +136,7 @@ __all__ = [
     "RobotAdapter",
     "RobotObservation",
     "RobotSpec",
+    "RendererSpec",
     "ScenarioSpec",
     "SpatialVelocity",
     "Task",
