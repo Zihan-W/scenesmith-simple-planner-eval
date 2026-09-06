@@ -238,6 +238,17 @@ differential-IK result is globally scaled to preserve its joint-space
 direction, then the complete edge is densely checked. These queries do not
 run RRT, TOPPRA, or advance the real simulation context.
 
+Every dense-edge result attributes validity independently to joint limits,
+strict nonpenetration, and policy-filtered safety clearance. For
+nonpenetration diagnostics, the limiting geometry pair is selected by its
+distance above the pair-specific bound, not merely by the smallest raw signed
+distance. The result records that pair's distance at the edge start, every
+sample, and the edge end, plus the actual end-effector translation from the
+measured validation start to the proposed command. This evidence distinguishes
+a safe separating motion from a command that moves an existing support
+contact deeper into penetration; recording it does not relax any threshold or
+change the dynamics collision filter.
+
 ### EpisodeRunner
 
 负责：
@@ -375,9 +386,12 @@ The current physical backend remains the explicitly named
 `LegacyZerithRuntimeBackend`, which wraps the robot-specific
 `ZerithOnlineEnv`. It is owned by the Zerith adapter integration boundary and
 is not part of the generic Environment API. A three-joint, gripper-free mock
-adapter verifies the public contract, but a second real robot adapter has not
-been validated. Retiring the compatibility backend is a later migration, not
-part of Phase 8.
+adapter verifies the public contract and drives `OnlineManipulationEnv`
+through `reset()` and a sparse two-joint action. The test derives joint names
+and state size from RobotSpec, proving that the facade does not require seven
+joints, Zerith names, a gripper, or a fixed action-vector dimension. A second
+real robot adapter has not been validated. Retiring the compatibility backend
+is a later migration, not part of Phase 8.
 
 ## 11. Colleague Handoff Recipes
 

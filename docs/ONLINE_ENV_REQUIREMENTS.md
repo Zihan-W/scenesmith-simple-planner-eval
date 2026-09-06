@@ -250,6 +250,12 @@ Task 决定当前允许哪些目标接触。
 * action 被拒绝或缩放时，在 `info` 中返回明确原因；
 * 抓取后必须检查携带物体与环境的碰撞。
 
+Cartesian edge 的拒绝诊断必须明确区分关节限位、nonpenetration 和 safety
+clearance。nonpenetration 失败必须记录限制它的 body/geometry pair、该 pair
+相对于自身阈值的 signed-distance margin、边起点/终点距离以及全部采样距离，
+以区分“安全脱离已有接触”和“继续加深穿透”。诊断不得引入新的白名单，也不得
+放宽全局阈值。
+
 ## 六、场景写回
 
 实现：
