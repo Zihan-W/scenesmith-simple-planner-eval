@@ -90,7 +90,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rgb_path = args.output_dir / "head_camera_rgb.png"
     depth_path = args.output_dir / "head_camera_depth_m.npy"
-    Image.fromarray(camera.rgb, mode="RGB").save(rgb_path)
+    Image.fromarray(camera.rgb).save(rgb_path)
     np.save(depth_path, camera.depth)
 
     valid_depth = np.isfinite(camera.depth) & (camera.depth > 0.0)
