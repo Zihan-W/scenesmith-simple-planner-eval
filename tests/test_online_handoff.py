@@ -15,8 +15,12 @@ from src.online_manipulation import (
     ObservedBodySpec,
     PlanarPoseRandomizationSpec,
     ScenarioSpec,
+    TimingConfig,
     ZerithEnvironmentConfig,
+    ZerithRobotAdapter,
+    build_planning_query,
     make_env,
+    make_zerith_robot_spec,
     run_episodes,
 )
 
@@ -58,7 +62,7 @@ def _config(
             pose_randomizations=randomizations,
         ),
         robot_model_dir=ROBOT_MODEL_DIR,
-        robot_xyz=(0.0, 0.0, 0.1815),
+        robot_xyz=(0.0, 0.0, 0.2315),
         robot_yaw_deg=0.0,
         rail_position=0.4,
         q_home_left=(0.0,) * 7,
@@ -69,6 +73,31 @@ def _config(
 
 class OnlineHandoffTest(unittest.TestCase):
     """Exercise public handoff behavior against a second real DMD scene."""
+
+    def test_minimal_scene_default_planning_state_has_no_penetration(self):
+        config = _config()
+        adapter = ZerithRobotAdapter(
+            make_zerith_robot_spec(
+                robot_model_dir=config.robot_model_dir,
+                robot_xyz=config.robot_xyz,
+                robot_yaw_deg=config.robot_yaw_deg,
+                rail_position=config.rail_position,
+                q_home_left=config.q_home_left,
+            )
+        )
+        query = build_planning_query(
+            scenario=config.scenario,
+            robot_adapter=adapter,
+            timing=TimingConfig(),
+        )
+
+        check = query.check_configuration(adapter.spec.home_positions)
+
+        self.assertTrue(check.valid)
+        self.assertGreaterEqual(
+            check.clearance.minimum_nonpenetration_distance_m,
+            0.0,
+        )
 
     def test_scene_replacement_runs_adapter_task_and_hold_policy(self):
         env = make_env(_config())

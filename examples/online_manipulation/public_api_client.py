@@ -33,7 +33,9 @@ def make_config(repository_root: Path) -> ZerithEnvironmentConfig:
             ),
         ),
         robot_model_dir=root / "models" / "zerith_drake",
-        robot_xyz=(0.0, 0.0, 0.1815),
+        # The floor top is z=0.0.  This height leaves the wheel collision
+        # proxies 1.6 mm above it in the default configuration.
+        robot_xyz=(0.0, 0.0, 0.2315),
         robot_yaw_deg=0.0,
         rail_position=0.4,
         q_home_left=(0.0,) * 7,
