@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-06
 Release status: Released as local annotated tag `online-env-v0.1`
-Current phase: Phase 8 — Handoff and Portability Complete
+Current phase: online-env-v0.2 Phase 1 — Camera API implemented, review pending
 
 ## Release Record
 
@@ -58,6 +58,13 @@ the fixed-base Zerith PickLift integration with the rail fixed at `0.4 m`.
 * `d9e4e4a` Tune Zerith servos for physical grasping
 * `d898456` Add portable seeded environment composition
 * `52202b5` Validate benchmark and DMD portability
+* `5e2a54d` Fix TAMP execution to send validated goal
+* `f991931` Raise Zerith above the portable scene floor
+* `b2f5bbe` Add copyable online environment quickstart
+* `2bcd02f` Define portable robot camera API
+* `6158ca8` Generate renderable Zerith OBJ meshes
+* `0032680` Add sampled robot-mounted camera observations
+* `2e3e203` Add external camera API example
 
 ## Current Validated State
 
@@ -81,6 +88,47 @@ the fixed-base Zerith PickLift integration with the rail fixed at `0.4 m`.
 * LIFT raises the target more than 8 cm and holds it for more than 3 s
 * Carried-target planning checks include table and environment geometry
 * No sustained torque saturation
+
+## online-env-v0.2 Phase 1 Camera Results
+
+The public development API is `0.2.dev1`. `RobotSpec` can declare zero or
+multiple `CameraSpec` values. `ScenarioSpec` owns the renderer. Only enabled
+cameras are added to the Drake Diagram, and a camera-free environment does not
+register a renderer.
+
+The upstream and derived Zerith URDFs contain three mechanically attached
+camera links but no sensor tags or hardware intrinsics. The exact mount
+inventory and joint chains are recorded in `docs/ZERITH_CAMERA_INVENTORY.md`.
+Default 320×240, 60-degree, 20 Hz pinhole values are explicitly simulation
+camera intrinsics.
+
+Validated behavior:
+
+* `reset(seed=...)` returns a real frame captured at simulation time 0;
+* RGB is H×W×3 uint8, depth is H×W float32 meters, and labels are H×W int16;
+* a 0.15 s camera retains timestamp/frame 0.0 at policy time 0.1, then updates
+  to timestamp 0.15 at policy time 0.2;
+* left wrist camera world pose changes after an online shoulder action;
+* rigid link-to-camera mounting is preserved across joint configurations;
+* the same Zerith adapter runs the base and camera-variant DMDs;
+* the two DMDs produce different RGB and depth images while camera pose and
+  intrinsics remain equal;
+* repeated randomized reset with the same seed reproduces the camera image;
+* disabled cameras preserve an empty `obs.sensors` map and create no renderer;
+* a three-axis MockRobotAdapter declares either zero or multiple cameras;
+* an external client runs from `/tmp`, saves RGB/depth, reads the image in its
+  Policy, and advances one accepted HoldAction.
+
+The focused camera suite passed 16 tests. The complete repository suite passed
+96 tests in 214.281 seconds. A post-change, camera-disabled fixed PickLift
+regression also passed 1/1 at seed 500 (`lift_held`, 276 policy steps), with
+JSON, CSV, and final-DMD artifacts under
+`output/online_env_v02_camera_disabled_picklift`.
+
+The two real rendered RGB samples are stored in `docs/assets`; the variant
+scene changes both RGB and metric depth while retaining the same camera mount
+and intrinsics. No target detection, visual policy, PLACE, mobile-base
+control, or rail dynamics was added.
 
 ## Current PREGRASP Metrics
 

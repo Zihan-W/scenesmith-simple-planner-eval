@@ -1,6 +1,6 @@
 # Online Manipulation Environment Architecture
 
-Status: Phase 8 handoff and portability validated
+Status: v0.2 Phase 1 camera implementation validated; visual review pending
 Source of truth: `docs/ONLINE_ENV_REQUIREMENTS.md`
 
 ## 0. Migration Baseline
@@ -41,8 +41,9 @@ Controller / Drake Plant / SceneGraph
 
 ## 2. Public API
 
-Phase 1 exposes the experimental public package `src.online_manipulation`
-with `PUBLIC_API_VERSION = "0.1"`. Version 0.1 is additive: the existing
+Phase 1 exposed the experimental public package `src.online_manipulation`.
+The current development branch reports `PUBLIC_API_VERSION = "0.2.dev1"`;
+the immutable `online-env-v0.1` tag still reports version 0.1. Version 0.1 was additive: the existing
 `ZerithOnlineEnv` entry points remain supported while the new environment
 delegates to them through an Adapter. Compatibility code may be removed only
 after the real Adapter regression covers the existing PREGRASP behavior.
@@ -112,6 +113,7 @@ env.write_updated_scenario(output_path)
 * 接触和仿真参数；
 * 初始对象状态；
 * 可视化及输出配置。
+* `RendererSpec`，仅在至少一个相机启用时实例化渲染器。
 
 ### RobotAdapter
 
@@ -126,6 +128,7 @@ env.write_updated_scenario(output_path)
 * controller gains；
 * collision groups；
 * home configuration。
+* stable robot-mounted `CameraSpec` declarations。
 
 第一个实现为 `ZerithRobotAdapter`。
 
@@ -143,6 +146,12 @@ It constructs `ZerithOnlineEnv` from `ScenarioSpec`, `TimingConfig`, and
 additional packages. A legacy dictionary-observation target is optional;
 generic object identity is declared only through
 `ScenarioSpec.observed_bodies` and Task configuration.
+
+Camera mounting belongs to `RobotSpec`/`RobotAdapter`, while renderer choice
+belongs to `ScenarioSpec`. The environment consumes those generic specs; it
+does not contain Zerith camera frame names. A disabled camera is not added to
+the Drake Diagram, and when no cameras are enabled the renderer is not
+registered.
 
 Scenario initial object poses are keyed by public observation name and applied
 to the simulation and independent planning contexts. The Zerith runtime
@@ -300,12 +309,19 @@ Observation 分为：
 * objects
 * contacts
 * task
+* sensors
 
 任务对象不得硬编码成固定顶层字段。
 
 Phase 3 normalizes the legacy runtime into these fields. Scene bodies exposed
 to policies are declared with `ObservedBodySpec`; the current task's red box
 appears under the caller-selected name `pick_target`, not a core field.
+
+Each `CameraObservation` contains optional RGB/depth/label arrays, capture
+timestamp, world-from-optical pose, and explicit simulation pinhole
+intrinsics. RGB is H×W×3 `uint8`; depth is H×W `float32` meters; labels are
+H×W `int16`. Drake uses 0 or infinity for invalid depth pixels, depending on
+which depth boundary was exceeded. Returned arrays are immutable snapshots.
 
 ## 6. Timing Contract
 
@@ -316,6 +332,12 @@ appears under the caller-selected name `pick_target`, not a core field.
 * policy_dt = 0.100 s
 
 一次 `step()` 精确推进一个 `policy_dt`。策略周期之间使用零阶保持。`step()` 中不得通过 `SetPositions()` 制造运动。
+
+Each camera uses `RgbdSensorDiscrete` with its own `update_period_s` and a
+zero capture offset. Camera sampling is therefore independent of the 10 Hz
+policy. The observation retains the latest complete frame and capture
+timestamp between sensor events. `reset()` explicitly processes the event at
+simulation time zero, making the first frame deterministic.
 
 ## 7. Collision and Contact
 

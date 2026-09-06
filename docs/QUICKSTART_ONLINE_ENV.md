@@ -29,6 +29,38 @@ Expected output ends with a JSON object containing
 `"action_type": "HoldAction"`, `"simulation_time_s": 0.1`, and
 `"action_status": "accepted"`.
 
+## Robot camera public API
+
+Run the camera client from outside the repository. It saves one PNG and one
+NumPy float32 depth array, prints timestamp/frame/intrinsics, and lets a
+Policy read the image without performing detection:
+
+```bash
+PYTHONPATH=/root/workspace/scenesmith-simple-planner-eval MPLCONFIGDIR=/tmp/matplotlib-cache MESA_SHADER_CACHE_DIR=/tmp/mesa-cache /root/workspace/scenesmith-simple-planner-eval/.venv/bin/python /root/workspace/scenesmith-simple-planner-eval/examples/online_manipulation/camera_public_api_client.py --repository-root /root/workspace/scenesmith-simple-planner-eval --output-dir /tmp/online-env-camera-quickstart --seed 0
+```
+
+The relevant public access is:
+
+```python
+observation, info = env.reset(seed=0)
+camera = observation.sensors["head_camera"]
+image = camera.rgb
+action = policy.act(observation)
+observation, reward, terminated, truncated, info = env.step(action)
+```
+
+The default simulation arrays have shapes `(240, 320, 3)` for RGB `uint8`,
+`(240, 320)` for depth `float32` meters, and `(240, 320)` for label `int16`.
+The update period is 0.05 s.
+Between camera events the latest complete frame and timestamp are held. These
+are simulation camera parameters; the Zerith URDF contains no hardware
+intrinsics.
+
+Two recorded examples are available for visual review:
+
+* [minimal scene](assets/head_camera_minimal_scene.png)
+* [camera variant scene](assets/head_camera_camera_variant.png)
+
 ## Validated PickLift
 
 The complete PickLift demonstration depends on a SceneSmith-generated scene

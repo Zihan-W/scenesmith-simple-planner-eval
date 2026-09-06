@@ -1,6 +1,6 @@
 # Online Manipulation Environment Requirements
 
-Status: Accepted implementation requirements
+Status: v0.2 Phase 1 camera requirements implemented; review pending
 Last reviewed: 2026-09-06
 
 你现在的任务不是继续开发一个写死的红盒抓取脚本，而是完成一个可交付给其他同事使用的在线机器人仿真环境。
@@ -33,6 +33,7 @@ env.write_updated_scenario(output_path)
 * 接入 Behavior Tree 或 TAMP；
 * 批量运行 episode，构建 benchmark；
 * 将来通过新增 RobotAdapter 接入其他机器人。
+* 通过稳定名称读取机器人挂载的零个或多个相机。
 
 红盒 Pick-and-Lift 只是端到端测试，不是系统架构中心。
 
@@ -106,6 +107,7 @@ Phase 0 基线已拆分为以下 checkpoint，后续里程碑必须持续复现�
 * 仿真和接触参数；
 * 初始自由物体状态；
 * Meshcat、日志和录制选项。
+* 场景渲染器配置；渲染器不属于机器人或任务。
 
 更换场景只能修改配置或构造参数，不能修改环境源码。
 
@@ -124,6 +126,7 @@ Phase 0 基线已拆分为以下 checkpoint，后续里程碑必须持续复现�
 * 控制器增益；
 * 碰撞分组；
 * home configuration。
+* 零个或多个 `CameraSpec`，包括父 frame、固定外参、仿真内参、更新周期和 modalities。
 
 先实现 `ZerithRobotAdapter`。
 
@@ -213,6 +216,26 @@ BT 或 TAMP 应能在每个周期读取 observation，并发送下一条 action�
 ```
 
 不得把红盒作为 observation 的固定顶层字段。任务相关内容放入 `task` 或通用 `objects`。
+
+v0.2 Phase 1 增加通用 `sensors` 映射。相机 observation 合同为：
+
+```python
+camera = obs.sensors["stable_camera_name"]
+camera.rgb          # H x W x 3 uint8, sRGB
+camera.depth        # H x W float32, meters
+camera.label        # H x W int16, Drake render labels
+camera.timestamp_s  # capture time in simulation seconds
+camera.pose         # world-from-optical-frame pose at capture time
+camera.intrinsics   # explicit simulation pinhole calibration
+```
+
+未启用的 modality 为 `None`。相机以自身 `update_period_s` 采样；策略两次
+读取之间看到最近一次完整帧的零阶保持结果。`reset()` 必须在 `t=0` 返回真实、
+确定的第一帧。关闭全部相机时不得注册渲染器或产生图像渲染开销。
+
+Task 可以按稳定名称读取所需 sensor，但 Environment 核心不得包含相机名称、
+Zerith frame 或当前任务的 sensor 选择。无可信硬件标定时，内参必须明确标为
+simulation camera intrinsics。
 
 ## 四、为 BT/TAMP 提供查询接口
 
