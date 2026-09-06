@@ -1,7 +1,23 @@
 # Online Manipulation Environment Progress
 
 Last updated: 2026-09-06
-Current phase: Phase 8 — Handoff and Portability Validated
+Release status: Released as local annotated tag `online-env-v0.1`
+Current phase: Phase 8 — Handoff and Portability Complete
+
+## Release Record
+
+The `online-env-v0.1` release covers the reusable online environment API and
+the fixed-base Zerith PickLift integration with the rail fixed at `0.4 m`.
+
+* Fixed-initial-state PickLift: `3/3` successful episodes.
+* Randomized PickLift (±3 mm X/Y and ±2° yaw): `2/3` successful episodes.
+* Seed 402 is classified as a PickLiftPolicy robustness failure. Pair-level
+  diagnostics showed that rejected carried-box actions deepened box-table
+  contact; the generic collision guard did not falsely reject separating
+  actions.
+* Not validated in this release: a second real robot, mobile-base control,
+  PLACE, or rail dynamics.
+* The tag is local only. Remote push requires separate authorization.
 
 ## Product Goal
 
@@ -818,7 +834,7 @@ largest reported step error was `0.013955 rad`.
 12. **Pass:** milestone commits are separated and `git status --short` is empty
     after documentation commit.
 
-## Current Blockers
+## Known Release Limitations
 
 * No trusted rail velocity or force parameters.
 * Robot portability has an executable three-joint, gripper-free mock
@@ -829,11 +845,11 @@ largest reported step error was `0.013955 rad`.
   diagnosed policy-robustness failure: proposed carried-box motion deepens the
   box-table contact for 44 steps, then the left elbow limit rejects 40 steps.
 
-## Next Action
+## Release Boundary
 
-The audited Phase 8 scope satisfies the `online-env-v0.1` creation criteria
-for the fixed-scene environment handoff. Await explicit authorization before
-creating the tag. The documented 2/3 perturbation robustness result is a
+The audited Phase 8 scope is released as `online-env-v0.1` for fixed-scene
+environment handoff. The documented 2/3 perturbation robustness result is a
 PickLiftPolicy limitation, not hidden infrastructure success. PLACE,
 mobile-base control, rail dynamics, a second real RobotAdapter, and broader
-randomized robustness belong to later phases.
+randomized robustness belong to later phases. The local tag must not be pushed
+until remote publication is separately authorized.
