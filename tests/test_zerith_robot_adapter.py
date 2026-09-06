@@ -259,6 +259,8 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                     joint_delta_scaled=False,
                     requested_twist=(0.0,) * 6,
                     achieved_twist=(0.0,) * 6,
+                    validation_start_configuration=(0.0,) * 9,
+                    validation_edge_translation_m=(0.0, 0.0, 0.0),
                     edge=SimpleNamespace(
                         valid=True,
                         minimum_nonpenetration_distance_m=0.01,
@@ -266,6 +268,16 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                         minimum_nonpenetration_alpha=0.0,
                         minimum_safety_alpha=0.0,
                         sample_count=2,
+                        limiting_nonpenetration_pair=None,
+                        limiting_pair_start_distance_m=None,
+                        limiting_pair_end_distance_m=None,
+                        limiting_pair_sample_distances_m=(),
+                        limiting_pair_monotonic_non_decreasing=None,
+                        minimum_nonpenetration_margin_m=0.01,
+                        minimum_nonpenetration_margin_alpha=0.0,
+                        joint_limits_valid=True,
+                        nonpenetration_valid=True,
+                        safety_clearance_valid=True,
                     ),
                 )
 
@@ -303,6 +315,8 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                     joint_delta_scaled=False,
                     requested_twist=(0.0,) * 6,
                     achieved_twist=(0.0,) * 6,
+                    validation_start_configuration=(0.0,) * 9,
+                    validation_edge_translation_m=(0.0, 0.0, 0.0),
                     edge=SimpleNamespace(
                         valid=True,
                         minimum_nonpenetration_distance_m=0.01,
@@ -310,6 +324,16 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                         minimum_nonpenetration_alpha=0.0,
                         minimum_safety_alpha=0.0,
                         sample_count=2,
+                        limiting_nonpenetration_pair=None,
+                        limiting_pair_start_distance_m=None,
+                        limiting_pair_end_distance_m=None,
+                        limiting_pair_sample_distances_m=(),
+                        limiting_pair_monotonic_non_decreasing=None,
+                        minimum_nonpenetration_margin_m=0.01,
+                        minimum_nonpenetration_margin_alpha=0.0,
+                        joint_limits_valid=True,
+                        nonpenetration_valid=True,
+                        safety_clearance_valid=True,
                     ),
                 )
 
@@ -381,6 +405,8 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                     joint_delta_scaled=False,
                     requested_twist=(0.0,) * 6,
                     achieved_twist=(0.0,) * 6,
+                    validation_start_configuration=(0.0,) * 9,
+                    validation_edge_translation_m=(0.0, 0.0, 0.0),
                     edge=SimpleNamespace(
                         valid=True,
                         minimum_nonpenetration_distance_m=0.01,
@@ -388,6 +414,16 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                         minimum_nonpenetration_alpha=0.0,
                         minimum_safety_alpha=0.0,
                         sample_count=2,
+                        limiting_nonpenetration_pair=None,
+                        limiting_pair_start_distance_m=None,
+                        limiting_pair_end_distance_m=None,
+                        limiting_pair_sample_distances_m=(),
+                        limiting_pair_monotonic_non_decreasing=None,
+                        minimum_nonpenetration_margin_m=0.01,
+                        minimum_nonpenetration_margin_alpha=0.0,
+                        joint_limits_valid=True,
+                        nonpenetration_valid=True,
+                        safety_clearance_valid=True,
                     ),
                 )
 
@@ -482,9 +518,12 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                 return SimpleNamespace(
                     success=False,
                     reason="edge_collision_or_clearance",
+                    configuration=(0.0,) * 9,
                     joint_delta_scaled=False,
                     requested_twist=(0.0,) * 6,
                     achieved_twist=(0.0,) * 6,
+                    validation_start_configuration=(0.0,) * 9,
+                    validation_edge_translation_m=(0.0, 0.0, 0.0),
                     edge=SimpleNamespace(
                         valid=False,
                         minimum_nonpenetration_distance_m=-0.01,
@@ -492,6 +531,16 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                         minimum_nonpenetration_alpha=0.5,
                         minimum_safety_alpha=0.5,
                         sample_count=2,
+                        limiting_nonpenetration_pair=None,
+                        limiting_pair_start_distance_m=None,
+                        limiting_pair_end_distance_m=None,
+                        limiting_pair_sample_distances_m=(),
+                        limiting_pair_monotonic_non_decreasing=None,
+                        minimum_nonpenetration_margin_m=-0.01,
+                        minimum_nonpenetration_margin_alpha=0.5,
+                        joint_limits_valid=True,
+                        nonpenetration_valid=False,
+                        safety_clearance_valid=True,
                     ),
                 )
 

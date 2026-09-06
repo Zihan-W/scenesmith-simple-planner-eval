@@ -571,8 +571,47 @@ class ZerithLegacyActionTranslator:
                     result.edge.minimum_safety_alpha
                 ),
                 "edge_sample_count": result.edge.sample_count,
+                "limiting_nonpenetration_pair": (
+                    dataclasses.asdict(
+                        result.edge.limiting_nonpenetration_pair
+                    )
+                    if result.edge.limiting_nonpenetration_pair is not None
+                    else None
+                ),
+                "limiting_pair_start_distance_m": (
+                    result.edge.limiting_pair_start_distance_m
+                ),
+                "limiting_pair_end_distance_m": (
+                    result.edge.limiting_pair_end_distance_m
+                ),
+                "limiting_pair_sample_distances_m": (
+                    result.edge.limiting_pair_sample_distances_m
+                ),
+                "limiting_pair_monotonic_non_decreasing": (
+                    result.edge.limiting_pair_monotonic_non_decreasing
+                ),
+                "minimum_nonpenetration_margin_m": (
+                    result.edge.minimum_nonpenetration_margin_m
+                ),
+                "minimum_nonpenetration_margin_alpha": (
+                    result.edge.minimum_nonpenetration_margin_alpha
+                ),
+                "joint_limits_valid": result.edge.joint_limits_valid,
+                "nonpenetration_valid": (
+                    result.edge.nonpenetration_valid
+                ),
+                "safety_clearance_valid": (
+                    result.edge.safety_clearance_valid
+                ),
                 "requested_twist": result.requested_twist,
                 "achieved_twist": result.achieved_twist,
+                "candidate_configuration": result.configuration,
+                "validation_start_configuration": (
+                    result.validation_start_configuration
+                ),
+                "validation_edge_translation_m": (
+                    result.validation_edge_translation_m
+                ),
             }
             if not result.success:
                 rejected = True

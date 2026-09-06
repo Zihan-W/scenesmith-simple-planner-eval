@@ -172,6 +172,13 @@ class PlanningQueryTest(unittest.TestCase):
         )
         self.assertFalse(edge.valid)
         self.assertGreater(edge.sample_count, 2)
+        self.assertTrue(edge.joint_limits_valid)
+        self.assertFalse(edge.nonpenetration_valid)
+        self.assertFalse(edge.safety_clearance_valid)
+        self.assertIsNotNone(edge.limiting_nonpenetration_pair)
+        self.assertIsNone(edge.limiting_pair_start_distance_m)
+        self.assertLess(edge.limiting_pair_end_distance_m, 0.0)
+        self.assertIsNone(edge.limiting_pair_monotonic_non_decreasing)
 
     def test_allowed_contact_only_relaxes_safety_layer(self) -> None:
         query = _planning_query()
@@ -294,6 +301,11 @@ class PlanningQueryTest(unittest.TestCase):
         )
         self.assertTrue(result.edge.valid)
         self.assertAlmostEqual(result.achieved_twist[2], 0.01, places=5)
+        self.assertEqual(
+            result.validation_start_configuration,
+            (math.pi / 2.0,),
+        )
+        self.assertEqual(len(result.validation_edge_translation_m), 3)
 
     def test_differential_ik_rejects_a_colliding_edge(self) -> None:
         query = _planning_query()

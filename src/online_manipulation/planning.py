@@ -64,6 +64,9 @@ class ConfigurationCheck:
     valid: bool
     configuration: tuple[float, ...]
     clearance: ClearanceMetrics
+    within_joint_limits: bool = True
+    nonpenetration_valid: bool = True
+    safety_clearance_valid: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -76,6 +79,16 @@ class EdgeCheck:
     minimum_safety_clearance_m: float
     minimum_nonpenetration_alpha: float
     minimum_safety_alpha: float
+    limiting_nonpenetration_pair: CollisionPair | None = None
+    limiting_pair_start_distance_m: float | None = None
+    limiting_pair_end_distance_m: float | None = None
+    limiting_pair_sample_distances_m: tuple[float | None, ...] = ()
+    limiting_pair_monotonic_non_decreasing: bool | None = None
+    minimum_nonpenetration_margin_m: float = float("inf")
+    minimum_nonpenetration_margin_alpha: float = 0.0
+    joint_limits_valid: bool = True
+    nonpenetration_valid: bool = True
+    safety_clearance_valid: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -102,6 +115,12 @@ class DifferentialIkResult:
     achieved_twist: tuple[float, ...]
     joint_delta_scaled: bool
     edge: EdgeCheck
+    validation_start_configuration: tuple[float, ...] = ()
+    validation_edge_translation_m: tuple[float, float, float] = (
+        0.0,
+        0.0,
+        0.0,
+    )
 
 
 def _qualified_body_name(plant: Any, body: Any) -> str:
@@ -387,6 +406,22 @@ class PlanningQuery:
         influence_distance_m: float = 0.05,
     ) -> ConfigurationCheck:
         """Check joint limits, nonpenetration, and safety clearance."""
+        return self._check_configuration(
+            configuration,
+            contact_policy=contact_policy,
+            minimum_safety_clearance_m=minimum_safety_clearance_m,
+            influence_distance_m=influence_distance_m,
+        )[0]
+
+    def _check_configuration(
+        self,
+        configuration: Sequence[float],
+        *,
+        contact_policy: ContactPolicy,
+        minimum_safety_clearance_m: float,
+        influence_distance_m: float,
+    ) -> tuple[ConfigurationCheck, tuple[CollisionPair, ...]]:
+        """Return one configuration check and its evaluated distance pairs."""
         values = self._configuration_array(configuration)
         within_limits = all(
             spec.position_lower <= value <= spec.position_upper
@@ -416,16 +451,22 @@ class PlanningQuery:
             )
             for pair in pairs
         )
+        safety_clearance_valid = (
+            clearance.minimum_safety_clearance_m
+            >= minimum_safety_clearance_m
+        )
         return ConfigurationCheck(
             valid=bool(
                 within_limits
                 and nonpenetrating
-                and clearance.minimum_safety_clearance_m
-                >= minimum_safety_clearance_m
+                and safety_clearance_valid
             ),
             configuration=tuple(float(value) for value in values),
             clearance=clearance,
-        )
+            within_joint_limits=bool(within_limits),
+            nonpenetration_valid=bool(nonpenetrating),
+            safety_clearance_valid=bool(safety_clearance_valid),
+        ), pairs
 
     def check_edge(
         self,
@@ -456,15 +497,33 @@ class PlanningQuery:
         minimum_safety = float("inf")
         minimum_nonpenetration_alpha = 0.0
         minimum_safety_alpha = 0.0
+        limiting_nonpenetration_pair = None
+        minimum_nonpenetration_margin = float("inf")
+        minimum_nonpenetration_margin_alpha = 0.0
+        sampled_pairs = []
+        joint_limits_valid = True
+        nonpenetration_valid = True
+        safety_clearance_valid = True
         valid = True
         for alpha in np.linspace(0.0, 1.0, sample_count):
-            check = self.check_configuration(
+            check, pairs = self._check_configuration(
                 q_start + alpha * (q_end - q_start),
                 contact_policy=contact_policy,
                 minimum_safety_clearance_m=minimum_safety_clearance_m,
                 influence_distance_m=influence_distance_m,
             )
+            sampled_pairs.append(pairs)
             valid = valid and check.valid
+            joint_limits_valid = (
+                joint_limits_valid and check.within_joint_limits
+            )
+            nonpenetration_valid = (
+                nonpenetration_valid and check.nonpenetration_valid
+            )
+            safety_clearance_valid = (
+                safety_clearance_valid
+                and check.safety_clearance_valid
+            )
             if (
                 check.clearance.minimum_nonpenetration_distance_m
                 < minimum_nonpenetration
@@ -481,6 +540,36 @@ class PlanningQuery:
                     check.clearance.minimum_safety_clearance_m
                 )
                 minimum_safety_alpha = float(alpha)
+            for pair in pairs:
+                margin = self._nonpenetration_margin(pair, contact_policy)
+                if margin < minimum_nonpenetration_margin:
+                    minimum_nonpenetration_margin = margin
+                    minimum_nonpenetration_margin_alpha = float(alpha)
+                    limiting_nonpenetration_pair = pair
+        limiting_pair_samples = tuple(
+            self._distance_for_pair(pairs, limiting_nonpenetration_pair)
+            for pairs in sampled_pairs
+        )
+        limiting_pair_start_distance = limiting_pair_samples[0]
+        limiting_pair_end_distance = limiting_pair_samples[-1]
+        finite_pair_samples = tuple(
+            distance
+            for distance in limiting_pair_samples
+            if distance is not None
+        )
+        monotonic_non_decreasing = (
+            all(
+                right >= left - 1e-12
+                for left, right in zip(
+                    finite_pair_samples,
+                    finite_pair_samples[1:],
+                )
+            )
+            if len(finite_pair_samples) == len(limiting_pair_samples)
+            else None
+        )
+        if not math.isfinite(minimum_nonpenetration_margin):
+            minimum_nonpenetration_margin = influence_distance_m
         return EdgeCheck(
             valid=valid,
             sample_count=sample_count,
@@ -488,6 +577,22 @@ class PlanningQuery:
             minimum_safety_clearance_m=minimum_safety,
             minimum_nonpenetration_alpha=minimum_nonpenetration_alpha,
             minimum_safety_alpha=minimum_safety_alpha,
+            limiting_nonpenetration_pair=limiting_nonpenetration_pair,
+            limiting_pair_start_distance_m=limiting_pair_start_distance,
+            limiting_pair_end_distance_m=limiting_pair_end_distance,
+            limiting_pair_sample_distances_m=limiting_pair_samples,
+            limiting_pair_monotonic_non_decreasing=(
+                monotonic_non_decreasing
+            ),
+            minimum_nonpenetration_margin_m=(
+                minimum_nonpenetration_margin
+            ),
+            minimum_nonpenetration_margin_alpha=(
+                minimum_nonpenetration_margin_alpha
+            ),
+            joint_limits_valid=joint_limits_valid,
+            nonpenetration_valid=nonpenetration_valid,
+            safety_clearance_valid=safety_clearance_valid,
         )
 
     def solve_ik(
@@ -724,6 +829,20 @@ class PlanningQuery:
             contact_policy=contact_policy,
             maximum_joint_step=min(0.002, maximum_joint_delta),
         )
+        validation_start_pose = self.frame_pose_at(
+            q_edge_start,
+            self.plant.GetModelInstanceName(self.robot_model_instance),
+            frame_name,
+        )
+        candidate_pose = self.frame_pose_at(
+            candidate,
+            self.plant.GetModelInstanceName(self.robot_model_instance),
+            frame_name,
+        )
+        validation_edge_translation = (
+            np.asarray(candidate_pose.translation_m)
+            - np.asarray(validation_start_pose.translation_m)
+        )
         achieved_twist = jacobian @ delta
         return DifferentialIkResult(
             success=edge.valid,
@@ -733,6 +852,12 @@ class PlanningQuery:
             achieved_twist=tuple(float(value) for value in achieved_twist),
             joint_delta_scaled=joint_delta_scaled,
             edge=edge,
+            validation_start_configuration=tuple(
+                float(value) for value in q_edge_start
+            ),
+            validation_edge_translation_m=tuple(
+                float(value) for value in validation_edge_translation
+            ),
         )
 
     def _configuration_array(
@@ -844,6 +969,43 @@ class PlanningQuery:
             nearest_safety_pair=nearest_safety,
             influence_distance_m=influence_distance_m,
         )
+
+    def _distance_for_pair(
+        self,
+        pairs: Sequence[CollisionPair],
+        target: CollisionPair | None,
+    ) -> float | None:
+        """Return one identified pair's distance from evaluated pairs."""
+        if target is None:
+            return None
+        target_identity = self._collision_pair_identity(target)
+        for pair in pairs:
+            if self._collision_pair_identity(pair) == target_identity:
+                return pair.distance_m
+        return None
+
+    @staticmethod
+    def _nonpenetration_margin(
+        pair: CollisionPair,
+        contact_policy: ContactPolicy,
+    ) -> float:
+        """Return signed distance above the pair-specific lower bound."""
+        lower_bound = (
+            -contact_policy.maximum_allowed_penetration_m
+            if contact_policy.permits(pair.body_a, pair.body_b)
+            else 0.0
+        )
+        return pair.distance_m - lower_bound
+
+    @staticmethod
+    def _collision_pair_identity(
+        pair: CollisionPair,
+    ) -> tuple[tuple[str, str], tuple[str, str]]:
+        """Return a stable unordered identity for one geometry pair."""
+        return tuple(sorted((
+            (pair.body_a, pair.geometry_a),
+            (pair.body_b, pair.geometry_b),
+        )))
 
     def _body_from_qualified_name(self, name: str) -> Any:
         """Resolve a ``model_instance::body`` name in the query plant."""
