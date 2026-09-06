@@ -124,6 +124,7 @@ class OnlineIntegrationExamplesTest(unittest.TestCase):
         self.assertEqual(query.edge, ((0.0,), (0.2,), 0.002))
         self.assertIn("object", query.synced_poses)
         self.assertEqual(len(env.actions), 1)
+        self.assertEqual(env.actions[0].positions, (0.2,))
 
     def test_tamp_rejects_invalid_edge_without_stepping(self) -> None:
         env = _InstantEnvironment()

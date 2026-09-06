@@ -101,10 +101,9 @@ def execute_validated_joint_goal(
             f"safety={edge.minimum_safety_clearance_m}"
         )
 
+    goal_by_name = dict(zip(query_order, goal, strict=True))
     commanded_names = tuple(goal_positions)
-    commanded_positions = tuple(
-        float(goal_positions[name]) for name in commanded_names
-    )
+    commanded_positions = tuple(goal_by_name[name] for name in commanded_names)
     for policy_step in range(1, maximum_policy_steps + 1):
         observation, _, terminated, truncated, _ = env.step(
             JointPositionAction(commanded_names, commanded_positions)
