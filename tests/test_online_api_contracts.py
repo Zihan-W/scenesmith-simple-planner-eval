@@ -18,6 +18,7 @@ from src.online_manipulation import (
     ObjectObservation,
     ObservedBodySpec,
     Observation,
+    OnlineManipulationEnv,
     OnlineEnvironment,
     PlanarPoseRandomizationSpec,
     Pose,
@@ -168,6 +169,78 @@ class _ThreeJointMockAdapter:
         return {}
 
 
+class _MockAdapterRuntimeBackend:
+    """Drive the generic environment from an arbitrary mock adapter spec."""
+
+    def __init__(self, adapter: _ThreeJointMockAdapter) -> None:
+        """Initialize state using only the adapter's public RobotSpec."""
+        self.adapter = adapter
+        self._q = np.asarray(adapter.spec.home_positions, dtype=float)
+
+    def reset(self, rng: np.random.Generator):
+        """Restore the adapter-defined home position."""
+        del rng
+        self._q = np.asarray(self.adapter.spec.home_positions, dtype=float)
+        return self._observation(), {"backend": "mock_adapter"}
+
+    def step(self, action, contact_policy):
+        """Apply named joint deltas without assuming an action dimension."""
+        del contact_policy
+        if isinstance(action, JointDeltaAction):
+            name_to_index = {
+                name: index
+                for index, name in enumerate(
+                    self.adapter.spec.controlled_joint_names
+                )
+            }
+            for name, delta in zip(
+                action.joint_names,
+                action.deltas,
+                strict=True,
+            ):
+                self._q[name_to_index[name]] += delta
+        elif not isinstance(action, HoldAction):
+            raise TypeError(f"Unsupported mock action: {type(action)}")
+        return self._observation(time_s=0.1), False, {
+            "action_decision": {"status": "accepted"},
+        }
+
+    def write_updated_scenario(self, output_path):
+        """Expose the complete backend contract without scene state."""
+        del output_path
+        return ()
+
+    def start_recording(self) -> None:
+        """Provide the optional recording hook."""
+
+    def save_recording(self, output_path) -> None:
+        """Provide the optional recording hook."""
+        del output_path
+
+    def _observation(self, time_s: float = 0.0) -> Observation:
+        """Return telemetry sized and named from the mock adapter."""
+        values = tuple(float(value) for value in self._q)
+        zeros = (0.0,) * len(values)
+        return Observation(
+            time_s,
+            RobotObservation(
+                joint_names=self.adapter.spec.controlled_joint_names,
+                q=values,
+                v=zeros,
+                q_commanded=values,
+                torque_commanded=zeros,
+                torque_applied=zeros,
+                torque_saturated=(False,) * len(values),
+                end_effector_pose=_pose(),
+                end_effector_twist=_twist(),
+                gripper_width_m=None,
+            ),
+            {},
+            (),
+            {},
+        )
+
+
 class _PublicEnvironment:
     """Small environment returned by the public composition contract."""
 
@@ -306,6 +379,27 @@ class PublicContractTest(unittest.TestCase):
         self.assertEqual(
             len(adapter.make_robot_observation(None, None, None, {}).q),
             3,
+        )
+
+    def test_mock_adapter_drives_environment_with_named_partial_action(self):
+        adapter = _ThreeJointMockAdapter()
+        env = OnlineManipulationEnv(_MockAdapterRuntimeBackend(adapter))
+        observation, info = env.reset(seed=9)
+
+        self.assertEqual(info["seed"], 9)
+        self.assertEqual(
+            observation.robot.joint_names,
+            ("axis_0", "axis_1", "axis_2"),
+        )
+        self.assertIsNone(observation.robot.gripper_width_m)
+
+        observation, _, _, _, step_info = env.step(
+            JointDeltaAction(("axis_0", "axis_2"), (0.25, -0.5))
+        )
+        self.assertEqual(observation.robot.q, (0.25, 0.0, -0.5))
+        self.assertEqual(
+            step_info["action_decision"]["status"],
+            "accepted",
         )
 
     def test_make_env_accepts_only_the_public_config_contract(self) -> None:
