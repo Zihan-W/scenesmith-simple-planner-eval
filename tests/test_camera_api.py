@@ -167,6 +167,81 @@ class CameraApiTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             observation.label_names[2] = "other::base_link"
 
+    def test_camera_as_dict_excludes_images_unless_explicitly_requested(self):
+        spec = _camera("camera", "frame", width=2, height=2)
+        observation = CameraObservation(
+            frame="camera",
+            timestamp_s=0.0,
+            pose=Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
+            intrinsics=spec.intrinsics,
+            rgb=np.full((2, 2, 3), 17, dtype=np.uint8),
+            depth=np.full((2, 2), 1.25, dtype=np.float32),
+            label=np.ones((2, 2), dtype=np.int16),
+        )
+
+        metadata = observation.as_dict()
+        with_images = observation.as_dict(include_images=True)
+
+        self.assertNotIn("rgb", metadata)
+        self.assertNotIn("depth", metadata)
+        self.assertNotIn("label", metadata)
+        self.assertEqual(
+            metadata["image_metadata"],
+            {
+                "rgb": {"shape": [2, 2, 3], "dtype": "uint8"},
+                "depth": {"shape": [2, 2], "dtype": "float32"},
+                "label": {"shape": [2, 2], "dtype": "int16"},
+            },
+        )
+        self.assertEqual(with_images["rgb"][0][0], [17, 17, 17])
+        self.assertEqual(with_images["depth"][0][0], 1.25)
+        self.assertEqual(with_images["label"][0][0], 1)
+
+    def test_observation_sensors_are_read_only_and_images_are_opt_in(self):
+        spec = _camera("camera", "frame", width=2, height=2)
+        camera = CameraObservation(
+            frame="camera",
+            timestamp_s=0.0,
+            pose=Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
+            intrinsics=spec.intrinsics,
+            rgb=np.full((2, 2, 3), 23, dtype=np.uint8),
+        )
+        source = {"camera": camera}
+        pose = Pose((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+        observation = Observation(
+            time_s=0.0,
+            robot=RobotObservation(
+                joint_names=("joint",),
+                q=(0.0,),
+                v=(0.0,),
+                q_commanded=(0.0,),
+                torque_commanded=(0.0,),
+                torque_applied=(0.0,),
+                torque_saturated=(False,),
+                end_effector_pose=pose,
+                end_effector_twist=SpatialVelocity(
+                    (0.0, 0.0, 0.0),
+                    (0.0, 0.0, 0.0),
+                ),
+            ),
+            objects={},
+            contacts=(),
+            task={},
+            sensors=source,
+        )
+        source.clear()
+
+        self.assertIn("camera", observation.sensors)
+        with self.assertRaises(TypeError):
+            observation.sensors["other"] = camera
+        self.assertNotIn("rgb", observation.as_dict()["sensors"]["camera"])
+        self.assertEqual(
+            observation.as_dict(include_images=True)["sensors"]["camera"][
+                "rgb"
+            ][0][0],
+            [23, 23, 23],
+        )
+
     def test_invalid_camera_contracts_fail_loudly(self) -> None:
         with self.assertRaisesRegex(ValueError, "Unsupported camera"):
             _camera("camera", "frame", modalities=("thermal",))

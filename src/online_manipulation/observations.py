@@ -330,20 +330,42 @@ class CameraObservation:
             MappingProxyType(label_names),
         )
 
-    def as_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible sensor observation."""
-        return {
+    def as_dict(self, *, include_images: bool = False) -> dict[str, Any]:
+        """Return JSON-compatible metadata and optionally image samples.
+
+        Args:
+            include_images: Whether to convert image arrays to nested Python
+                lists. This is disabled by default so logs and benchmark
+                artifacts remain compact.
+        """
+        result = {
             "frame": self.frame,
             "timestamp_s": self.timestamp_s,
             "pose": self.pose.as_dict(),
             "intrinsics": self.intrinsics.as_dict(),
-            "rgb": None if self.rgb is None else self.rgb.tolist(),
-            "depth": None if self.depth is None else self.depth.tolist(),
-            "label": None if self.label is None else self.label.tolist(),
+            "image_metadata": {
+                name: {
+                    "shape": list(image.shape),
+                    "dtype": str(image.dtype),
+                }
+                for name, image in (
+                    ("rgb", self.rgb),
+                    ("depth", self.depth),
+                    ("label", self.label),
+                )
+                if image is not None
+            },
             "label_names": {
                 str(label): name for label, name in self.label_names.items()
             },
         }
+        if include_images:
+            result.update(
+                rgb=None if self.rgb is None else self.rgb.tolist(),
+                depth=None if self.depth is None else self.depth.tolist(),
+                label=None if self.label is None else self.label.tolist(),
+            )
+        return result
 
 
 @dataclasses.dataclass(frozen=True)
@@ -376,10 +398,15 @@ class Observation:
         object.__setattr__(self, "objects", dict(self.objects))
         object.__setattr__(self, "contacts", tuple(self.contacts))
         object.__setattr__(self, "task", dict(self.task))
-        object.__setattr__(self, "sensors", sensors)
+        object.__setattr__(self, "sensors", MappingProxyType(sensors))
 
-    def as_dict(self) -> dict[str, Any]:
-        """Return the required nested policy observation mapping."""
+    def as_dict(self, *, include_images: bool = False) -> dict[str, Any]:
+        """Return the policy observation mapping.
+
+        Camera image arrays are excluded by default. Pass
+        ``include_images=True`` only when explicitly serializing image data;
+        PNG/NPY artifacts are preferable for ordinary runs.
+        """
         return {
             "time": self.time_s,
             "robot": self.robot.as_dict(),
@@ -390,7 +417,7 @@ class Observation:
             "contacts": [contact.as_dict() for contact in self.contacts],
             "task": dict(self.task),
             "sensors": {
-                name: sensor.as_dict()
+                name: sensor.as_dict(include_images=include_images)
                 for name, sensor in self.sensors.items()
             },
         }

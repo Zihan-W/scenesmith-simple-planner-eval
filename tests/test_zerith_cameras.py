@@ -199,6 +199,49 @@ class ZerithCameraTest(unittest.TestCase):
             first.sensors["head_camera"].rgb,
         )
 
+    def test_moving_wrist_camera_holds_one_coherent_slow_frame(self):
+        env = make_env(
+            _config(
+                camera_names=("left_wrist_camera",),
+                update_period_s=0.3,
+            )
+        )
+        initial, _ = env.reset(seed=0)
+        moved, _, _, _, _ = env.step(
+            JointDeltaAction(("left_shoulder_pitch_joint",), (0.08,))
+        )
+        held, _, _, _, _ = env.step(HoldAction())
+        updated, _, _, _, _ = env.step(HoldAction())
+
+        initial_camera = initial.sensors["left_wrist_camera"]
+        moved_camera = moved.sensors["left_wrist_camera"]
+        held_camera = held.sensors["left_wrist_camera"]
+        updated_camera = updated.sensors["left_wrist_camera"]
+        shoulder_index = initial.robot.joint_names.index(
+            "left_shoulder_pitch_joint"
+        )
+
+        self.assertGreater(
+            abs(moved.robot.q[shoulder_index] - initial.robot.q[shoulder_index]),
+            1e-4,
+        )
+        for camera in (moved_camera, held_camera):
+            self.assertEqual(camera.timestamp_s, initial_camera.timestamp_s)
+            self.assertEqual(camera.pose, initial_camera.pose)
+            np.testing.assert_array_equal(camera.rgb, initial_camera.rgb)
+            np.testing.assert_array_equal(camera.depth, initial_camera.depth)
+            np.testing.assert_array_equal(camera.label, initial_camera.label)
+
+        self.assertAlmostEqual(updated_camera.timestamp_s, 0.3)
+        self.assertNotEqual(updated_camera.pose, initial_camera.pose)
+        self.assertFalse(np.array_equal(updated_camera.rgb, initial_camera.rgb))
+        self.assertFalse(
+            np.array_equal(updated_camera.depth, initial_camera.depth)
+        )
+        self.assertFalse(
+            np.array_equal(updated_camera.label, initial_camera.label)
+        )
+
     def test_wrist_camera_pose_follows_joint_and_keeps_mount_transform(self):
         initial_env = make_env(_config(camera_names=("left_wrist_camera",)))
         moved_env = make_env(

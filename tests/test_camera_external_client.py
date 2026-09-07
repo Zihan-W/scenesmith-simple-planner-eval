@@ -60,6 +60,11 @@ class CameraExternalClientTest(unittest.TestCase):
             self.assertEqual(payload["depth_shape"], [240, 320])
             self.assertEqual(payload["depth_dtype"], "float32")
             self.assertEqual(payload["depth_unit"], "m")
+            self.assertFalse(payload["default_serialization_contains_images"])
+            self.assertEqual(
+                payload["image_metadata"]["rgb"],
+                {"shape": [240, 320, 3], "dtype": "uint8"},
+            )
             rgb = np.asarray(Image.open(payload["rgb_path"]))
             depth = np.load(payload["depth_path"])
             self.assertEqual(rgb.shape, (240, 320, 3))

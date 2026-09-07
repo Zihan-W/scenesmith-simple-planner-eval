@@ -87,6 +87,9 @@ def main() -> None:
     env = make_env(make_config(repository_root, scene_dmd))
     observation, info = env.reset(seed=args.seed)
     camera = observation.sensors["head_camera"]
+    camera_metadata = camera.as_dict()
+    if any(name in camera_metadata for name in ("rgb", "depth", "label")):
+        raise RuntimeError("Default camera serialization unexpectedly includes images")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rgb_path = args.output_dir / "head_camera_rgb.png"
     depth_path = args.output_dir / "head_camera_depth_m.npy"
@@ -111,6 +114,8 @@ def main() -> None:
         "depth_shape": list(camera.depth.shape),
         "depth_dtype": str(camera.depth.dtype),
         "depth_unit": "m",
+        "default_serialization_contains_images": False,
+        "image_metadata": camera_metadata["image_metadata"],
         "valid_depth_range_m": [
             float(camera.depth[valid_depth].min()),
             float(camera.depth[valid_depth].max()),

@@ -8,7 +8,6 @@ physics_dt.
 
 import csv
 import dataclasses
-import math
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Sequence
@@ -41,6 +40,7 @@ from pydrake.all import (
     Simulator,
 )
 
+from src.online_manipulation._drake_camera_time import sampled_image_time
 from src.online_manipulation.controller import CoupledInverseDynamicsServo
 from src.online_manipulation.drake_utils import (
     register_package_xml,
@@ -588,14 +588,11 @@ class ZerithOnlineEnv:
             if "label" in modalities:
                 label_data = sensor.label_image_output_port().Eval(context).data
                 label = np.asarray(label_data[:, :, 0], dtype=np.int16)
-            simulation_time = float(root_context.get_time())
-            # RgbdSensorDiscrete samples at offset zero and holds for exactly
-            # update_period_s. Derive the capture time from that public
-            # schedule so observation time remains stable across Drake builds.
-            sample_index = math.floor(
-                (simulation_time + 1e-12) / spec.update_period_s
+            timestamp = sampled_image_time(
+                sensor,
+                context,
+                root_context,
             )
-            timestamp = sample_index * spec.update_period_s
             X_WC = sensor.body_pose_in_world_output_port().Eval(context)
             observations[name] = CameraObservation(
                 frame=name,

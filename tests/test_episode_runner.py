@@ -6,7 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
+
 from src.online_manipulation import (
+    CameraIntrinsics,
+    CameraObservation,
     ContactObservation,
     HoldAction,
     ObjectObservation,
@@ -19,7 +23,12 @@ from src.online_manipulation import (
 )
 
 
-def _observation(time_s: float, *, saturated: bool) -> Observation:
+def _observation(
+    time_s: float,
+    *,
+    saturated: bool,
+    include_camera: bool = False,
+) -> Observation:
     """Build one deterministic runner observation."""
     pose = Pose((time_s, 0.0, 0.5), (1.0, 0.0, 0.0, 0.0))
     twist = SpatialVelocity((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
@@ -37,12 +46,34 @@ def _observation(time_s: float, *, saturated: bool) -> Observation:
     contacts = (
         ContactObservation("robot::finger", "scene::box", 0.001),
     ) if saturated else ()
+    sensors = {}
+    if include_camera:
+        sensors["review_camera"] = CameraObservation(
+            frame="review_camera",
+            timestamp_s=time_s,
+            pose=pose,
+            intrinsics=CameraIntrinsics(
+                width=2,
+                height=2,
+                focal_x_px=1.0,
+                focal_y_px=1.0,
+                center_x_px=0.5,
+                center_y_px=0.5,
+                fov_y_rad=1.0,
+                near_m=0.1,
+                far_m=5.0,
+            ),
+            rgb=np.full((2, 2, 3), 254, dtype=np.uint8),
+            depth=np.full((2, 2), 1.25, dtype=np.float32),
+            label=np.full((2, 2), 1234, dtype=np.int16),
+        )
     return Observation(
         time_s=time_s,
         robot=robot,
         objects={"box": ObjectObservation(pose, twist)},
         contacts=contacts,
         task={"success": time_s >= 0.2},
+        sensors=sensors,
     )
 
 
@@ -94,15 +125,25 @@ class _TerminalDiagnosticPolicy(_Policy):
 class _Environment:
     """Two-step deterministic online environment used by runner tests."""
 
-    def __init__(self, *, report_randomization: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        report_randomization: bool = False,
+        include_camera: bool = False,
+    ) -> None:
         self.time_s = 0.0
         self.reset_count = 0
         self.report_randomization = report_randomization
+        self.include_camera = include_camera
 
     def reset(self, seed=None):
         self.time_s = 0.0
         self.reset_count += 1
-        return _observation(0.0, saturated=False), {
+        return _observation(
+            0.0,
+            saturated=False,
+            include_camera=self.include_camera,
+        ), {
             "seed": seed,
             "episode_randomization": (
                 {"box": {"x_offset_m": 0.001 * float(seed or 0)}}
@@ -118,7 +159,11 @@ class _Environment:
         self.time_s += 0.1
         done = self.time_s >= 0.2
         return (
-            _observation(self.time_s, saturated=done),
+            _observation(
+                self.time_s,
+                saturated=done,
+                include_camera=self.include_camera,
+            ),
             1.0 if done else 0.0,
             done,
             False,
@@ -301,6 +346,32 @@ class EpisodeRunnerTest(unittest.TestCase):
                 ],
                 0.003,
             )
+
+    def test_camera_images_are_not_inlined_in_benchmark_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            run_episodes(
+                env=_Environment(include_camera=True),
+                policy=_Policy(),
+                seeds=(4,),
+                max_steps=2,
+                output_root=output,
+            )
+
+            artifact_text = "\n".join(
+                path.read_text(encoding="utf-8")
+                for path in (
+                    output / "benchmark_summary.json",
+                    output / "benchmark_episodes.csv",
+                    output / "episode_000_seed_4" / "summary.json",
+                    output / "episode_000_seed_4" / "trace.csv",
+                )
+            )
+            self.assertNotIn('"rgb"', artifact_text)
+            self.assertNotIn('"depth"', artifact_text)
+            self.assertNotIn('"label"', artifact_text)
+            self.assertNotIn("1234", artifact_text)
+            self.assertNotIn("254", artifact_text)
 
     def test_run_episodes_requires_at_least_one_seed(self):
         with tempfile.TemporaryDirectory() as directory:
