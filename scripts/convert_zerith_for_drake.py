@@ -5,15 +5,21 @@ import argparse
 import json
 import math
 import subprocess
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
 import trimesh
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from src.zerith_gripper_config import FINGER_CLOSING_TRAVEL_M
+
 SOURCE_PACKAGE_RELATIVE_PATH = Path("models/Zerith_Model/ZERITH_H1_PRO_URDF")
 SOURCE_PACKAGE_NAME = "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02"
 SOURCE_URDF_RELATIVE_PATH = Path(
@@ -24,9 +30,12 @@ OUTPUT_PACKAGE_NAME = "zerith_drake"
 OUTPUT_URDF_NAME = "zerith_drake.urdf"
 EXPECTED_MESH_COUNT = 35
 EXPECTED_SOURCE_MESH_REFERENCE_COUNT = 70
-EXPECTED_OUTPUT_MESH_REFERENCE_COUNT = 57
+EXPECTED_OUTPUT_MESH_REFERENCE_COUNT = 65
 EXPECTED_COLLISION_GEOMETRY_COUNT = 53
-CONVERTER_VERSION = 4
+CONVERTER_VERSION = 5
+# Clip each individual finger, never a convex hull spanning the jaw cavity.
+FINGER_CONTACT_INTERVALS = {"middle": (0.033, 0.059), "tip": (0.059, 0.10)}
+EXPECTED_CONTACT_MESH_COUNT = 8
 DIPAN_COLLISION_BOXES = (
     {
         "name": "dipan_lower_base",
@@ -54,7 +63,7 @@ def _arm_collision_proxies(
         raise ValueError(f"Unexpected arm side: {side}")
 
     pitch_bracket_y = 0.0295 if side == "left" else -0.0295
-    return {
+    proxies = {
         f"{side}_wrist_roll_link": (
             {
                 "name": f"{side}_wrist_roll_body",
@@ -168,6 +177,15 @@ def _arm_collision_proxies(
             },
         ),
     }
+    for jaw in ("left", "right"):
+        name = f"{side}_jaw_{jaw}_finger_link"
+        for index, region in enumerate(FINGER_CONTACT_INTERVALS, start=1):
+            proxies[name][index].update(
+                type="mesh",
+                xyz=(0.0, 0.0, 0.0),
+                filename=f"{name}_{region}_collision.obj",
+            )
+    return proxies
 
 
 def _parse_args() -> argparse.Namespace:
@@ -237,6 +255,36 @@ def _obj_declares_normals(path: Path) -> bool:
         return any(line.startswith("vn ") for line in stream)
 
 
+def _finger_contact_meshes(
+    source_mesh_dir: Path,
+) -> Iterator[tuple[str, trimesh.Trimesh]]:
+    """Yield deterministic convex pieces covering the distal CAD surfaces.
+
+    Slicing triangles (rather than selecting vertices) preserves material at
+    section boundaries. Convexification happens within each finger section;
+    the space between the two fingers is never filled.
+    """
+    for arm in ("left", "right"):
+        for jaw in ("left", "right"):
+            name = f"{arm}_jaw_{jaw}_finger_link"
+            mesh = trimesh.load_mesh(source_mesh_dir / f"{name}.STL")
+            for region, (lower, upper) in FINGER_CONTACT_INTERVALS.items():
+                vertices = np.asarray(mesh.vertices)
+                inside = (vertices[:, 0] >= lower) & (vertices[:, 0] <= upper)
+                points = [vertices[inside]]
+                edges = vertices[mesh.edges_unique]
+                for plane in (lower, upper):
+                    a, b = edges[:, 0], edges[:, 1]
+                    crossed = ((a[:, 0] < plane) & (b[:, 0] > plane)) | (
+                        (a[:, 0] > plane) & (b[:, 0] < plane)
+                    )
+                    a, b = a[crossed], b[crossed]
+                    fraction = (plane - a[:, 0]) / (b[:, 0] - a[:, 0])
+                    points.append(a + fraction[:, None] * (b - a))
+                hull = trimesh.convex.convex_hull(np.vstack(points))
+                yield f"{name}_{region}_collision.obj", hull
+
+
 def _rewrite_urdf(
     source_urdf: Path,
     output_urdf: Path,
@@ -281,6 +329,17 @@ def _rewrite_urdf(
     left_wrist_limit.set("velocity", "16.747")
     _replace_dipan_collision(tree.getroot())
     _replace_wrist_and_gripper_collisions(tree.getroot())
+
+    # Geometric finger closure calibrated from the distal source CAD. These
+    # derived limits are simulation stops, not claimed hardware specifications.
+    for arm in ("left", "right"):
+        for jaw, attribute, sign in (
+            ("left", "lower", -1), ("right", "upper", 1)
+        ):
+            limit = tree.getroot().find(
+                f"./joint[@name='{arm}_jaw_{jaw}_finger_joint']/limit"
+            )
+            limit.set(attribute, str(sign * FINGER_CLOSING_TRAVEL_M))
 
     output_urdf.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(tree, space="  ")
@@ -382,6 +441,12 @@ def _append_collision_proxy(
                 "length": str(proxy_spec["length"]),
             },
         )
+    elif geometry_type == "mesh":
+        filename = proxy_spec["filename"]
+        ET.SubElement(
+            geometry, "mesh",
+            {"filename": f"package://{OUTPUT_PACKAGE_NAME}/meshes/{filename}"},
+        )
     else:
         raise ValueError(f"Unsupported collision proxy type: {geometry_type}")
 
@@ -422,7 +487,9 @@ def _manifest_contents(source_commit: str) -> str:
         "source_mesh_reference_count": EXPECTED_SOURCE_MESH_REFERENCE_COUNT,
         "source_commit": source_commit,
         "source_repository": "https://github.com/inFpZero/Zerith_Model.git",
-        "wrist_gripper_collision_proxy": "primitive_boxes_and_cylinders",
+        "wrist_gripper_collision_proxy": "primitives_and_sectioned_finger_convex_meshes",
+        "finger_contact_mesh_count": EXPECTED_CONTACT_MESH_COUNT,
+        "finger_geometric_closing_travel_m": FINGER_CLOSING_TRAVEL_M,
     }
     return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
 
@@ -489,13 +556,10 @@ def _check_generated_package(
                     f"Unexpected collision proxies for {link_name}: "
                     f"{actual_names}"
                 )
-            if any(
-                collision.find("./geometry/mesh") is not None
-                for collision in collisions
-            ):
-                raise ValueError(
-                    f"Generated {link_name} still has a mesh collision"
-                )
+            for collision, spec in zip(collisions, proxy_specs, strict=True):
+                is_mesh = collision.find("./geometry/mesh") is not None
+                if is_mesh != (spec["type"] == "mesh"):
+                    raise ValueError(f"Unexpected collision geometry for {link_name}")
 
     if package_xml.read_text(encoding="utf-8") != _package_xml_contents():
         raise ValueError(f"package.xml has drifted: {package_xml}")
@@ -504,10 +568,16 @@ def _check_generated_package(
 
     output_mesh_dir = output_package / "meshes"
     output_meshes = sorted(output_mesh_dir.glob("*.obj"))
-    if len(output_meshes) != EXPECTED_MESH_COUNT:
+    expected_meshes = EXPECTED_MESH_COUNT + EXPECTED_CONTACT_MESH_COUNT
+    if len(output_meshes) != expected_meshes:
         raise ValueError(
-            f"Expected {EXPECTED_MESH_COUNT} OBJ meshes, found {len(output_meshes)}"
+            f"Expected {expected_meshes} OBJ meshes, found {len(output_meshes)}"
         )
+    source_mesh_dir = source_urdf.parent.parent / "meshes"
+    for filename, mesh in _finger_contact_meshes(source_mesh_dir):
+        expected_obj = mesh.export(file_type="obj", include_normals=True)
+        if (output_mesh_dir / filename).read_text() != expected_obj:
+            raise ValueError(f"Finger collision mesh has drifted: {filename}")
     for source_mesh in source_meshes:
         output_mesh = output_mesh_dir / source_mesh.with_suffix(".obj").name
         if not output_mesh.is_file():
@@ -556,6 +626,9 @@ def main() -> None:
         output_mesh = output_mesh_dir / source_mesh.with_suffix(".obj").name
         print(f"[{index:02d}/{len(source_meshes)}] {source_mesh.name}")
         _convert_mesh(source_mesh, output_mesh)
+
+    for filename, mesh in _finger_contact_meshes(source_mesh_dir):
+        mesh.export(output_mesh_dir / filename, include_normals=True)
 
     output_urdf = output_package / "urdf" / OUTPUT_URDF_NAME
     replacement_count = _rewrite_urdf(

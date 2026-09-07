@@ -24,9 +24,9 @@ WRIST_JOINT_SUFFIXES = (
     "wrist_pitch_joint",
 )
 GRIPPER_CONFIGURATIONS = (
-    ("open", 0.0, 0.0),
-    ("half", -0.02, 0.02),
-    ("closed", -0.04, 0.04),
+    ("open", 0.0),
+    ("half", 0.5),
+    ("closed", 1.0),
 )
 
 
@@ -155,7 +155,9 @@ def main() -> None:
                 strict=True,
             ):
                 positions[joint.position_start()] = value
-            gripper_name, left_position, right_position = gripper
+            gripper_name, fraction = gripper
+            left_position = fraction * left_finger.position_lower_limits()[0]
+            right_position = fraction * right_finger.position_upper_limits()[0]
             positions[left_finger.position_start()] = left_position
             positions[right_finger.position_start()] = right_position
             plant.SetPositions(plant_context, positions)

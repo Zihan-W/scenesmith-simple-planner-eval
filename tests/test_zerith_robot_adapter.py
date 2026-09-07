@@ -31,6 +31,10 @@ from src.online_manipulation.adapters.zerith import (
     make_zerith_robot_spec,
 )
 from src.zerith_online_env import ALL_SERVO_CONFIGS
+from src.zerith_gripper_config import (
+    FINGER_CLOSING_TRAVEL_M,
+    GRIPPER_MAX_OPENING_M,
+)
 from src.zerith_robot_config import (
     PICK_RAIL_POSITION_METERS,
     ROBOT_BASE_XYZ_METERS,
@@ -72,7 +76,7 @@ class ZerithRobotAdapterTest(unittest.TestCase):
     def test_gripper_width_maps_to_symmetric_joint_targets(self) -> None:
         adapter = _adapter()
         self.assertEqual(
-            adapter.gripper_position_targets(0.08),
+            adapter.gripper_position_targets(GRIPPER_MAX_OPENING_M),
             {
                 "left_jaw_left_finger_joint": -0.0,
                 "left_jaw_right_finger_joint": 0.0,
@@ -81,10 +85,24 @@ class ZerithRobotAdapterTest(unittest.TestCase):
         self.assertEqual(
             adapter.gripper_position_targets(0.0),
             {
-                "left_jaw_left_finger_joint": -0.04,
-                "left_jaw_right_finger_joint": 0.04,
+                "left_jaw_left_finger_joint": -FINGER_CLOSING_TRAVEL_M,
+                "left_jaw_right_finger_joint": FINGER_CLOSING_TRAVEL_M,
             },
         )
+
+    def test_calibrated_width_round_trip_and_urdf_limits(self) -> None:
+        adapter = _adapter()
+        specs = {spec.name: spec for spec in adapter.spec.controlled_joints}
+        for width in (0.0, 0.04, GRIPPER_MAX_OPENING_M):
+            targets = adapter.gripper_position_targets(width)
+            positions = list(adapter.spec.home_positions)
+            for name, position in targets.items():
+                self.assertGreaterEqual(position, specs[name].position_lower)
+                self.assertLessEqual(position, specs[name].position_upper)
+                positions[adapter.spec.controlled_joint_names.index(name)] = position
+            self.assertAlmostEqual(adapter._gripper_width(positions), width)
+        with self.assertRaises(ValueError):
+            adapter.gripper_position_targets(0.08)
 
     def test_adapter_builds_and_initializes_real_model(self) -> None:
         adapter = _adapter()
@@ -128,7 +146,7 @@ class ZerithRobotAdapterTest(unittest.TestCase):
             adapter.spec.controlled_joint_names,
         )
         self.assertEqual(observation.q, zeros)
-        self.assertAlmostEqual(observation.gripper_width_m, 0.08)
+        self.assertAlmostEqual(observation.gripper_width_m, GRIPPER_MAX_OPENING_M)
         self.assertAlmostEqual(
             sum(
                 value * value
@@ -216,7 +234,7 @@ class ZerithRobotAdapterTest(unittest.TestCase):
         )
         legacy = translator.translate(action)
         np.testing.assert_allclose(legacy[:7], [0, 0, 0.025, 0, 0, 0, 0])
-        self.assertAlmostEqual(legacy[7], 0.0)
+        self.assertAlmostEqual(legacy[7], 2.0 * 0.04 / GRIPPER_MAX_OPENING_M - 1.0)
 
         translator.update_from_runtime_info(
             {
@@ -228,7 +246,7 @@ class ZerithRobotAdapterTest(unittest.TestCase):
             JointPositionAction((arm_names[0],), (0.12,))
         )
         np.testing.assert_allclose(position[:7], [0.02, 0, 0, 0, 0, 0, 0])
-        self.assertAlmostEqual(position[7], 0.0)
+        self.assertAlmostEqual(position[7], 2.0 * 0.04 / GRIPPER_MAX_OPENING_M - 1.0)
 
     def test_legacy_translation_rejects_unsupported_cartesian_action(self) -> None:
         adapter = _adapter()

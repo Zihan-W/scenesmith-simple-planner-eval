@@ -49,6 +49,7 @@ from src.online_manipulation.drake_utils import (
 from src.online_manipulation.observations import CameraObservation, Pose
 from src.online_manipulation.specs import CameraSpec, JointSpec, RendererSpec
 from src.zerith_grasp_geometry import add_left_grasp_frame
+from src.zerith_gripper_config import GRIPPER_MAX_OPENING_M
 from src.zerith_robot_config import (
     ROBOT_BASE_XYZ_METERS,
     ROBOT_BASE_YAW_DEG,
@@ -56,7 +57,9 @@ from src.zerith_robot_config import (
 
 ZERITH_PACKAGE_NAME = "zerith_drake"
 ZERITH_URDF_RELATIVE_PATH = Path("urdf/zerith_drake.urdf")
-GRIPPER_MAX_OPENING = 0.08
+# Minimum separation of the CAD-derived distal finger envelopes at q=0.
+# This calibrates simulation width, not the advertised hardware stroke.
+GRIPPER_MAX_OPENING = GRIPPER_MAX_OPENING_M
 SUPPORTED_CONTACT_PARAMETERS = frozenset(
     ("penetration_allowance_m", "stiction_tolerance_m_s")
 )

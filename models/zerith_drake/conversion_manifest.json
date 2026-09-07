@@ -1,12 +1,14 @@
 {
-  "converter_version": 4,
+  "converter_version": 5,
   "dipan_collision_proxy": "three_boxes",
   "expected_collision_geometry_count": 53,
+  "finger_contact_mesh_count": 8,
+  "finger_geometric_closing_travel_m": 0.03814,
   "mesh_count": 35,
   "output_format": "obj",
-  "output_mesh_reference_count": 57,
+  "output_mesh_reference_count": 65,
   "source_commit": "ddd6dc76ec9ec0a8ebd597d5576e466e11aa72be",
   "source_mesh_reference_count": 70,
   "source_repository": "https://github.com/inFpZero/Zerith_Model.git",
-  "wrist_gripper_collision_proxy": "primitive_boxes_and_cylinders"
+  "wrist_gripper_collision_proxy": "primitives_and_sectioned_finger_convex_meshes"
 }

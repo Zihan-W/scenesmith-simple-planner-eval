@@ -27,11 +27,12 @@ cd "$REPO_ROOT"
 
 git checkout online-env-v0.2
 test "$(git rev-parse HEAD)" = "$(git rev-parse 'online-env-v0.2^{commit}')"
+echo $?
 git submodule update --init --recursive
 ```
 
 `git checkout` 后处于 detached HEAD 是正常的：这里使用的是发布 tag，不是
-开发分支。上述 `test` 没有输出且退出码为 0，表示检出的 commit 正确。
+开发分支。上述 `test` 没有输出，随后 `echo $?` 输出为 0，表示检出的 commit 正确。
 
 创建并激活独立环境。这里显式使用官方 PyPI，因为某些镜像站没有
 `drake==1.49.0`：
