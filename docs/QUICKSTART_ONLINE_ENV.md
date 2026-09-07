@@ -26,7 +26,7 @@ export REPO_ROOT="$WORK_ROOT/scenesmith-simple-planner-eval"
 cd "$REPO_ROOT"
 
 git checkout online-env-v0.2
-test "$(git rev-parse HEAD)" = "23d656c75e31391bba843e59462f50610b3969f4"
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'online-env-v0.2^{commit}')"
 git submodule update --init --recursive
 ```
 
@@ -316,8 +316,14 @@ Episode 0: success=True, reason=lift_held, steps=276
 验证基线：
 
 - tag：`online-env-v0.2`；
-- commit：`23d656c75e31391bba843e59462f50610b3969f4`；
+- 完整运行验证所用的代码基线：`23d656c75e31391bba843e59462f50610b3969f4`；
 - Zerith submodule：`ddd6dc76ec9ec0a8ebd597d5576e466e11aa72be`。
+
+发布后的 v0.2 tag 已更新，包含本中文 Quickstart。上述旧 commit 只记录
+完整运行验证的历史代码基线，不是更新后的 tag 指向；两者之间只修改了本文档，
+运行代码和模型保持一致。当前发布 commit 应以
+`git rev-parse 'online-env-v0.2^{commit}'` 的输出为准，checkout 检查也使用
+tag 解引用结果，避免把旧 commit 写死。
 
 实际结果：
 
