@@ -1,8 +1,9 @@
 # Online Manipulation Environment Progress
 
-Last updated: 2026-09-06
-Release status: Released as local annotated tag `online-env-v0.1`
-Current phase: online-env-v0.2 Phase 1 — Camera API implemented, review pending
+Last updated: 2026-09-07
+Release status: Released as local annotated tags `online-env-v0.1` and
+`online-env-v0.2`
+Current phase: online-env-v0.2 released after camera API hardening
 
 ## Release Record
 
@@ -93,7 +94,7 @@ the fixed-base Zerith PickLift integration with the rail fixed at `0.4 m`.
 
 ## online-env-v0.2 Phase 1 Camera Results
 
-The public development API is `0.2.dev1`. `RobotSpec` can declare zero or
+The public release API is `0.2`. `RobotSpec` can declare zero or
 multiple `CameraSpec` values. `ScenarioSpec` owns the renderer. Only enabled
 cameras are added to the Drake Diagram, and a camera-free environment does not
 register a renderer.
@@ -156,6 +157,56 @@ timestamps, and world poses are stored under
 
 No target detection, visual policy, PLACE, mobile-base control, or rail
 dynamics was added.
+
+### Camera API Hardening (2026-09-07)
+
+Camera geometry, rendering, and PickLift visibility passed human review before
+this hardening pass. The pass did not change camera extrinsics, grasp
+parameters, or physical dynamics.
+
+`CameraObservation.timestamp_s` now comes from the sampled image-time output
+owned by `RgbdSensorDiscrete`; it is no longer inferred by flooring the current
+simulation time. The pinned Drake 1.49.0 wheel exposes an upstream diagram-port
+defect: its nominal `image_time` output evaluates to the held body pose. The
+workaround is isolated in `_drake_camera_time.py`, gated to exact Drake 1.49.0,
+and reads the unique one-element image-time zero-order hold inside the same
+discrete sensor. Unknown versions and absent or ambiguous sources fail loudly;
+there is no fallback to time arithmetic. Independent tests cover the valid
+public port, the exact 1.49.0 path, an unknown version, and an ambiguous source.
+
+A 0.3 s left-wrist camera regression moves the shoulder during the sampling
+interval. At policy times 0.1 s and 0.2 s, RGB, metric depth, label, timestamp,
+and world camera pose all remain bitwise/equality-held at the t=0 frame. At
+the t=0.3 s sensor event, all five update together. The measured robot joint
+changes before the event, proving that the held pose is the capture pose rather
+than the current live link pose.
+
+`Observation.sensors` is now a read-only `MappingProxyType` over a copied
+mapping. The documentation does not promise immutability for the copied
+`objects` and `task` mappings, so they were intentionally left unchanged.
+`CameraObservation.as_dict()` and `Observation.as_dict()` now omit pixel arrays
+by default and report modality shape/dtype metadata. Callers can explicitly use
+`include_images=True`; normal image artifacts remain PNG/NPY. A runner test
+feeds camera images containing distinctive pixel and label values through a
+benchmark and verifies that episode/benchmark JSON and CSV contain no RGB,
+depth, or label payload.
+
+Validation results:
+
+* full repository suite: 113 tests passed in 313.254 s;
+* three-camera numerical calibration: passed for head, left wrist, and right
+  wrist; maximum pixel error 0.758 px and maximum front-depth error
+  0.248 micrometers;
+* PickLift PREGRASP visibility: passed (`left_wrist_target_visible=true`,
+  `head_workspace_visible=true`);
+* camera-disabled physical PickLift seed 500: passed with `lift_held` in 276
+  policy steps;
+* repository-external public client: passed from `/tmp`, saved 320x240 RGB PNG
+  and float32 metric-depth NPY, completed one accepted 0.1 s policy step, and
+  confirmed default serialization contains no images.
+
+Validation artifacts were written to a temporary directory outside the
+repository. The release tag is local and has not been pushed.
 
 ## Current PREGRASP Metrics
 

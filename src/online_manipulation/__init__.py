@@ -82,7 +82,7 @@ from src.online_manipulation.adapters.zerith import (
     make_zerith_robot_spec,
 )
 
-PUBLIC_API_VERSION = "0.2.dev1"
+PUBLIC_API_VERSION = "0.2"
 
 __all__ = [
     "PUBLIC_API_VERSION",

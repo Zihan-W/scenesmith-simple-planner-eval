@@ -42,11 +42,12 @@ Controller / Drake Plant / SceneGraph
 ## 2. Public API
 
 Phase 1 exposed the experimental public package `src.online_manipulation`.
-The current development branch reports `PUBLIC_API_VERSION = "0.2.dev1"`;
-the immutable `online-env-v0.1` tag still reports version 0.1. Version 0.1 was additive: the existing
-`ZerithOnlineEnv` entry points remain supported while the new environment
-delegates to them through an Adapter. Compatibility code may be removed only
-after the real Adapter regression covers the existing PREGRASP behavior.
+The `online-env-v0.2` release reports `PUBLIC_API_VERSION = "0.2"`;
+the immutable `online-env-v0.1` tag still reports version 0.1. Version 0.1 was
+additive: the existing `ZerithOnlineEnv` entry points remain supported while
+the new environment delegates to them through an Adapter. Compatibility code
+may be removed only after the real Adapter regression covers the existing
+PREGRASP behavior.
 
 Phase 8 adds one public composition root:
 
@@ -331,7 +332,15 @@ intrinsics. RGB is H×W×3 `uint8`; depth is H×W `float32` meters; labels are
 H×W `int16`. Drake uses 0 or infinity for invalid depth pixels, depending on
 which depth boundary was exceeded. `label_names` maps render-label integers to
 model-qualified body names. Returned arrays and the label mapping are
-immutable snapshots.
+immutable snapshots. `Observation.sensors` is a `MappingProxyType` over a
+copied mapping, so callers cannot replace sensor observations. `objects` and
+`task` remain copied mappings and are not documented as immutable.
+
+Default `CameraObservation.as_dict()` and `Observation.as_dict()` output
+camera frame, capture time, pose, intrinsics, label names, and per-modality
+shape/dtype metadata only. Pixel arrays are opt-in with
+`include_images=True`; benchmark traces and summaries use their own compact
+state schema and never serialize sensor images.
 
 ## 6. Timing Contract
 
@@ -348,6 +357,16 @@ zero capture offset. Camera sampling is therefore independent of the 10 Hz
 policy. The observation retains the latest complete frame and capture
 timestamp between sensor events. `reset()` explicitly processes the event at
 simulation time zero, making the first frame deterministic.
+
+The capture timestamp is read from the discrete sensor's image-time output,
+not reconstructed from current simulation time. Drake 1.49.0 incorrectly
+exports that public diagram port as the held body pose. The workaround is
+isolated in `src/online_manipulation/_drake_camera_time.py` and gated to the
+exact dependency version pinned in `requirements.txt`. It reads the unique
+one-element image-time zero-order-hold output inside the same
+`RgbdSensorDiscrete`; any unknown version or ambiguous source fails loudly.
+RGB, depth, label, pose, and timestamp are all held until the next sensor
+event.
 
 ## 7. Collision and Contact
 

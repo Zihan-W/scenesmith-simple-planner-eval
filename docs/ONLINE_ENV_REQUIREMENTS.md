@@ -234,6 +234,17 @@ camera.intrinsics   # explicit simulation pinhole calibration
 读取之间看到最近一次完整帧的零阶保持结果。`reset()` 必须在 `t=0` 返回真实、
 确定的第一帧。关闭全部相机时不得注册渲染器或产生图像渲染开销。
 
+`timestamp_s` 必须来自 `RgbdSensorDiscrete.image_time_output_port()` 所代表的
+采样事件，不得用当前仿真时间和周期手工推算。RGB、depth、label、timestamp
+和 camera pose 必须来自同一零阶保持帧：相机事件之间全部保持，到下一事件同步
+更新。`Observation.sensors` 是只读映射快照；当前合同不声明 `objects` 和
+`task` 映射本身不可变。
+
+`CameraObservation.as_dict()` 和 `Observation.as_dict()` 默认只返回相机元数据
+（包括 modality 的 shape/dtype），不得展开像素数组。只有显式传入
+`include_images=True` 时才允许把图像转换成嵌套 list。benchmark summary 和
+trace 不得内联图像；常规图像工件应保存为 PNG/NPY。
+
 Task 可以按稳定名称读取所需 sensor，但 Environment 核心不得包含相机名称、
 Zerith frame 或当前任务的 sensor 选择。无可信硬件标定时，内参必须明确标为
 simulation camera intrinsics。

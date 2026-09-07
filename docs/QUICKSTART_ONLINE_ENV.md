@@ -65,6 +65,12 @@ Two recorded examples are available for visual review:
 label image is accompanied by `camera.label_names`, an immutable mapping from
 integer labels to model-qualified body names.
 
+`camera.as_dict()` and `observation.as_dict()` return camera metadata without
+pixel arrays by default, which keeps logs small. Use
+`as_dict(include_images=True)` only when nested JSON image data is explicitly
+required; normal clients should save RGB as PNG and metric depth as NPY, as
+the example above does. `observation.sensors` is a read-only mapping.
+
 Run the self-contained three-camera geometric calibration without any
 SceneSmith output assets:
 

@@ -332,7 +332,7 @@ class PublicContractTest(unittest.TestCase):
     """Validate stable public action, observation, and protocol behavior."""
 
     def test_public_api_version_is_explicit(self) -> None:
-        self.assertEqual(PUBLIC_API_VERSION, "0.2.dev1")
+        self.assertEqual(PUBLIC_API_VERSION, "0.2")
 
     def test_default_timing_has_expected_integer_schedule(self) -> None:
         timing = TimingConfig()
