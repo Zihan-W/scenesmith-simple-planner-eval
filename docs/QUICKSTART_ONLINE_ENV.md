@@ -1,8 +1,23 @@
 # 仿真评测 Quickstart
 
-本文针对当前本地提交后的代码，不是旧 online-env-v0.3 tag 的命令手册。
-本轮未推送、未打新 tag；同事需要取得包含本轮提交的 checkout 后再执行。
+本文针对用户 fork 的 `dev/wzh` 分支，不是旧 online-env-v0.3 tag 的命令手册。
+安装前确认 checkout 根目录存在 `pyproject.toml`；缺少它说明代码版本不匹配，
+不要继续运行安装和模型转换命令，也不要通过逐个补包绕过版本问题。
 旧发布的文档可用 `git show online-env-v0.3:docs/QUICKSTART_ONLINE_ENV.md` 查看。
+
+首次取得代码（目标目录尚不存在时）：
+
+```bash
+git clone --branch dev/wzh --single-branch https://github.com/Zihan-W/scenesmith-simple-planner-eval.git
+cd scenesmith-simple-planner-eval
+git branch --show-current
+git rev-parse HEAD
+test -f pyproject.toml
+```
+
+已有 checkout 请先保存自己的修改，再从上述用户 fork 更新 `dev/wzh`。
+注意部分开发 checkout 的 origin fetch 指向作者仓库、push 才指向用户 fork，
+更新前用 `git remote -v` 确认，不能假定 `git pull origin` 获取的就是用户 fork。
 
 ## 1. 安装与模型准备
 

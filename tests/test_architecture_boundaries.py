@@ -97,6 +97,7 @@ class ArchitectureBoundaryTest(unittest.TestCase):
         examples = REPOSITORY_ROOT / "examples" / "online_manipulation"
         for filename in (
             "public_api_client.py",
+            "pick_lift.py",
             "camera_public_api_client.py",
             "mobile_public_api_client.py",
         ):
