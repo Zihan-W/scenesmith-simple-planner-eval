@@ -40,17 +40,24 @@ export PYTHON="$REPO_ROOT/.venv/bin/python"
 上游 Zerith STL 由 submodule 提供，转换器生成本地 OBJ 与派生模型；
 OBJ 不进 Git。已有模型时先执行 --check。转换失败不能靠跳过碰撞模型解决。
 安装核心可用 `pip install -e "$REPO_ROOT"`；model-tools 仅模型生成需要，
-iiwa 为离线基线，dev 为测试/审计。依赖以 pyproject.toml 为准，
-requirements-online/model-tools.txt 是无打包安装时的版本列表，不是另一套环境。
+iiwa 为离线基线，dev 为测试/审计。依赖以 pyproject.toml 为准。
+model-tools 同时安装 trimesh 和 scipy：OBJ 顶点法线计算及手指凸碰撞代理
+需要这些依赖。旧环境更新代码后应重新执行上述 editable 安装命令，
+不能只更新源码而跳过新增依赖。若安装失败，请先解决安装错误，再运行转换器。
 
 可编辑安装保留现有 `src.online_manipulation` 公共命名，不为改包名重写项目。
 Python 包不携带大型场景、OBJ 或 submodule；运行时明确传入 repository-root。
 不再需要设置 PYTHONPATH，不需要激活虚拟环境；下文使用绝对可执行文件路径。
 
-本轮实测：在已有完整 .venv 中安装 editable 包、构建wheel、pip check，
+此前结构整理实测：在已有完整 .venv 中安装 editable 包、构建wheel、pip check，
 在全新临时模型根完整生成OBJ并 --check，
 以及仓库外运行。**没有宣称本轮重新联网安装了一整套全新虚拟环境**。
 首次无隔离构建发现缺 wheel，补齐构建依赖后安装成功；默认 pip 隔离构建会安装它。
+
+后续首次安装修复：补齐 model-tools 的 scipy==1.15.3，并在独立全新 Python 3.11
+虚拟环境中仅安装 `[model-tools]`，通过 pip check、两项依赖/网格操作回归测试，
+完整生成35份源STL对应的OBJ和8份手指碰撞OBJ，共43份；未借用dev依赖。
+该补测覆盖安装和模型准备，不代表在全新环境重跑了所有仿真实验。
 
 ## 2. 最快运行：空 output 与独立 cache
 
