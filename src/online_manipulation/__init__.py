@@ -180,3 +180,20 @@ __all__ += [
     "ZerithMobileRobotAdapter", "ZerithDualRobotAdapter", "make_zerith_dual_spec",
     "DescriptionRobotAdapter", "run_configured_episodes",
 ]
+
+from src.online_manipulation.execution import (
+    JointGoalExecutionResult, execute_validated_joint_goal,
+)
+
+def make_minimal_config(repository_root):
+    """Build the repository minimal fixture without expert-policy inputs."""
+    from src.online_manipulation.recipes.minimal import make_config
+    return make_config(repository_root)
+
+def make_mobile_config(mode, **kwargs):
+    """Build a mobile fixture with an explicit repository root and mode."""
+    from src.online_manipulation.recipes.mobile import make_config
+    return make_config(mode, **kwargs)
+
+__all__ += ["JointGoalExecutionResult", "execute_validated_joint_goal",
+            "make_minimal_config", "make_mobile_config"]

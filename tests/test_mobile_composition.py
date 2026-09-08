@@ -4,7 +4,7 @@ import dataclasses
 from pathlib import Path
 import unittest
 
-from examples.online_manipulation.minimal_setup import make_config
+from src.online_manipulation.recipes.minimal import make_config
 from src.online_manipulation import HoldAction, JointDeltaAction, NullTask, make_env
 
 

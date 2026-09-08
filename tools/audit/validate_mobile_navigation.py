@@ -18,7 +18,7 @@ from src.online_manipulation import (
     StaticNavigationMap,
     make_env,
 )
-from examples.online_manipulation.mobile_smoke import make_config
+from src.online_manipulation.recipes.mobile import make_config
 
 
 def local_arrival(mode, output):

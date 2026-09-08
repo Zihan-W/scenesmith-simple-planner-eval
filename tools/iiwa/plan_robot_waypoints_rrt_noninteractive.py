@@ -32,11 +32,10 @@ from pydrake.multibody.tree import BodyIndex
 # Fix relative paths so contents of the src directory can be imported.
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Import your RRT and shortcut implementations
-from src.rrt import BiRRT, RRTOptions
-from src.shortcut import shortcut
+from tools.iiwa.rrt import BiRRT, RRTOptions
+from tools.iiwa.shortcut import shortcut
 
 def embed_q_prefix(
     *,

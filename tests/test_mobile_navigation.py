@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 from pydrake.all import RigidTransform, RollPitchYaw
 
-from examples.online_manipulation.mobile_smoke import make_config
+from src.online_manipulation.recipes.mobile import make_config
 from src.online_manipulation import (
     BaseVelocityAction,
     HoldAction,

@@ -4,11 +4,12 @@ import argparse
 import dataclasses
 import json
 import math
+from pathlib import Path
 
 import numpy as np
 
 from examples.online_manipulation.cartesian_policy import CartesianGoalPolicy
-from examples.online_manipulation.minimal_setup import make_env_config
+from src.online_manipulation import make_minimal_config
 from src.online_manipulation import (
     CartesianDeltaAction,
     HoldAction,
@@ -22,9 +23,10 @@ def main() -> None:
     """Send five 2 mm deltas, then track an absolute position/orientation."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-json", required=True)
+    parser.add_argument("--repository-root", type=Path, required=True)
     args = parser.parse_args()
     config = dataclasses.replace(
-        make_env_config(), enable_planning_query=True,
+        make_minimal_config(args.repository_root), enable_planning_query=True,
         episode_duration=20., maximum_cartesian_joint_delta=0.02)
     robot = make_zerith_robot_spec(
         robot_model_dir=config.robot_model_dir, robot_xyz=config.robot_xyz,

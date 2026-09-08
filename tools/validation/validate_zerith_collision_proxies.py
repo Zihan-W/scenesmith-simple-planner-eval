@@ -15,7 +15,7 @@ from pydrake.all import (
     RigidTransform,
 )
 
-REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ROBOT_MODEL_DIR = REPOSITORY_ROOT / "models/zerith_drake"
 EXPECTED_COLLISION_GEOMETRY_COUNT = 53
 WRIST_JOINT_SUFFIXES = (

@@ -1,0 +1,19 @@
+{
+  "robot": "zerith_dual",
+  "base": {
+    "mode": "planar_kinematic",
+    "base_height_m": 0.1816
+  },
+  "control": "navigation",
+  "initial_state": "navigation_planar",
+  "scene": "navigation",
+  "policy": "navigate_exercise",
+  "task": "parked_dual_exercise",
+  "evaluator": "task_result",
+  "run": {
+    "seeds": [
+      0
+    ],
+    "max_steps": 1750
+  }
+}

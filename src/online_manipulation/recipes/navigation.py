@@ -1,29 +1,11 @@
-"""Navigate, park, then exercise both arms/grippers through public actions."""
-
-import argparse
-import dataclasses
+"""Existing navigate-park-dual-exercise benchmark, not a general planner."""
 import math
-from pathlib import Path
 import numpy as np
-
 from src.online_manipulation import (
-    BaseVelocityAction,
-    GripperAction,
-    HoldAction,
-    JointPositionAction,
-    NavigationGoal,
-    Navigator,
-    NullTask,
-    Pose,
-    RobotCommand,
-    TaskEvaluation,
-    build_navigation_map,
-    build_planning_query,
-    make_env,
-    run_episodes,
+    BaseVelocityAction, JointPositionAction, GripperAction, RobotCommand,
+    HoldAction, NullTask, TaskEvaluation, NavigationGoal, Pose, Navigator,
+    build_planning_query, build_navigation_map,
 )
-from examples.online_manipulation.mobile_smoke import make_config
-
 
 class NavigateExercisePolicy:
     """Own navigation/manipulation sequencing without accessing a Context."""
@@ -171,73 +153,33 @@ class ParkedExerciseTask(NullTask):
         return {"success": self.result.success, "metrics": self.result.metrics}
 
 
-def main():
-    """Assemble reusable pieces; the public episode runner owns the step loop."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--mode", required=True, choices=("planar_kinematic", "wheel_dynamic")
-    )
-    parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--meshcat", action="store_true")
-    args = parser.parse_args()
-    config = make_config(args.mode, meshcat=args.meshcat, obstacle=True)
-    spec = config.robot_adapter.spec
-    home = list(spec.home_positions)
+
+def make_task(options, spec):
+    """Bind fixture targets to named robot capabilities."""
     for side in ("left", "right"):
-        home[spec.controlled_joint_names.index(f"{side}_elbow_joint")] = 1.4
-    adapter = type(config.robot_adapter)(
-        dataclasses.replace(spec, home_positions=tuple(home)),
-        config.robot_adapter.base_config,
-    )
-    goal = NavigationGoal(Pose((2.8, 0, 0), (1, 0, 0, 0)))
-    joint_targets = {
-        side: {spec.arm_groups[side][0]: -0.08} for side in ("left", "right")
-    }
-    widths = {"left": 0.060, "right": 0.055}
-    config = dataclasses.replace(
-        config,
-        robot_adapter=adapter,
-        episode_duration=180,
-        task_factory=lambda: ParkedExerciseTask(goal, joint_targets, widths),
-    )
-    query = build_planning_query(
-        scenario=config.scenario, robot_adapter=adapter, timing=config.timing
-    )
+        if side not in spec.arm_groups or side not in spec.grippers:
+            raise ValueError("Parked exercise requires left/right arms and grippers")
+    goal = NavigationGoal(Pose(tuple(options["goal_xyz_m"]), (1, 0, 0, 0)))
+    targets = {side: {spec.arm_groups[side][0]: options["arm_target_rad"]}
+               for side in ("left", "right")}
+    return ParkedExerciseTask(goal, targets, options["gripper_widths_m"])
+
+
+def make_policy(context):
+    """Check the initial posture and build a static map through PlanningQuery."""
+    config = context.environment_config
+    task = config.task_factory()
+    if not isinstance(task, ParkedExerciseTask):
+        raise TypeError("Navigation exercise policy requires ParkedExerciseTask")
+    if not hasattr(config.robot_adapter, "base_config"):
+        raise ValueError("Navigation exercise requires a mobile RobotAdapter")
+    query = build_planning_query(scenario=config.scenario,
+                                robot_adapter=config.robot_adapter, timing=config.timing)
     if not query.check_configuration(query.configuration()).valid:
-        raise RuntimeError("Navigation posture is not collision safe")
+        raise ValueError("Navigation posture is not collision safe")
     navigation_map = build_navigation_map(
-        query,
-        navigation_frame=adapter.navigation_frame_name,
+        query, navigation_frame=config.robot_adapter.navigation_frame_name,
         ground_body_names=config.scenario.ground_body_names,
-        ground_geometries=config.scenario.ground_geometries,
-    )
-    policy = NavigateExercisePolicy(
-        Navigator(navigation_map), goal, joint_targets, widths
-    )
-    results = run_episodes(
-        env=make_env(config),
-        policy=policy,
-        seeds=(0,),
-        max_steps=1750,
-        output_root=args.output,
-        record_html=args.meshcat,
-    )
-    print(
-        {
-            key: results[0].summary[key]
-            for key in (
-                "success",
-                "termination_reason",
-                "episode_time_s",
-                "policy_steps",
-                "task",
-                "policy",
-            )
-        }
-    )
-    if not results[0].success:
-        raise RuntimeError("Navigation and parked dual-arm exercise did not pass")
-
-
-if __name__ == "__main__":
-    main()
+        ground_geometries=config.scenario.ground_geometries)
+    return NavigateExercisePolicy(Navigator(navigation_map), task.goal,
+                                  task.joint_targets, task.gripper_targets)

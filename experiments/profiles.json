@@ -29,6 +29,16 @@
       "episode_duration": 2.1,
       "max_joint_delta": 0.1,
       "maximum_cartesian_joint_delta": 0.02
+    },
+    "navigation": {
+      "timing": {
+        "physics_dt": 0.001,
+        "controller_dt": 0.005,
+        "policy_dt": 0.1
+      },
+      "episode_duration": 180,
+      "max_joint_delta": 0.1,
+      "maximum_cartesian_joint_delta": 0.02
     }
   },
   "initial_state": {
@@ -69,10 +79,22 @@
       ]
     },
     "mobile_planar": {
-      "robot_xyz": [0, 0, 0.1816],
+      "robot_xyz": [
+        0,
+        0,
+        0.1816
+      ],
       "robot_yaw_deg": 0,
       "rail_position": 0.4,
-      "q_home_left": [0, 0, 0, 0, 0, 0, 0]
+      "q_home_left": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
     },
     "mobile": {
       "robot_xyz": [
@@ -87,6 +109,60 @@
         0,
         0,
         0,
+        0,
+        0,
+        0
+      ]
+    },
+    "navigation_dynamic": {
+      "robot_xyz": [
+        0,
+        0,
+        0.1808
+      ],
+      "robot_yaw_deg": 0,
+      "rail_position": 0.4,
+      "q_home_left": [
+        0,
+        0,
+        0,
+        1.4,
+        0,
+        0,
+        0
+      ],
+      "q_home_right": [
+        0,
+        0,
+        0,
+        1.4,
+        0,
+        0,
+        0
+      ]
+    },
+    "navigation_planar": {
+      "robot_xyz": [
+        0,
+        0,
+        0.1816
+      ],
+      "robot_yaw_deg": 0,
+      "rail_position": 0.4,
+      "q_home_left": [
+        0,
+        0,
+        0,
+        1.4,
+        0,
+        0,
+        0
+      ],
+      "q_home_right": [
+        0,
+        0,
+        0,
+        1.4,
         0,
         0,
         0
@@ -125,6 +201,19 @@
     "scenesmith": {
       "kind": "scenesmith",
       "root_env": "SCENE_ROOT"
+    },
+    "navigation": {
+      "kind": "dmd",
+      "dmd": "models/mobile_scene/obstacle.dmd.yaml",
+      "package_xmls": [
+        "models/mobile_scene/package.xml"
+      ],
+      "ground_geometries": [
+        [
+          "ground::floor",
+          "floor"
+        ]
+      ]
     }
   },
   "policy": {
@@ -135,6 +224,9 @@
       "kind": "picklift",
       "inputs": "experiments/inputs/pick_lift",
       "calibration": "experiments/inputs/pick_lift/pick_lift_calibration.json"
+    },
+    "navigate_exercise": {
+      "factory": "src.online_manipulation.recipes.navigation:make_policy"
     }
   },
   "task": {
@@ -152,6 +244,19 @@
         "support_contact_bodies": [
           "living_room_coffee_table_0::base_link"
         ]
+      }
+    },
+    "parked_dual_exercise": {
+      "factory": "src.online_manipulation.recipes.navigation:make_task",
+      "goal_xyz_m": [
+        2.8,
+        0,
+        0
+      ],
+      "arm_target_rad": -0.08,
+      "gripper_widths_m": {
+        "left": 0.06,
+        "right": 0.055
       }
     }
   },

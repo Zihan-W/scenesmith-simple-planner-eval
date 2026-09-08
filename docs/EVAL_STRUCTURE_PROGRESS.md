@@ -1,3 +1,85 @@
+# 维护记录：仿真评测仓库
+
+本文件是唯一实施/验收记录。Quickstart/GENERIC面向使用者；模型及底盘专题保留几何依据。
+历史移动双臂完整过程可从检查点读取：
+`git show cb79ba8:docs/mobile_manipulation_progress.md`。
+历史结构方案：`git show cb79ba8:docs/EVAL_STRUCTURE_REFACTOR_PLAN.md`。
+这些历史实验未重复运行时，不作为当前随机鲁棒性或新机器人证据。
+
+## 当前收敛工作（2026-09-08，用户授权本地提交）
+
+- 基线cb79ba8和此前未提交迁移保留；旧删除不恢复。
+- 真正删除旧Zerith字典/Facade、重复CLI、safe-home/导轨/pregrasp阶段工具链、
+  已被profile替代的environment.json与pick_environment/settings；不留archive/legacy副本。
+- 专家输入原样保留。相机几何标定、碰撞代理行程检查及三类独立审计仍保留。
+- IIWA算法集中tools/iiwa，由iiwa-baseline显式四阶段编排；删除带批量覆盖/吞失败的旧shell。
+- 合并重复examples组装；TAMP执行helper进入公开execution接口，例子只调用它。
+- 既有导航停车双臂演示进入可选recipe + 两份短profile配置，原初态/控制/成功阈值不变。
+- pyproject提供核心/model-tools/iiwa/dev依赖和scene-eval，保留现有公开包命名；
+  去除sys.path.insert，不要求生成环境或API key。未修改摩擦、抓取参数或模型。
+- 已失去产品用途的旧CLI专属测试删除；组装参数转交、策略独立/不变性、初态恢复、
+  夹爪/携物和移动后TAMP同步等有效断言迁至正式接口。
+- 用户文档改为唯一入口；旧计划/重复进度退出当前文档，历史由Git保留。
+
+### 安装和针对性证据
+
+首次无隔离editable安装因缺wheel失败；补齐构建依赖后成功。
+使用项目现有.venv：setuptools65.5.0、wheel0.48.0；未重装Drake/NumPy，pip check通过。
+未宣称全新venv联网完整安装已验证。模型--check通过：源commit ddd6dc76、43OBJ、65派生引用、53collision。
+23项迁移行为测试通过；4项安装/退役依赖测试通过，不与最终全量相加。
+保留的9个入口和IIWA阶段--help从仓库外、无PYTHONPATH运行；启动检查不是完整算法验收。
+
+首轮全量启动发现public_api_client重复两次公共import不符合既有精确断言；
+中止该轮、合并源文件import后边界5项通过，再执行最终全量。没有删断言或调阈值。
+首次批量改动脚本误用系统Python导致缺pydrake，在应用patch之前退出；改用.venv完成。
+
+最终日志：/tmp/eval-product-final-tests.log；首次失败记录：/tmp/eval-product-full-tests.log。
+真实基准和独立cache/output：/tmp/eval-product-runs-pmxmfyx9。
+### 最终验收（最终实现，无测试数量累加）
+
+全量：**158项，665.785秒，OK，exit 0，无skip**。它与历史M0—M4的158项不是
+同一组结果：退役CLI专属测试删除，有效行为迁移，并增加安装/配置/退役依赖测试。
+最终实现测试后只补文档、依赖入口说明和提交记录，未再改变控制/任务实现。
+
+实际命令（仓库根目录）：
+
+```bash
+SCENE_ROOT=/root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000 MPLCONFIGDIR=/tmp/eval-product-mpl PYTHONPATH=.:tests .venv/bin/python -B -m unittest discover -s tests -v
+```
+
+| 验收 | 结果 / 产物 |
+|---|---|
+| 已安装CLI/API、空output、独立cache、仓库外无PYTHONPATH | DistributionTest实际reset/step和10步运行通过 |
+| 外部Policy/evaluator | /tmp/eval-product-external-s4gk3j3l；seed7/8各3步、custom_hold_confirmed；无需修改核心 |
+| 真实A迁根、源只读、geometry地面/墙区分 | 全量中的test_real_a_relocation_metadata_and_wall_scope通过；墙未被轮地容差排除 |
+| 固定PickLift | seed500，277步/27.7s；lift_held；抬升0.102855139m、保持3.1s；双指true，support_contact=false，无意外目标接触 |
+| PickLift输出DMD | final.dmd.yaml重新加载通过，25模型；通用round-trip回归也通过 |
+| 轮驱导航停车双臂 | 421步/42.1s，parked_dual_targets_held；最终位置误差0.02261134m，yaw误差0.01004386rad |
+| 运动学导航停车双臂 | 420步/42.0s，同成功原因；位置误差0.01857344m，yaw误差0.01038774rad |
+| 相机/双臂/携物/TAMP | 既有全量断言保留并通过；两种底盘机制的已充分验证审计未大规模重跑 |
+| OBJ首次生成 | 独立/tmp/eval-product-model-fmpkra/zerith_drake全量生成后--check通过；原模型未改 |
+| editable和wheel | pip check通过；wheel 187272 bytes，78项、展开624974 bytes，无models/output/OBJ/HTML/legacy |
+| IIWA可选基线 | 4阶段--help、加机器人与真实Drake加载通过：46模型、132positions、2742collision；/tmp/eval-iiwa-assets-kqxoff9h |
+| 文档/依赖 | 当前README/docs/examples/tools链接检查无缺失文件；正式src无工具/示例反向导入；diff --check通过 |
+
+三个真实运行使用同一已安装scene-eval，从/tmp执行，参数可由Quickstart复制：
+experiments/picklift.json、navigation_wheel_dynamic.json、navigation_planar_kinematic.json；
+output及cache均在/tmp/eval-product-runs-pmxmfyx9对应子目录。含JSON/CSV，PickLift含最终DMD。
+此次为headless回归，没有生成新的HTML；已有视觉验收不改称本轮人工验收。
+两导航Task仍要求实际v/omega与pose误差共同满足原停车窗口，不以最终pose独立宣称通过。
+
+限制：没有完整重跑IIWA的IK/RRT/TOPPRA抓放；它保留sticky模型/携物近似及原摩擦倍率10，
+不能作为Zerith真实接触证据。B缺纹理视觉仍未验收；没有新venv完整联网安装或第二真实机器人验证。
+固定PickLift只是一轮回归，不代表随机鲁棒性。未添加PLACE、移动携物、完整TAMP或新控制模式。
+
+提交组织：代码、profile、消费者、有效测试和使用文档强耦合，合为一个可安装的本地提交。
+显式核对暂存文件，保留基线相关修改和删除；不纳入output、OBJ、build、egg-info、虚拟环境或大场景。
+不推送、不修改tag；仓库外备份/root/workspace/eval-checkpoint-CdmzSR1W和上游资产保留。
+
+---
+
+# 历史M0—M4与检查点记录
+
 # Eval 结构整理执行记录
 
 ## M0：基线（2026-09-08）
@@ -192,3 +274,28 @@ Git索引无暂存内容、diff --check通过；没有提交、推送、tag操�
 - 缓存、普通日志/HTML、OBJ、虚拟环境和上游大场景不整批备份、不删除。
 - 本次只授权本地检查点；不推送、不改tag。之后的入口精简与退役变更单独保留工作树，
   不悄悄并入这个已验证检查点。
+
+## 本地检查点完成与后续入口整理
+
+检查点：`cb79ba8ffa80bcbada4bda4c88528bf951e01c55`（dev/wzh）。
+显式暂存76个Git变更文件，核对staged diff后提交；提交后工作树干净。
+既有相关修改/删除一并保留，没有无关改动混入。
+六份仓库外备份均通过SHA256校验，位置见上一节，源文件仍在。
+
+随后按授权执行入口整理：25个文件移至tools的calibration/validation/audit/legacy，
+删除3个纯转发，旧字典组装从Adapter移到tools/legacy/zerith_facade.py。
+正式运行不反向依赖tools；仍被当前命令解析消费的translator保留。
+没有修改控制参数、场景资产、版本或tag。完整路径对照见[入口退役说明](QUICKSTART_ONLINE_ENV.md)。
+
+迁移后针对性命令：
+
+```bash
+SCENE_ROOT=/root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000 MPLCONFIGDIR=/tmp/ev-mpl PYTHONPATH=.:tests .venv/bin/python -B -m unittest test_architecture_boundaries test_closure_contracts test_zerith_robot_adapter test_zerith_camera_calibration test_structure_migration test_generic_online_example test_picklift_demo_example -v
+```
+
+44项/141.364s/OK，日志 `/tmp/ev-retirement-targeted-tests.log`。
+20个迁移CLI仓库外 --help 通过，日志 `/tmp/ev-retirement-cli-smoke.jsonl`；
+AST及shell语法检查通过。未重复完整PickLift/离线IIWA实验。
+不与检查点158项相加，也不把旧全量视为当前迁移后全量。
+
+后续整理全部留在未暂存工作树，未第二次提交；没有推送、改tag或批量删output。

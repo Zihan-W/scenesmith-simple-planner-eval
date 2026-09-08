@@ -31,12 +31,11 @@ from pydrake.all import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from src.zerith_robot_config import (
-    ROBOT_BASE_XYZ_METERS,
-    ROBOT_BASE_YAW_DEG,
-)
+
+_INITIAL = json.loads((REPOSITORY_ROOT / "experiments/profiles.json").read_text())["initial_state"]["picklift"]
+ROBOT_BASE_XYZ_METERS = tuple(_INITIAL["robot_xyz"])
+ROBOT_BASE_YAW_DEG = _INITIAL["robot_yaw_deg"]
 
 ZERITH_PACKAGE_NAME = "zerith_drake"
 ZERITH_MODEL_RELATIVE_PATH = Path("models/zerith_drake")

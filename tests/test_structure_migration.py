@@ -33,7 +33,7 @@ class StructureMigrationTest(unittest.TestCase):
         for path in paths:
             for node in ast.walk(ast.parse(path.read_text())):
                 if isinstance(node, ast.ImportFrom):
-                    self.assertFalse((node.module or "").startswith(("examples", "scripts", "src.item_locking_monitor")), path)
+                    self.assertFalse((node.module or "").startswith(("examples", "scripts", "tools")), path)
         self.assertNotIn("zerith_grasp_geometry", (ROOT / "src/online_manipulation/adapters/zerith.py").read_text())
 
     def test_external_policy_evaluator_reset_and_artifacts(self):
@@ -155,7 +155,7 @@ class StructureMigrationTest(unittest.TestCase):
 import importlib.abc, sys, tempfile
 class BlockOptional(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.split('.')[0] in {'scenesmith', 'openai', 'agents', 'torch', 'trimesh', 'manipulation', 'networkx'}:
+        if fullname.split('.')[0] in {'scenesmith', 'openai', 'agents', 'torch', 'trimesh', 'manipulation', 'networkx', 'tools'}:
             raise ImportError('optional package disabled: ' + fullname)
 sys.meta_path.insert(0, BlockOptional())
 from src.online_manipulation import load_experiment, make_env, HoldAction

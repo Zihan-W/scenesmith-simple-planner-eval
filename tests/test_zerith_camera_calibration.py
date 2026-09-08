@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from scripts.validate_zerith_camera_geometry import validate_calibration
+from tools.calibration.validate_zerith_camera_geometry import validate_calibration
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]

@@ -6,12 +6,12 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
-from src.online_manipulation.actions import (
+from src.online_manipulation import (
     HoldAction,
     JointPositionAction,
 )
-from src.online_manipulation.observations import Observation
-from src.online_manipulation.protocols import OnlineEnvironment
+from src.online_manipulation import Observation
+from src.online_manipulation import OnlineEnvironment
 
 
 class BehaviorTreeStatus(enum.Enum):

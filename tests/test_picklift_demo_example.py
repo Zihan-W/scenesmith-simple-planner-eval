@@ -9,12 +9,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from examples.online_manipulation import minimal_setup as minimal
+from src.online_manipulation.recipes import minimal
 from examples.online_manipulation.example_policies import (
     make_hold_policy, make_joint_step_policy,
 )
-from examples.online_manipulation.pick_lift_demo import minimal_setup
-from examples.online_manipulation.pick_lift_demo import policy as expert
+from src.online_manipulation import experiment as minimal_setup, load_experiment
+from src.online_manipulation.recipes import pick_policy as expert
 from src.online_manipulation import HoldPolicy, JointStepPolicy, PickLiftPolicy
 
 
@@ -39,14 +39,15 @@ class PickLiftDemoExampleTest(unittest.TestCase):
             ),
             end_effector_frame_name="fixture_grasp_frame",
         )
-        with mock.patch.object(
-            minimal_setup, "make_zerith_robot_spec", return_value=self.robot
-        ):
-            self.config = minimal_setup.make_config(
-                repository_root=self.root,
-                scene_root=self.artifacts / "scene",
-                pick_artifact_root=self.artifacts,
-            )
+        user = json.loads((self.root / "experiments/minimal.json").read_text())
+        user.update(initial_state="picklift", control="picklift", task="picklift")
+        config_path = self.artifacts / "experiment.json"
+        config_path.write_text(json.dumps(user))
+        loaded = load_experiment(config_path, repository_root=self.root,
+                                 cache_root=self.artifacts / "cache")
+        self.config = dataclasses.replace(loaded.environment_config,
+                                         task=loaded.environment_config.task.task)
+        config_path.unlink()
 
     def _write_expert_fixture(self):
         """Write files that only the expert policy requires."""
@@ -119,7 +120,7 @@ class PickLiftDemoExampleTest(unittest.TestCase):
 
     def test_environment_modules_do_not_import_or_create_policies(self):
         """Guard the dependency boundary in both example environments."""
-        for module in (minimal, minimal_setup):
+        for module in (minimal,):
             source = Path(module.__file__).read_text()
             tree = ast.parse(source)
             for node in ast.walk(tree):

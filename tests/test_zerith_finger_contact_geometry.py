@@ -9,7 +9,7 @@ import numpy as np
 import trimesh
 from scipy.spatial import ConvexHull
 
-from examples.online_manipulation.public_api_client import make_config
+from src.online_manipulation.recipes.minimal import make_config
 from src.online_manipulation import GripperAction, make_env
 from src.zerith_gripper_config import FINGER_CLOSING_TRAVEL_M
 

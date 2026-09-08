@@ -1,7 +1,3 @@
-drake==1.49.0
-trimesh==4.11.0
-networkx==3.4.2
-tqdm==4.67.1
-scipy==1.15.3
-manipulation==2025.10.20
-pillow==12.3.0
+# Default install is the online core, not the optional IIWA research stack.
+# Prefer pip install -e '.[model-tools]' or '.[iiwa]' for explicit extras.
+-r requirements-online.txt

@@ -5,7 +5,7 @@ from examples.online_manipulation.behavior_tree_tick import (
     JointTargetLeaf,
     TickResult,
 )
-from examples.online_manipulation.tamp_execution import (
+from src.online_manipulation import (
     JointGoalExecutionResult,
     execute_validated_joint_goal,
 )

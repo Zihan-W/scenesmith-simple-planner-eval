@@ -82,6 +82,10 @@ def load_experiment(config_path, *, repository_root, cache_root, scene_root=None
     root = Path(repository_root).resolve()
     path = Path(config_path).resolve()
     user = json.loads(path.read_text())
+    required_groups = {"robot", "control", "initial_state", "scene", "policy", "task", "evaluator"}
+    missing = required_groups - user.keys()
+    if missing:
+        raise ValueError(f"Missing experiment profiles: {sorted(missing)}")
     allowed = {"robot", "control", "initial_state", "scene", "policy", "task",
                "evaluator", "scene_options", "robot_options", "policy_options",
                "task_options", "evaluator_options", "initial_state_options",
@@ -246,6 +250,9 @@ def load_experiment(config_path, *, repository_root, cache_root, scene_root=None
         if kind not in actual or not set(names).issubset(actual[kind]):
             raise ValueError(f"Unsatisfied required capability {kind}: {names}")
     options = {"seeds": (0,), "max_steps": 100, "record_html": False, "write_final_dmd": False}
+    unknown_run = set(user.get("run", {})) - options.keys()
+    if unknown_run:
+        raise ValueError(f"Unknown run options: {sorted(unknown_run)}")
     options.update(user.get("run", {}))
     if options["record_html"] and not meshcat:
         raise ValueError("record_html requires meshcat enabled explicitly")

@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.lib import recfunctions
 
-from examples.online_manipulation.mobile_smoke import make_config
+from src.online_manipulation.recipes.mobile import make_config
 from src.online_manipulation import (
     BaseVelocityAction, NavigationGoal, Navigator, Pose,
     build_navigation_map, make_env,

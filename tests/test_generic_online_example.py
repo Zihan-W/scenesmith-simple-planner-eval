@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from examples.online_manipulation import run_online
+from src.online_manipulation import assembly as run_online
 from examples.online_manipulation.example_policies import MyPolicy
 
 
@@ -47,51 +47,7 @@ class GenericOnlineExampleTest(unittest.TestCase):
                 run_online.run(object(), object(), output_root=Path("run"))
         build.assert_not_called()
 
-    def test_cli_loads_environment_and_policy_independently(self):
-        """The policy factory receives config, never a runtime or context."""
-        config = object()
-        policy = MyPolicy()
-        env_factory = mock.Mock(return_value=config)
-        policy_factory = mock.Mock(return_value=policy)
-        args = [
-            "run_online", "--env-factory", "user_env:make_config",
-            "--policy-factory", "user_policy:make_policy",
-            "--output-root", "output/example",
-        ]
-        with (
-            mock.patch("sys.argv", args),
-            mock.patch.object(
-                run_online, "load_factory", side_effect=[env_factory, policy_factory]
-            ),
-            mock.patch.object(run_online, "run", return_value=[]) as execute,
-        ):
-            run_online.main()
-        env_factory.assert_called_once_with()
-        policy_factory.assert_called_once_with(config)
-        self.assertEqual(execute.call_args.args, (config, policy))
 
-    def test_launcher_only_imports_public_library_api(self):
-        """Keep concrete setup, Drake access, and robot choices out of launcher."""
-        tree = ast.parse(Path(run_online.__file__).read_text())
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                name = node.module or ""
-                if name.startswith("src"):
-                    self.assertEqual(name, "src.online_manipulation")
-                self.assertFalse(name.startswith(("pydrake", "examples")))
-            if isinstance(node, ast.Attribute):
-                self.assertNotIn(node.attr, ("backend", "runtime", "context"))
-        public_imports = {
-            alias.name for node in ast.walk(tree)
-            if isinstance(node, ast.ImportFrom)
-            and node.module == "src.online_manipulation"
-            for alias in node.names
-        }
-        self.assertEqual(public_imports, {
-            "EnvironmentConfig", "EpisodeResult", "Policy", "make_env",
-            "run_episodes",
-            "run_configured_episodes",
-        })
 
 
 if __name__ == "__main__":

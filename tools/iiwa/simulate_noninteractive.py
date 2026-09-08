@@ -33,9 +33,8 @@ from manipulation.station import LoadScenario, MakeHardwareStation, MakeMultibod
 
 # Fix relative paths so contents of the src directory can be imported.
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.item_locking_monitor import ItemLockingMonitorConfig, ApplyItemLockingMonitorConfig
+from tools.iiwa.item_locking_monitor import ItemLockingMonitorConfig, ApplyItemLockingMonitorConfig
 
 def _ensure_model_drivers(yaml_text: str) -> str:
     if "model_drivers:" in yaml_text:

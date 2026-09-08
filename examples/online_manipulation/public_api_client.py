@@ -5,8 +5,8 @@ import argparse
 import json
 from pathlib import Path
 
-from examples.online_manipulation.minimal_setup import make_config
 from src.online_manipulation import (
+    make_minimal_config as make_config,
     HoldPolicy,
     ZerithEnvironmentConfig,
     make_env,

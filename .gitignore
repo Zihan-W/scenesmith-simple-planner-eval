@@ -20,6 +20,9 @@ zerith_online_control.html
 meshcats/*
 .venv
 logs
+*.egg-info/
+build/
+dist/
 models/zerith_drake/meshes/*.obj
 # Deprecated local prototype; preserved for reference but never committed.
 scripts/simulate_zerith_safe_pregrasp.py

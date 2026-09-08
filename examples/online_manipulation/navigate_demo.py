@@ -15,7 +15,7 @@ from src.online_manipulation import (
     build_planning_query,
     make_env,
 )
-from examples.online_manipulation.mobile_smoke import make_config
+from src.online_manipulation import make_mobile_config as make_config
 
 
 def main():
@@ -26,10 +26,11 @@ def main():
     )
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--meshcat", action="store_true")
+    parser.add_argument("--repository-root", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     config = dataclasses.replace(
-        make_config(args.mode, meshcat=args.meshcat, obstacle=True),
+        make_config(args.mode, meshcat=args.meshcat, obstacle=True, repository_root=args.repository_root),
         episode_duration=180,
     )
     # A compact elbow-flexed navigation pose, checked before starting motion.

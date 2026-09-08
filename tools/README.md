@@ -1,12 +1,25 @@
-# 可选工具，不是在线运行依赖
+# 可选工具
 
-- `calibration/prepare_zerith_pick_eval_scene.py`：旧场景/目标标定器；需要主动重新标定时才运行。日常入口从已验收显式覆盖生成 cache，不调用此搜索器。
-- `calibration/validate_zerith_camera_geometry.py`：三相机几何及实际可见性审核。
-- `audit/audit_cartesian_edge_rejections.py`：消费 trace.csv，输出拒绝动作几何证据。
-- `scripts/` 的同名命令保留为薄转发；测试导入也仍兼容。
-- `scripts/convert_zerith_for_drake.py`：仍是首次安装必须运行的模型转换命令；不是可删输出。
-- `scripts/*noninteractive.py` 与 `src/rrt*`、`src/shortcut.py`、`src/item_locking_monitor.py`：离线 IIWA 研究流程，保留但不进入默认在线入口。
-- `examples/online_manipulation/`：公共 API 使用、导航和回归演示；正式配置工厂在 `src/online_manipulation/recipes`，不再反向导入示例。
+日常使用 scene-eval + experiments，不经本目录组装。
+工具可以依赖正式库，正式src不能反向导入工具。
 
-运行工具用 `PYTHONPATH="$REPO_ROOT" "$PYTHON" -m tools.calibration.validate_zerith_camera_geometry --help`，或原 `scripts/` 薄转发。
-不会为清理目录删除已追踪的示例大资产、Zerith OBJ 或上游模型。
+| 入口 | 独立用途 |
+|---|---|
+| scripts/convert_zerith_for_drake.py | 首次模型准备/转换一致性--check |
+| scripts/visualize_dmd_scene.py | 任意DMD的场景检查 |
+| scripts/visualize_zerith_left_arm.py | 模型安装与关节零位的运动学检查，不是动力学 |
+| tools.calibration.validate_zerith_camera_geometry | 三相机数值投影及真实场景可见性 |
+| tools.validation.validate_zerith_collision_proxies | 腕部/手指几何行程扫描 |
+| tools.audit.audit_cartesian_edge_rejections | CSV中的动作拒绝逐几何诊断 |
+| tools.audit.audit_base_modes | 两种底盘机制及独立零驱动力矩对照 |
+| tools.audit.validate_mobile_navigation | local目标、到达窗口和受阻专项验证 |
+| iiwa-baseline | 可选原IIWA四阶段离线基线 |
+
+安装后可从仓库外运行 `python -m tools.calibration.validate_zerith_camera_geometry --help`。
+其余tools同理；scripts使用显式文件路径。审计可能访问仿真内部以记录物理证据，
+不是Policy应模仿的接口。完整基线见 [Quickstart](../docs/QUICKSTART_ONLINE_ENV.md)。
+
+旧Zerith字典兼容层、临时搜索、阶段回放和重复CLI已删除，
+不再全部搬进legacy；需要历史源码时从cb79ba8检查点检出。
+当前已验收策略输入仍版本化，未重新搜索替代。新目标专家的自动再标定流程
+不作为此次交付能力；相机/模型的有效独立检查保留。

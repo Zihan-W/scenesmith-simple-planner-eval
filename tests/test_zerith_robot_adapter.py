@@ -24,22 +24,22 @@ from src.online_manipulation import (
     SpatialVelocity,
     TimingConfig,
 )
+from src.online_manipulation import RuntimeConfig, make_env
 from src.online_manipulation.adapters.zerith import (
     ZerithLegacyActionTranslator,
     ZerithRobotAdapter,
-    make_legacy_zerith_online_environment,
     make_zerith_robot_spec,
 )
-from src.zerith_online_env import ALL_SERVO_CONFIGS
+from src.zerith_servo_config import ALL_SERVO_CONFIGS
 from src.zerith_gripper_config import (
     FINGER_CLOSING_TRAVEL_M,
     GRIPPER_MAX_OPENING_M,
 )
-from src.zerith_robot_config import (
-    PICK_RAIL_POSITION_METERS,
-    ROBOT_BASE_XYZ_METERS,
-    ROBOT_BASE_YAW_DEG,
-)
+import json
+_PROFILE = json.loads((Path(__file__).resolve().parents[1] / "experiments/profiles.json").read_text())["initial_state"]["picklift"]
+PICK_RAIL_POSITION_METERS = _PROFILE["rail_position"]
+ROBOT_BASE_XYZ_METERS = tuple(_PROFILE["robot_xyz"])
+ROBOT_BASE_YAW_DEG = _PROFILE["robot_yaw_deg"]
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 _ROBOT_MODEL_DIR = _REPOSITORY_ROOT / "models" / "zerith_drake"
@@ -216,13 +216,11 @@ class ZerithRobotAdapterTest(unittest.TestCase):
                     "stiction_tolerance_m_s": 0.01,
                 },
             )
-            env = make_legacy_zerith_online_environment(
-                scenario=scenario,
-                adapter=_adapter(),
-                timing=TimingConfig(),
-                episode_duration=0.2,
-                task=NullTask(),
-            )
+            env = make_env(RuntimeConfig(
+                scenario=scenario, robot_adapter=_adapter(),
+                timing=TimingConfig(), episode_duration=0.2,
+                task_factory=NullTask,
+            ))
             observation, _ = env.reset(seed=0)
             self.assertEqual(
                 observation.objects["movable"].pose,

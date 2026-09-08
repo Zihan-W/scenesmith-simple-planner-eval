@@ -74,7 +74,7 @@ SceneSmith场景及四份ignored派生文件，详见Quickstart第4节。发布�
 
 - 最终实现全量：**150项、581.234s、OK、exit 0**。日志路径
   `output/closure_audit/full_tests_submission_ready.log`，时序和实现指纹见
-  [progress §16](mobile_manipulation_progress.md#16-提交前最终记录核对2026-09-08未暂存)。
+  [维护记录中的历史读取方式](EVAL_STRUCTURE_PROGRESS.md)；原progress §16保存在cb79ba8检查点。
   较早150项和最后24项重叠，不相加；版本收口仅改声明及对应版本断言，
   无控制、动力学、抓取或导航实现变化，因此复用最终全量。
 - 版本针对性检查：`tests.test_online_api_contracts`的14项通过；公开API

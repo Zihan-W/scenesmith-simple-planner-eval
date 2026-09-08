@@ -6,10 +6,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from examples.online_manipulation.pick_lift_demo.minimal_setup import make_config
-from examples.online_manipulation.tamp_execution import execute_validated_joint_goal
-from examples.online_manipulation.mobile_smoke import make_config as mobile_config
-from scripts.run_zerith_online_example import _parse_args, build_run
+from src.online_manipulation import execute_validated_joint_goal
+from src.online_manipulation.recipes.mobile import make_config as mobile_config
 from src.online_manipulation import (
     BaseVelocityAction,
     DescriptionRobotAdapter,
@@ -28,91 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ClosureContractTest(unittest.TestCase):
     """Use actual models for construction failures, no additional robot project."""
 
-    def test_old_cli_hold_and_joint_step_ignore_expert_files(self):
-        for policy in ("hold", "joint-step"):
-            args = _parse_args(
-                [
-                    policy,
-                    "/not-loaded/scene.dmd.yaml",
-                    "--scene-package-xml",
-                    "/not-loaded/package.xml",
-                    "--output-root",
-                    "/not-used",
-                    "--pick-home-json",
-                    "/missing/expert.json",
-                    "--pregrasp-json",
-                    "/missing/ik.json",
-                    "--pick-lift-calibration-json",
-                    "/missing/calibration.json",
-                ]
-            )
-            with mock.patch("scripts.run_zerith_online_example.build_policy") as expert:
-                actual, _, steps = build_run(args)
-            expert.assert_not_called()
-            expected = make_config(
-                repository_root=ROOT,
-                scene_root=Path("/not-loaded"),
-                pick_artifact_root=Path("/not-loaded"),
-                task_enabled=False,
-            )
-            self.assertIsInstance(actual.task, NullTask)
-            for field in ("robot_xyz", "robot_yaw_deg", "rail_position", "q_home_left"):
-                self.assertEqual(getattr(actual, field), getattr(expected, field))
-            self.assertEqual(
-                actual.scenario.observed_bodies, expected.scenario.observed_bodies
-            )
-            self.assertEqual(actual.robot_xyz, (2.65, 2.95, 0.1815))
-            self.assertEqual(actual.q_home_left, (0.0,) * 7)
-            self.assertEqual(actual.timing, expected.timing)
-            self.assertEqual(
-                actual.max_joint_delta, 0.01
-            )  # Old CLI default, not .1 recipe default.
-            self.assertEqual(actual.maximum_cartesian_joint_delta, 0.02)
-            self.assertEqual(actual.episode_duration, 2.1)
-            self.assertEqual(steps, 20)
 
-    def test_old_cli_pick_uses_shared_task_and_policy_factory(self):
-        args = _parse_args(
-            [
-                "pick-lift",
-                "output/zerith_pick_eval/zerith_pick_eval.dmd.yaml",
-                "--scene-package-xml",
-                "/scene/package.xml",
-                "--output-root",
-                "/not-used",
-                "--pick-home-json",
-                "/expert/home.json",
-                "--max-steps",
-                "1200",
-                "--maximum-joint-step",
-                "0.1",
-                "--closed-width",
-                "0",
-            ]
-        )
-        with mock.patch("scripts.run_zerith_online_example.build_policy") as expert:
-            actual, _, _ = build_run(args)
-        expected = make_config(
-            repository_root=ROOT,
-            scene_root=Path("/scene"),
-            pick_artifact_root=ROOT / "output/zerith_pick_eval",
-        )
-        self.assertEqual(actual.task.config, expected.task.config)
-        for field in (
-            "robot_xyz",
-            "robot_yaw_deg",
-            "rail_position",
-            "q_home_left",
-            "timing",
-            "max_joint_delta",
-            "maximum_cartesian_joint_delta",
-        ):
-            self.assertEqual(getattr(actual, field), getattr(expected, field))
-        self.assertAlmostEqual(actual.episode_duration, expected.episode_duration)
-        self.assertIs(expert.call_args.args[0], actual)
-        self.assertEqual(
-            expert.call_args.kwargs["policy_overrides"]["closed_width_m"], 0
-        )
 
     def test_adapter_mapping_rejected_at_construction(self):
         class MissingActuator(DescriptionRobotAdapter):

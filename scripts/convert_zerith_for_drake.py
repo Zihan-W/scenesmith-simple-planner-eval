@@ -16,7 +16,6 @@ import numpy as np
 import trimesh
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from src.zerith_gripper_config import FINGER_CLOSING_TRAVEL_M
 

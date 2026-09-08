@@ -18,6 +18,7 @@ from src.online_manipulation import (
     ScenarioSpec,
     ZerithMobileRobotAdapter,
     make_env,
+    make_mobile_config,
     make_zerith_camera_specs,
     make_zerith_dual_spec,
 )
@@ -34,16 +35,8 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     root = args.repo_root.resolve()
-    base = BaseConfig(
-        args.mode, base_height_m=0.1816 if args.mode == "planar_kinematic" else 0.1808
-    )
-    spec = make_zerith_dual_spec(
-        robot_model_dir=root / "models/zerith_drake",
-        robot_xyz=(0, 0, base.base_height_m),
-        robot_yaw_deg=0,
-        rail_position=0.4,
-        q_home_left=(0,) * 7,
-    )
+    config = make_mobile_config(args.mode, repository_root=root, obstacle=True)
+    spec = config.robot_adapter.spec
     spec = dataclasses.replace(
         spec,
         cameras=make_zerith_camera_specs(
@@ -53,17 +46,8 @@ def main():
             update_period_s=0.1,
         ),
     )
-    scene = root / "models/mobile_scene"
-    env = make_env(
-        RuntimeConfig(
-            ScenarioSpec(
-                scene / "obstacle.dmd.yaml",
-                (scene / "package.xml",),
-                ground_body_names=("ground::floor",),
-            ),
-            ZerithMobileRobotAdapter(spec, base),
-        )
-    )
+    env = make_env(dataclasses.replace(config, robot_adapter=ZerithMobileRobotAdapter(
+        spec, config.robot_adapter.base_config)))
     obs, reset_info = env.reset(seed=0)
     trace = [obs.as_dict()]
     for _ in range(5):

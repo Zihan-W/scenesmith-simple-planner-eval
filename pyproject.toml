@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scenesmith-online-eval"
+version = "0.3.0"
+description = "Online robot simulation and task evaluation for existing SceneSmith scenes"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "drake==1.49.0", "numpy==2.4.6", "pillow==12.3.0", "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+model-tools = ["trimesh==4.11.0"]
+iiwa = ["trimesh==4.11.0", "networkx==3.4.2", "tqdm==4.67.1", "scipy==1.15.3", "manipulation==2025.10.20"]
+dev = ["trimesh==4.11.0", "scipy==1.15.3", "matplotlib>=3.9"]
+
+[project.scripts]
+scene-eval = "src.online_manipulation.experiment:main"
+iiwa-baseline = "tools.iiwa.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "tools*", "examples*"]
+namespaces = true
+
+[tool.setuptools]
+include-package-data = false
