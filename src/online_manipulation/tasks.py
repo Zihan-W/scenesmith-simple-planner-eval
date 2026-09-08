@@ -8,8 +8,13 @@ from typing import Any
 import numpy as np
 
 from src.online_manipulation.actions import (
+    BaseVelocityAction,
     CartesianDeltaAction,
+    CartesianPoseAction,
     CompositeAction,
+    JointDeltaAction,
+    JointPositionAction,
+    RobotCommand,
     RobotAction,
 )
 from src.online_manipulation.contact import (
@@ -66,6 +71,8 @@ class PickLiftTaskConfig:
     maximum_target_translational_speed_m_s: float = 0.02
     maximum_target_rotational_speed_rad_s: float = 0.5
     maximum_allowed_contact_penetration_m: float = 0.0001
+    carrier_arm_name: str | None = None
+    carrier_gripper_name: str | None = None
 
     def __post_init__(self) -> None:
         """Validate target identifiers and success thresholds."""
@@ -104,9 +111,7 @@ class PickLiftTaskConfig:
             not math.isfinite(self.maximum_allowed_contact_penetration_m)
             or self.maximum_allowed_contact_penetration_m <= 0.0
         ):
-            raise ValueError(
-                "PickLiftTask contact penetration limit must be positive"
-            )
+            raise ValueError("PickLiftTask contact penetration limit must be positive")
         object.__setattr__(self, "gripper_contact_bodies", contacts)
         object.__setattr__(self, "support_contact_bodies", supports)
 
@@ -182,17 +187,14 @@ class PickLiftTask:
             and not contact_state["unexpected_target_contacts"]
             and translational_speed
             <= self.config.maximum_target_translational_speed_m_s
-            and rotational_speed
-            <= self.config.maximum_target_rotational_speed_rad_s
+            and rotational_speed <= self.config.maximum_target_rotational_speed_rad_s
         )
         if stable_lift:
             self._held_above_threshold_s += elapsed
         else:
             self._held_above_threshold_s = 0.0
         self._last_time_s = now
-        self._success = (
-            self._held_above_threshold_s >= self.config.required_hold_s
-        )
+        self._success = self._held_above_threshold_s >= self.config.required_hold_s
         return TaskEvaluation(
             reward=1.0 if self._success else 0.0,
             terminated=self._success,
@@ -214,28 +216,81 @@ class PickLiftTask:
         action: RobotAction,
     ) -> ContactPolicy:
         """Allow configured gripper-target pairs in planning safety checks."""
-        cartesian_action = None
-        if isinstance(action, CartesianDeltaAction):
-            cartesian_action = action
-        elif isinstance(action, CompositeAction) and isinstance(
-            action.arm,
-            CartesianDeltaAction,
-        ):
-            cartesian_action = action.arm
         carried_bodies = ()
-        if (
-            cartesian_action is not None
-            and self._contact_state(env)["bilateral_gripper_contact"]
-        ):
+        if self._contact_state(env)["bilateral_gripper_contact"]:
+            base = action.base if isinstance(action, RobotCommand) else action
+            if isinstance(base, BaseVelocityAction) and (
+                base.velocity_m_s != 0.0 or base.yaw_rate_rad_s != 0.0
+            ):
+                raise ValueError(
+                    "PickLift carrying with a moving base is not supported; "
+                    "stop the base before manipulating the target"
+                )
+            query = env.get_planning_query()
+            spec = query.robot_adapter.spec
+            grippers = spec.grippers or {"": spec.gripper}
+            matches = [
+                name
+                for name, gripper in grippers.items()
+                if gripper is not None
+                and set(self.config.gripper_contact_bodies)
+                == {
+                    f"{spec.model_instance_name}::{body}"
+                    for body in gripper.contact_body_names
+                }
+            ]
+            if len(matches) != 1:
+                raise ValueError(
+                    "PickLift carrier gripper is missing or ambiguous in RobotSpec"
+                )
+            gripper_name = matches[0]
+            if (
+                self.config.carrier_gripper_name is not None
+                and self.config.carrier_gripper_name != gripper_name
+            ):
+                raise ValueError(
+                    "PickLift carrier gripper does not match contact bodies"
+                )
+            groups = spec.arm_groups or {
+                "": tuple(
+                    n
+                    for n in spec.controlled_joint_names
+                    if n not in grippers[gripper_name].joint_names
+                )
+            }
+            frames = spec.end_effector_frames or {"": spec.end_effector_frame_name}
+            arm_name = self.config.carrier_arm_name
+            if arm_name is None:
+                if len(groups) != 1:
+                    raise ValueError(
+                        "PickLift with multiple arms requires carrier_arm_name"
+                    )
+                arm_name = next(iter(groups))
+            if arm_name not in groups:
+                raise ValueError(f"Unknown PickLift carrier arm: {arm_name}")
+            frame = frames[arm_name]
+            command = (
+                action.arms.get(arm_name)
+                if isinstance(action, RobotCommand)
+                else action.arm if isinstance(action, CompositeAction) else action
+            )
+            if isinstance(command, (CartesianDeltaAction, CartesianPoseAction)):
+                if command.end_effector_frame != frame:
+                    raise ValueError(
+                        "PickLift action frame differs from its bound carrier"
+                    )
+            elif isinstance(command, (JointDeltaAction, JointPositionAction)):
+                if not set(command.joint_names).issubset(groups[arm_name]):
+                    raise ValueError(
+                        "PickLift joint action must address its bound carrier arm"
+                    )
             carried_bodies = (
                 CarriedBody(
                     body_name=self.config.target_contact_body,
-                    carrier_frame_name=(
-                        cartesian_action.end_effector_frame
-                    ),
+                    carrier_frame_name=frame,
                     body_pose_world=self._target(env).pose,
-                    carrier_pose_world=(
-                        env.observation.robot.end_effector_pose
+                    carrier_pose_world=query.frame_pose(
+                        spec.model_instance_name, frame
                     ),
                 ),
             )
@@ -244,7 +299,8 @@ class PickLiftTask:
             tuple(
                 (body, self.config.target_contact_body)
                 for body in self.config.gripper_contact_bodies
-            ) + tuple(
+            )
+            + tuple(
                 (body, self.config.target_contact_body)
                 for body in self.config.support_contact_bodies
             ),
@@ -267,9 +323,7 @@ class PickLiftTask:
 
     def _contact_state(self, env: Any) -> dict[str, Any]:
         """Classify physical contacts involving the configured target."""
-        finger_contacts = {
-            body: False for body in self.config.gripper_contact_bodies
-        }
+        finger_contacts = {body: False for body in self.config.gripper_contact_bodies}
         support_contact = False
         unexpected_contacts = set()
         known_contacts = set(self.config.gripper_contact_bodies) | set(
@@ -289,8 +343,7 @@ class PickLiftTask:
             elif other_body not in known_contacts:
                 unexpected_contacts.add(other_body)
         finger_flags = tuple(
-            finger_contacts[body]
-            for body in self.config.gripper_contact_bodies
+            finger_contacts[body] for body in self.config.gripper_contact_bodies
         )
         return {
             "finger_contacts": finger_flags,
@@ -302,9 +355,7 @@ class PickLiftTask:
     def _target(self, env: Any):
         """Return the configured generic target observation."""
         try:
-            return env.observation.objects[
-                self.config.target_observation_name
-            ]
+            return env.observation.objects[self.config.target_observation_name]
         except KeyError as error:
             raise KeyError(
                 "PickLiftTask target is absent from Observation.objects: "
@@ -315,6 +366,4 @@ class PickLiftTask:
         """Return target vertical displacement from reset."""
         if self._initial_height_m is None:
             raise RuntimeError("Call task.reset() before evaluation")
-        return float(
-            self._target(env).pose.translation_m[2] - self._initial_height_m
-        )
+        return float(self._target(env).pose.translation_m[2] - self._initial_height_m)

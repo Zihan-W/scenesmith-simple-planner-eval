@@ -2,12 +2,15 @@
 
 from src.online_manipulation.actions import (
     CartesianDeltaAction,
+    CartesianPoseAction,
     CompositeAction,
     GripperAction,
     HoldAction,
     JointDeltaAction,
     JointPositionAction,
     RobotAction,
+    RobotCommand,
+    BaseVelocityAction,
 )
 from src.online_manipulation.contact import (
     CarriedBody,
@@ -35,6 +38,13 @@ from src.online_manipulation.planning import (
     build_planning_query,
 )
 from src.online_manipulation.factory import make_env
+from src.online_manipulation.runtime import RuntimeConfig
+from src.online_manipulation.base import BaseConfig
+from src.online_manipulation.navigation import NavigationConfig, NavigationGoal, Navigator, StaticNavigationMap
+from src.online_manipulation.navigation_geometry import build_navigation_map
+from src.online_manipulation.adapters.zerith_mobile import ZerithMobileRobotAdapter
+from src.online_manipulation.adapters.description import DescriptionRobotAdapter
+from src.online_manipulation.adapters.zerith_dual import ZerithDualRobotAdapter, make_zerith_dual_spec
 from src.online_manipulation.policies import (
     HoldPolicy,
     JointStepPolicy,
@@ -54,6 +64,7 @@ from src.online_manipulation.protocols import (
     EnvironmentConfig,
     OnlineEnvironment,
     Policy,
+    StoppablePolicy,
     RobotAdapter,
     Task,
     TaskEvaluation,
@@ -87,6 +98,7 @@ PUBLIC_API_VERSION = "0.2"
 __all__ = [
     "PUBLIC_API_VERSION",
     "CartesianDeltaAction",
+    "CartesianPoseAction",
     "CameraIntrinsics",
     "CameraObservation",
     "CameraSpec",

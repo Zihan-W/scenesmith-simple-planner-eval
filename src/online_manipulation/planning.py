@@ -21,6 +21,8 @@ from pydrake.planning import RobotDiagramBuilder
 from src.online_manipulation.contact import (
     CarriedBody,
     FREE_MOTION_CONTACT_POLICY,
+    penetration_limit,
+    SupportContactPolicy,
 )
 from src.online_manipulation.drake_utils import (
     register_package_xml,
@@ -162,6 +164,7 @@ class PlanningQuery:
         robot_model_instance: Any,
         robot_adapter: RobotAdapter,
         observed_bodies: Sequence[ObservedBodySpec] = (),
+        support_limits_m: Mapping[tuple[str, str], float] | None = None,
     ):
         """Create and initialize a context owned only by planning queries."""
         self.diagram = diagram
@@ -169,6 +172,7 @@ class PlanningQuery:
         self.robot_model_instance = robot_model_instance
         self.robot_adapter = robot_adapter
         self.observed_bodies = tuple(observed_bodies)
+        self.support_limits_m = dict(support_limits_m or {})
         self._root_context = diagram.CreateDefaultContext()
         self._plant_context = plant.GetMyMutableContextFromRoot(
             self._root_context
@@ -199,6 +203,8 @@ class PlanningQuery:
             if robot_adapter.spec.gripper is not None
             else set()
         )
+        for gripper_spec in robot_adapter.spec.grippers.values():
+            gripper_names.update(gripper_spec.joint_names)
         safety_active_joint_names = {
             spec.name
             for spec in robot_adapter.spec.controlled_joints
@@ -215,6 +221,24 @@ class PlanningQuery:
     def context(self) -> Any:
         """Return the independent mutable Plant context for advanced users."""
         return self._plant_context
+
+    def synchronize_state(self, actual_context: Any) -> None:
+        """Copy full actual state into planning only, never into simulation."""
+        self._base_positions = self.plant.GetPositions(actual_context).copy()
+        self.plant.SetPositions(self._plant_context, self._base_positions)
+        self.plant.SetVelocities(self._plant_context, self.plant.GetVelocities(actual_context))
+        self._root_context.SetTime(actual_context.get_time())
+
+    @property
+    def state_time_s(self) -> float:
+        """Simulation time of the last synchronized planning snapshot."""
+        return float(self._root_context.get_time())
+
+    def _contact_policy(self, policy):
+        """Keep robot support limits separate from task-specific contacts."""
+        if self.support_limits_m and not isinstance(policy, SupportContactPolicy):
+            return SupportContactPolicy(policy, self.support_limits_m)
+        return policy
 
     def configuration(self) -> tuple[float, ...]:
         """Return controlled joint positions in RobotSpec order."""
@@ -385,6 +409,7 @@ class PlanningQuery:
         influence_distance_m: float = 0.05,
     ) -> ClearanceMetrics:
         """Return strict nonpenetration and policy-filtered safety layers."""
+        contact_policy = self._contact_policy(contact_policy)
         pairs = self.collision_pairs(
             configuration,
             influence_distance_m=influence_distance_m,
@@ -422,9 +447,13 @@ class PlanningQuery:
         influence_distance_m: float,
     ) -> tuple[ConfigurationCheck, tuple[CollisionPair, ...]]:
         """Return one configuration check and its evaluated distance pairs."""
+        contact_policy = self._contact_policy(contact_policy)
         values = self._configuration_array(configuration)
         within_limits = all(
-            spec.position_lower <= value <= spec.position_upper
+            # The discrete contact solver can put an open finger ~1e-11 m
+            # outside its stop. This is a numerical state-check tolerance,
+            # not a relaxed command limit or collision clearance.
+            spec.position_lower - 1e-9 <= value <= spec.position_upper + 1e-9
             for spec, value in zip(
                 self.robot_adapter.spec.controlled_joints,
                 values,
@@ -445,7 +474,7 @@ class PlanningQuery:
         nonpenetrating = all(
             pair.distance_m
             >= (
-                -contact_policy.maximum_allowed_penetration_m
+                -penetration_limit(contact_policy, pair.body_a, pair.body_b)
                 if contact_policy.permits(pair.body_a, pair.body_b)
                 else 0.0
             )
@@ -479,6 +508,7 @@ class PlanningQuery:
         maximum_joint_step: float = 0.002,
     ) -> EdgeCheck:
         """Densely sample one joint-space edge without advancing simulation."""
+        contact_policy = self._contact_policy(contact_policy)
         if maximum_joint_step <= 0.0:
             raise ValueError("maximum_joint_step must be positive")
         q_start = self._configuration_array(start)
@@ -724,6 +754,42 @@ class PlanningQuery:
             clearance=check.clearance,
         )
 
+    def differential_ik_to_pose(
+        self,
+        *,
+        target_pose: Pose,
+        frame_name: str,
+        seed: Sequence[float],
+        maximum_joint_delta: float,
+        validation_start: Sequence[float] | None = None,
+        contact_policy: ContactPolicy = FREE_MOTION_CONTACT_POLICY,
+    ) -> DifferentialIkResult:
+        """Take one bounded online step toward an absolute world-frame pose.
+
+        Error is recomputed at the commanded configuration on each call.
+        The shortest world-expressed rotation is log(R_goal R_current^T).
+        The existing delta solver supplies joint limits and full edge checks,
+        including the measured starting state and any carried-body policy.
+        This local method may reject or stall; callers must check observations
+        and action diagnostics rather than interpreting acceptance as arrival.
+        """
+        current = _rigid_transform(self.frame_pose_at(
+            seed, self.robot_adapter.spec.model_instance_name, frame_name
+        ))
+        target = _rigid_transform(target_pose)
+        rotation_error = (
+            target.rotation() @ current.rotation().inverse()
+        ).ToAngleAxis()
+        return self.differential_ik_step(
+            translation_m=target.translation() - current.translation(),
+            rotation_vector_rad=rotation_error.axis() * rotation_error.angle(),
+            frame_name=frame_name,
+            seed=seed,
+            maximum_joint_delta=maximum_joint_delta,
+            validation_start=validation_start,
+            contact_policy=contact_policy,
+        )
+
     def differential_ik_step(
         self,
         *,
@@ -735,6 +801,7 @@ class PlanningQuery:
         validation_start: Sequence[float] | None = None,
         contact_policy: ContactPolicy = FREE_MOTION_CONTACT_POLICY,
         damping: float = 1e-4,
+        active_joint_names: Sequence[str] | None = None,
     ) -> DifferentialIkResult:
         """Map one small world-frame pose delta to a safe joint-space edge."""
         translation = np.asarray(translation_m, dtype=float)
@@ -768,7 +835,8 @@ class PlanningQuery:
                 for index, spec in enumerate(
                     self.robot_adapter.spec.controlled_joints
                 )
-                if gripper is None or spec.name not in gripper.joint_names
+                if (spec.name in active_joint_names if active_joint_names is not None
+                    else gripper is None or spec.name not in gripper.joint_names)
             ],
             dtype=int,
         )
@@ -991,7 +1059,7 @@ class PlanningQuery:
     ) -> float:
         """Return signed distance above the pair-specific lower bound."""
         lower_bound = (
-            -contact_policy.maximum_allowed_penetration_m
+            -penetration_limit(contact_policy, pair.body_a, pair.body_b)
             if contact_policy.permits(pair.body_a, pair.body_b)
             else 0.0
         )
@@ -1053,17 +1121,11 @@ def build_planning_query(
 ) -> PlanningQuery:
     """Build a planning-only RobotDiagram from public specifications."""
     builder = RobotDiagramBuilder(time_step=timing.physics_dt)
+    from src.online_manipulation.model import populate_model, support_contact_limits
+
     parser = builder.parser()
-    parser.SetAutoRenaming(True)
-    for package_xml in scenario.package_xmls:
-        register_package_xml(parser, package_xml)
-    ProcessModelDirectives(
-        LoadModelDirectives(str(scenario.dmd_path)),
-        parser,
-    )
     plant = builder.plant()
-    robot_model_instance = robot_adapter.add_model(parser)
-    robot_adapter.configure_model(plant, robot_model_instance)
+    robot_model_instance = populate_model(parser, scenario, robot_adapter)
     plant.Finalize()
     diagram = builder.Build()
     query = PlanningQuery(
@@ -1072,6 +1134,7 @@ def build_planning_query(
         robot_model_instance=robot_model_instance,
         robot_adapter=robot_adapter,
         observed_bodies=scenario.observed_bodies,
+        support_limits_m=support_contact_limits(robot_adapter, scenario),
     )
     query.set_observed_body_poses(scenario.initial_object_poses)
     return query

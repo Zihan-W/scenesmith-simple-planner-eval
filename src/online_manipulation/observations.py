@@ -110,6 +110,9 @@ class RobotObservation:
     end_effector_pose: Pose
     end_effector_twist: SpatialVelocity
     gripper_width_m: float | None = None
+    end_effectors: Mapping[str, Pose] = dataclasses.field(default_factory=dict)
+    gripper_widths_m: Mapping[str, float] = dataclasses.field(default_factory=dict)
+    frame_poses_world: Mapping[str, Pose] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate ordered joint telemetry dimensions."""
@@ -138,6 +141,8 @@ class RobotObservation:
         if len(saturated) != size:
             raise ValueError("torque_saturated must match joint_names")
         object.__setattr__(self, "torque_saturated", saturated)
+        for name in ("end_effectors", "gripper_widths_m", "frame_poses_world"):
+            object.__setattr__(self, name, MappingProxyType(dict(getattr(self, name))))
         if self.gripper_width_m is not None and (
             not math.isfinite(self.gripper_width_m)
             or self.gripper_width_m < 0.0
@@ -157,6 +162,9 @@ class RobotObservation:
             "end_effector_pose": self.end_effector_pose.as_dict(),
             "end_effector_twist": self.end_effector_twist.as_dict(),
             "gripper_width_m": self.gripper_width_m,
+            "end_effectors": {name: pose.as_dict() for name, pose in self.end_effectors.items()},
+            "gripper_widths_m": dict(self.gripper_widths_m),
+            "frame_poses_world": {name: pose.as_dict() for name, pose in self.frame_poses_world.items()},
         }
 
 
@@ -380,6 +388,7 @@ class Observation:
     sensors: Mapping[str, CameraObservation] = dataclasses.field(
         default_factory=dict
     )
+    base: Mapping[str, Any] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate time and generic object namespace."""
@@ -409,6 +418,7 @@ class Observation:
         """
         return {
             "time": self.time_s,
+            **({"base": dict(self.base)} if self.base else {}),
             "robot": self.robot.as_dict(),
             "objects": {
                 name: observation.as_dict()

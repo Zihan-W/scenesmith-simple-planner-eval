@@ -19,6 +19,12 @@ GENERIC_CORE_FILES = (
     "protocols.py",
     "runner.py",
     "specs.py",
+    "runtime.py",
+    "model.py",
+    "sensors.py",
+    "base.py",
+    "navigation.py",
+    "navigation_geometry.py",
 )
 FORBIDDEN_MARKERS = (
     "zerith",
@@ -92,6 +98,7 @@ class ArchitectureBoundaryTest(unittest.TestCase):
         for filename in (
             "public_api_client.py",
             "camera_public_api_client.py",
+            "mobile_public_api_client.py",
         ):
             source = (examples / filename).read_text(encoding="utf-8")
             tree = ast.parse(source)

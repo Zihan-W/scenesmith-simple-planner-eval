@@ -316,6 +316,11 @@ class PickLiftPolicy:
         """Return the current externally owned policy stage."""
         return self._stage
 
+    @property
+    def stop_reason(self) -> str | None:
+        """Expose policy failure through the explicit runner lifecycle contract."""
+        return self._failure_reason
+
     def diagnostics(self) -> dict[str, object]:
         """Return state-machine diagnostics for episode artifacts."""
         return {

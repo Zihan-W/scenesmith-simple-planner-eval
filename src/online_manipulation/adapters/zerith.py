@@ -1,5 +1,8 @@
 """Zerith-specific model, joint, gripper, and legacy-runtime adapter."""
 
+from __future__ import annotations
+
+import copy
 import dataclasses
 import math
 import xml.etree.ElementTree as ET
@@ -17,6 +20,7 @@ from pydrake.all import (
 
 from src.online_manipulation.actions import (
     CartesianDeltaAction,
+    CartesianPoseAction,
     CompositeAction,
     GripperAction,
     HoldAction,
@@ -39,6 +43,7 @@ from src.online_manipulation.planning import (
     build_planning_query,
 )
 from src.online_manipulation.protocols import ContactPolicy, Task
+from src.online_manipulation.tasks import NullTask
 from src.online_manipulation.specs import (
     CameraSpec,
     GripperSpec,
@@ -48,14 +53,13 @@ from src.online_manipulation.specs import (
     ScenarioSpec,
     TimingConfig,
 )
-from src.zerith_online_env import (
+from src.zerith_servo_config import (
     ALL_SERVO_CONFIGS,
     GRIPPER_MAX_OPENING,
     LEFT_ARM_SERVO_CONFIGS,
     LEFT_GRIPPER_SERVO_CONFIGS,
     ZERITH_PACKAGE_NAME,
     ZERITH_URDF_RELATIVE_PATH,
-    ZerithOnlineEnv,
 )
 from src.zerith_grasp_geometry import (
     LEFT_GRASP_FRAME_NAME,
@@ -242,6 +246,14 @@ def make_zerith_robot_spec(
     locked_positions.update(overrides)
     root = ET.parse(urdf_path).getroot()
     model_instance_name = root.attrib["name"]
+    gripper = GripperSpec(
+        joint_names=tuple(config.name for config in LEFT_GRIPPER_SERVO_CONFIGS),
+        minimum_width_m=0.0,
+        maximum_width_m=GRIPPER_MAX_OPENING,
+        contact_body_names=(
+            "left_jaw_left_finger_link", "left_jaw_right_finger_link",
+        ),
+    )
     return RobotSpec(
         name="zerith_left_arm",
         model_instance_name=model_instance_name,
@@ -253,13 +265,7 @@ def make_zerith_robot_spec(
         locked_joint_positions=locked_positions,
         end_effector_frame_name=_END_EFFECTOR_FRAME_NAME,
         home_positions=q_home + (0.0, 0.0),
-        gripper=GripperSpec(
-            joint_names=tuple(
-                config.name for config in LEFT_GRIPPER_SERVO_CONFIGS
-            ),
-            minimum_width_m=0.0,
-            maximum_width_m=GRIPPER_MAX_OPENING,
-        ),
+        gripper=gripper,
         safety_exempt_body_pairs=(
             (
                 f"{model_instance_name}::body_yaw_link",
@@ -267,6 +273,9 @@ def make_zerith_robot_spec(
             ),
         ),
         cameras=tuple(cameras),
+        arm_groups={"left": tuple(config.name for config in LEFT_ARM_SERVO_CONFIGS)},
+        end_effector_frames={"left": _END_EFFECTOR_FRAME_NAME},
+        grippers={"left": gripper},
     )
 
 
@@ -459,13 +468,28 @@ class ZerithRobotAdapter:
                 tuple(float(value) for value in velocity.translational()),
             ),
             gripper_width_m=self._gripper_width(q),
+            end_effectors={
+                name: _drake_pose(
+                    plant.GetFrameByName(frame, model_instance).CalcPoseInWorld(
+                        plant_context
+                    )
+                )
+                for name, frame in self.spec.end_effector_frames.items()
+            },
+            gripper_widths_m={
+                name: self._gripper_width(q) for name in self.spec.grippers
+            },
         )
 
-    def gripper_position_targets(self, width_m: float) -> Mapping[str, float]:
+    def gripper_position_targets(
+        self, width_m: float, name: str | None = None,
+    ) -> Mapping[str, float]:
         """Map physical opening width to symmetric finger positions."""
-        gripper = self.spec.gripper
+        if name is not None and name not in self.spec.grippers:
+            raise ValueError(f"Unknown gripper: {name}")
+        gripper = self.spec.gripper if name is None else self.spec.grippers[name]
         if gripper is None:
-            raise RuntimeError("Zerith gripper specification is missing")
+            raise ValueError("Zerith gripper specification is missing")
         width = float(width_m)
         if not gripper.minimum_width_m <= width <= gripper.maximum_width_m:
             raise ValueError(
@@ -626,6 +650,7 @@ class ZerithLegacyActionTranslator:
             | JointPositionAction
             | JointDeltaAction
             | CartesianDeltaAction
+            | CartesianPoseAction
             | None
         )
         gripper_action: GripperAction | None
@@ -656,7 +681,7 @@ class ZerithLegacyActionTranslator:
             ):
                 requested[self._arm_index(name)] = value
             requested_arm_delta = requested - self._desired_arm
-        elif isinstance(arm_action, CartesianDeltaAction):
+        elif isinstance(arm_action, (CartesianDeltaAction, CartesianPoseAction)):
             requested_arm_delta, result = self._cartesian_arm_delta(
                 arm_action,
                 contact_policy,
@@ -816,22 +841,22 @@ class ZerithLegacyActionTranslator:
 
     def _cartesian_arm_delta(
         self,
-        action: CartesianDeltaAction,
+        action: CartesianDeltaAction | CartesianPoseAction,
         contact_policy: ContactPolicy | None,
     ) -> tuple[np.ndarray, Any]:
         """Solve one safe online world-frame differential-IK increment."""
         if self._planning_query is None:
             raise NotImplementedError(
-                "CartesianDeltaAction requires a configured PlanningQuery"
+                "Cartesian actions require a configured PlanningQuery"
             )
         if action.reference_frame != "world":
             raise NotImplementedError(
-                "The initial CartesianDeltaAction implementation supports "
+                "The Cartesian action implementation supports "
                 "only reference_frame='world'"
             )
         if action.end_effector_frame != self._spec.end_effector_frame_name:
             raise ValueError(
-                "CartesianDeltaAction end_effector_frame does not match "
+                "Cartesian action end_effector_frame does not match "
                 "RobotSpec"
             )
         seed_by_name = dict(zip(self._arm_names, self._desired_arm))
@@ -847,15 +872,20 @@ class ZerithLegacyActionTranslator:
         )
         if self._maximum_cartesian_joint_delta is None:
             raise RuntimeError(
-                "CartesianDeltaAction requires "
+                "Cartesian actions require "
                 "maximum_cartesian_joint_delta"
             )
         solve_kwargs = {}
         if contact_policy is not None:
             solve_kwargs["contact_policy"] = contact_policy
-        result = self._planning_query.differential_ik_step(
-            translation_m=action.translation_m,
-            rotation_vector_rad=action.rotation_vector_rad,
+        if isinstance(action, CartesianPoseAction):
+            solve = self._planning_query.differential_ik_to_pose
+            solve_kwargs["target_pose"] = action.pose
+        else:
+            solve = self._planning_query.differential_ik_step
+            solve_kwargs["translation_m"] = action.translation_m
+            solve_kwargs["rotation_vector_rad"] = action.rotation_vector_rad
+        result = solve(
             frame_name=action.end_effector_frame,
             seed=q_seed,
             validation_start=validation_start,
@@ -919,6 +949,10 @@ class LegacyZerithRuntimeBackend:
     def control_log(self):
         """Expose legacy controller diagnostics during migration."""
         return self.runtime.control_log
+
+    def get_planning_query(self):
+        """Forward old callers to the same full-state planning snapshot."""
+        return self.runtime.runtime.get_planning_query()
 
     def reset(
         self,
@@ -1151,6 +1185,8 @@ def make_legacy_zerith_environment(
             "Legacy Zerith runtime requires the scene package.xml as the "
             "first ScenarioSpec.package_xmls entry"
         )
+    from src.zerith_online_env import ZerithOnlineEnv
+
     scene_package_xml = scenario.package_xmls[0]
     additional_package_xmls = scenario.package_xmls[1:]
     body_specs_by_name = {
@@ -1325,26 +1361,64 @@ class ZerithEnvironmentConfig:
                 ),
             )
         )
-        planning_query = (
-            build_planning_query(
-                scenario=self.scenario,
-                robot_adapter=adapter,
-                timing=self.timing,
-            )
-            if self.enable_planning_query
-            else None
-        )
-        return make_legacy_zerith_online_environment(
+        from src.online_manipulation.runtime import RuntimeConfig
+
+        # Public fixed-baseline composition now uses the same real runtime as
+        # other mechanisms. Only the v0.2 action translation remains specific.
+        return RuntimeConfig(
             scenario=self.scenario,
-            adapter=adapter,
+            robot_adapter=adapter,
             timing=self.timing,
-            target_model_name=self.target_model_name,
-            target_body_name=self.target_body_name,
             episode_duration=self.episode_duration,
-            max_joint_delta=self.max_joint_delta,
+            maximum_joint_delta=self.max_joint_delta,
             maximum_cartesian_joint_delta=(
-                self.maximum_cartesian_joint_delta
+                self.maximum_cartesian_joint_delta or self.max_joint_delta
             ),
-            planning_query=planning_query,
-            task=self.task,
-        )
+            task_factory=lambda: copy.deepcopy(self.task) if self.task is not None else NullTask(),
+            action_resolver_factory=lambda runtime: ZerithFixedCommandResolver(
+                runtime, enable_planning=self.enable_planning_query,
+                maximum_cartesian_joint_delta=self.maximum_cartesian_joint_delta),
+        ).build_environment()
+
+
+class ZerithFixedCommandResolver:
+    """Keep v0.2 fixed action semantics on the shared integrator, not two plants."""
+
+    def __init__(self, runtime, *, enable_planning, maximum_cartesian_joint_delta):
+        self.runtime = runtime
+        self.translator = ZerithLegacyActionTranslator(
+            runtime.spec, planning_query=runtime.planning if enable_planning else None,
+            maximum_joint_delta=runtime.config.maximum_joint_delta,
+            maximum_cartesian_joint_delta=maximum_cartesian_joint_delta)
+
+    def reset(self):
+        self.translator.reset()
+
+    def resolve(self, action, contact_policy):
+        runtime = self.runtime
+        observation = runtime._observation()
+        self.translator.update_from_observation(observation)
+        gripper = runtime.spec.gripper
+        indices = [runtime.spec.controlled_joint_names.index(n) for n in gripper.joint_names]
+        arm_indices = [i for i, n in enumerate(runtime.spec.controlled_joint_names) if n not in gripper.joint_names]
+        width = gripper.maximum_width_m - runtime.command[indices[1]] + runtime.command[indices[0]]
+        self.translator.update_from_runtime_info({"desired_q_left": runtime.command[arm_indices],
+                                                  "desired_gripper_width": width})
+        runtime.planning.synchronize_state(runtime.plant_context)
+        legacy = self.translator.translate(action, contact_policy)
+        candidate = runtime.command.copy()
+        candidate[arm_indices] += legacy[:-1]
+        desired_width = (legacy[-1] + 1) * gripper.maximum_width_m / 2
+        for name, value in runtime.adapter.gripper_position_targets(desired_width).items():
+            candidate[runtime.spec.controlled_joint_names.index(name)] = value
+        decision = self.translator.last_decision
+        decision["accepted"] = decision["status"] != "rejected"
+        arm_action = action.arm if isinstance(action, CompositeAction) else action
+        if (decision["accepted"] and contact_policy.carried_bodies
+                and isinstance(arm_action, (JointDeltaAction, JointPositionAction))):
+            edge = runtime.check_command_edge(observation.robot.q, candidate, contact_policy)
+            decision["edge"] = dataclasses.asdict(edge)
+            if not edge.valid:
+                decision.update(accepted=False, status="rejected",
+                                reasons=("carried_joint_edge_rejected",))
+        return candidate, decision

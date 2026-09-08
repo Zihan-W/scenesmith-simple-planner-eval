@@ -1,0 +1,1 @@
+<sdf version="1.7"><model name="obstacle"><static>true</static><link name="obstacle"><pose>1.5 0 0.65 0 0 0</pose><visual name="obstacle"><geometry><box><size>0.5 0.6 1.3</size></box></geometry><material><diffuse>0.2 0.35 0.8 1</diffuse></material></visual><collision name="obstacle"><geometry><box><size>0.5 0.6 1.3</size></box></geometry></collision></link></model></sdf>

@@ -1,7 +1,10 @@
 # Online Environment v0.2 快速开始
 
-本文面向第一次使用仓库的同事。下面的命令已经在一个全新 clone、全新
-`.venv` 和 `online-env-v0.2` tag 上逐条验证。
+开发分支补充：需要接入自己的场景、Task 和 Policy 时，请看
+[通用在线运行示例](GENERIC_ONLINE_EXAMPLE.md)。该示例是 tag 发布后的新增
+内容，不包含在原 `online-env-v0.2` tag 中。
+
+本文面向第一次使用仓库的同事。**第1—5节是v0.2发布版的历史安装与验证记录；第6—7节是当前未提交工作树的交接入口，不在v0.2 tag内。** 不要在当前有改动的工作树执行第1节的checkout；那一节仅用于全新clone。第1—5节命令此前在全新clone和`.venv`验证；本次没有重新做全新安装。
 
 v0.2 的交付内容分为两类：
 
@@ -51,6 +54,8 @@ export PYTHON="$REPO_ROOT/.venv/bin/python"
 本次验证安装得到 `drake 1.49.0`、`trimesh 4.11.0` 和
 `manipulation 2025.10.20`。
 
+这里的“本次”指第5节所述历史发布验证，不是当前迁移收尾又做了一次安装。
+
 准备运行输出和可写缓存目录：
 
 ```bash
@@ -85,6 +90,10 @@ Source URDF mesh references: 70
 Generated URDF mesh references: 57
 Collision geometries: 53
 ```
+
+以上是 v0.2 历史转换器输出。当前 HEAD `b433ee6` 的指部碰撞修复使用转换器
+v5：35个visual OBJ加8个collision OBJ（共43个），53个collision；不要拿
+旧输出数量检查当前开发工作树，也不要为匹配旧数量回退模型。
 
 ## 2. 自包含 smoke：最小公共 API
 
@@ -339,3 +348,177 @@ tag 解引用结果，避免把旧 commit 写死。
 | 从原始 SceneSmith 场景独立生成 PickLift 派生文件 | **不通过**，旧脚本存在上述循环导入 |
 | 补齐外部场景和四个派生文件后的 PickLift 相机验证 | 通过，`{"calibration": true, "picklift": true}` |
 | 补齐外部资产后的固定 PickLift | 通过，`lift_held`，276 steps |
+
+## 6. 当前工作树：移动底盘与双臂交接
+
+本节针对当前开发工作树，不意味着远端或`online-env-v0.2`已包含这些文件。安装/submodule/OBJ准备沿用上文；移动演示的场景在`models/mobile_scene`，不依赖SceneSmith外部场景或专家IK文件。不要为运行本节去切换tag、覆盖现有工作。
+
+### 6.1 最快运行两种模式
+
+在当前仓库根、同一终端执行；直接使用`.venv`，无需activate：
+
+```bash
+# 先在实际的 eval 仓库根目录执行；不要切换或覆盖当前工作树。
+export REPO_ROOT="$(pwd)"
+export PYTHON="$REPO_ROOT/.venv/bin/python"
+export MOBILE_OUTPUT="$(mktemp -d "$REPO_ROOT/output/mobile_handoff_XXXXXX")"
+
+"$PYTHON" -m examples.online_manipulation.navigation_manipulation --mode wheel_dynamic --output "$MOBILE_OUTPUT/wheel" --meshcat
+"$PYTHON" -m examples.online_manipulation.navigation_manipulation --mode planar_kinematic --output "$MOBILE_OUTPUT/kinematic" --meshcat
+```
+
+已完成的实际运行打印`success: True`、`parked_dual_targets_held`。各模式输出`episode_000_seed_0/{simulation.html,summary.json,trace.csv}`和benchmark汇总。实时地址看终端；远程需要转发对应端口，或下载HTML后本地打开。
+
+| 模式 | 运动来源 | 请求0速度后的行为 |
+| --- | --- | --- |
+| `planar_kinematic` | 受扫掠碰撞检查的平面关节小步积分，理想规定运动 | 按加速度限幅减速，之后不再积分位移；不模拟底座反作用力 |
+| `wheel_dynamic` | 浮动底座、两个驱动轮力矩及轮地接触 | 轮速伺服以0为目标制动；不是位置锁定，不保证完全静止 |
+
+创建时选择，不能运行中热切换。程序组装用`BaseConfig(mode=...)`与`ZerithMobileRobotAdapter(spec, base_config)`，再传给`RuntimeConfig`/`make_env`。各模式原有初始高度和模型派生参数由示例工厂处理；只想切换演示时改`--mode`即可。
+
+“到达/停车”统一指：位置误差≤3cm、最短yaw误差≤3°、实际平面速度≤0.01m/s、实际|omega|≤0.02rad/s，**同时连续满足0.5s**，均为可配置阈值；不是严格零速度。
+
+### 6.2 一次step控制双臂、双夹爪和底盘
+
+完整可运行的无专家文件客户端：
+
+```bash
+cd /tmp
+PYTHONPATH="$REPO_ROOT" "$PYTHON" "$REPO_ROOT/examples/online_manipulation/mobile_public_api_client.py" --repo-root "$REPO_ROOT" --mode wheel_dynamic --output "$MOBILE_OUTPUT/client"
+cd "$REPO_ROOT"
+```
+
+客户端已在仓库外实跑，使用公共API。核心形式如下，`spec`来自机器人配置，`env`/`obs`由构造和reset取得：
+
+```python
+from src.online_manipulation import (
+    BaseVelocityAction, GripperAction, JointDeltaAction, RobotCommand,
+)
+
+action = RobotCommand(
+    arms={side: JointDeltaAction((spec.arm_groups[side][0],), (-0.004,))
+          for side in ("left", "right")},
+    grippers={"left": GripperAction(0.060), "right": GripperAction(0.055)},
+    base=BaseVelocityAction(0.06, 0.1),
+)
+obs, reward, terminated, truncated, info = env.step(action)
+```
+
+- 旋转关节单位rad，夹爪宽度为双指开口米制距离；底盘v单位m/s、omega单位rad/s。
+- 默认step推进0.1s，伺服200Hz、物理1000Hz。组合动作共同校验，任一分量失败则新目标整体拒绝，返回`info['action_decision']`；拒绝仍推进仿真，不是状态回滚或急停。
+- 未指定臂/夹爪保持旧目标；未指定base每tick都请求0速度，不能把省略理解为沿用上次非零速度。
+- 各臂已有abs/delta Cartesian接口保持world表达、commanded FK增量基准、world左乘rotvec语义；abs需要每tick持续提交。导航的local frame支持不意味着新增了Cartesian局部控制模式。
+
+### 6.3 global/local pose导航
+
+完整世界目标示例（已有场景/收拢姿态/地图组装）：
+
+```bash
+"$PYTHON" -m examples.online_manipulation.navigate_demo --mode wheel_dynamic --output "$MOBILE_OUTPUT/world_navigation"
+"$PYTHON" -m examples.online_manipulation.validate_mobile_navigation --output "$MOBILE_OUTPUT/local_navigation"
+```
+
+第二条已验证两种模式：初始yaw90°，目标用实际腕部frame表达，接收后固定世界目标并实际到达。以下为替换现有`navigator.set_goal`调用的两种写法，**二选一，不在已有控制权未释放时连续设置两次**：
+
+```python
+from src.online_manipulation import NavigationGoal, Pose
+
+# global在本API中用world/map/odom表示，没有名为global的frame别名。
+navigator.set_goal(NavigationGoal(Pose((2.8, 0, 0), (1, 0, 0, 0)), "world"), obs)
+```
+
+如需把同一个目标写成腕部局部pose，只对公开Pose做刚体数学运算，不访问Context：
+
+```python
+from pydrake.all import Quaternion, RigidTransform
+
+name = "right_wrist_pitch_link"
+reference = obs.robot.frame_poses_world[name]
+X_WR = RigidTransform(Quaternion(reference.quaternion_wxyz), reference.translation_m)
+X_WG = RigidTransform([2.8, 0, 0])
+X_RG = X_WR.inverse() @ X_WG
+local_pose = Pose(tuple(X_RG.translation()), tuple(X_RG.rotation().ToQuaternion().wxyz()))
+navigator.set_goal(NavigationGoal(local_pose, name), obs)
+```
+
+四元数顺序wxyz。执行对象始终是`navigation_frame`，`frame_id`只指定目标的表达系。接收时使用完整3D变换`X_WG=X_WR(t_accept)@X_RG`并固定；后续腕部运动不会带着目标移动。动态底座有沉降/倾角，不应直接把局部z=0当作世界地面。转换后非平面目标明确拒绝，不静默投影。
+
+### 6.4 取消、失败与控制权
+
+Navigator只生成action，调用者仍负责`env.step(navigator.act(obs))`。
+
+- `tracking`不是成功；`arrived`才表示连续满足配置的到达与停车阈值。
+- `no_path/blocked/timeout`是不同失败，不能当作已到达。需要继续减速时仍要推进step；停止调用step只是暂停仿真，不证明已停车。
+- 导航已持有控制权时调用`navigator.cancel()`，继续act/step直到`cancelled`，表示实际速度连续满足停车阈值；不是瞬间清零。
+- `arrived/cancelled`后先`navigator.release()`，再通过一次`env.step(BaseVelocityAction(0, 0, control_owner="navigation", release_control=True))`交接环境中的控制权。默认owner为navigation；若配置了其他名称使用相应名称。仍被导航占用时直接发另一owner命令会拒绝。
+- 无路径且尚未获得控制权时直接处理规划失败，不需要假装完成导航。已获得控制权后的受阻/超时，可走上述取消与减速流程再交接。
+- 轮驱直接速度命令不自带全局避障；静态Navigator负责所用地图上的避障。运动学backend另有小步扫掠阻挡检查。这些检查不是连续动力学安全证明。
+
+### 6.5 已验证边界与交接证据
+
+已运行同一步双臂/夹爪、两模式直倒转、静态pose绕障、local目标固定、取消/无路径、零轮力矩隔离、移动相机和固定PickLift回归。完整端到端示例是在满足到达与停车阈值后做双臂关节动作及**空夹爪开合**，不是双臂协同抓物。
+
+动力学四辅助轮为零摩擦滑动支撑，非真实脚轮标定；导轨固定0.4m。尚未验证动态障碍、坡地、随机场景鲁棒性、移动中精细操作、双臂闭链/协同抓取、导轨动力学。本轮未重跑大规模测试或重新做全新clone交付验证，不把旧记录冒称新结果。
+
+- `output/mobile_manipulation/manipulation_handoff_metrics.json`：已有HTML对应CSV的10Hz操作阶段统计，含参考时刻、全部样本、峰值时刻、源CSV哈希；物理子步峰值没有记录，明确缺失。
+
+## 7. 当前工作树：通用入口及收尾修复
+
+配置归属、单/双臂动作语义、RobotAdapter 执行器约定、相机采样和版本历史，
+统一见[通用接口契约](GENERIC_ONLINE_EXAMPLE.md)。
+
+### 7.1 无专家文件的最小运行
+
+使用第6节设置的 `REPO_ROOT/PYTHON`，仓库外运行：
+
+```bash
+export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export HANDOFF_OUTPUT="$(mktemp -d "$REPO_ROOT/output/closure_handoff_XXXXXX")"
+cd /tmp
+"$PYTHON" -B -m examples.online_manipulation.run_online --env-factory examples.online_manipulation.minimal_setup:make_env_config --policy-factory examples.online_manipulation.example_policies:make_hold_policy --output-root "$HANDOFF_OUTPUT/hold" --seeds 0 --max-steps 10 --write-final-dmd
+```
+
+使用自包含minimal DMD，NullTask没有抓取目标，`success=False`及时间截断是
+预期。换策略只改 `--policy-factory`；换场景/Task只改环境工厂，不复制Runtime。
+
+### 7.2 PickLift：相同执行链，仍依赖外部资产
+
+先按第4节准备 `SCENE_ROOT`、`PICK_ARTIFACT_ROOT` 及完整外部资产；本轮没有
+重新验收从原始场景到全部专家JSON的生成链，因此仍按非便携演示交付。
+环境只需DMD；下面的专家Policy才需要专家文件。原循环导入已在共享Runtime
+迁移中处理，但这不能替代整个资产生成流程的独立验收。
+
+旧命令现在调用同一环境/策略工厂与runner，可直接运行：
+
+```bash
+cd "$REPO_ROOT"
+test -f "$SCENE_ROOT/package.xml"
+test -f "$PICK_ARTIFACT_ROOT/pick_home.json"
+"$PYTHON" -B scripts/run_zerith_online_example.py pick-lift "$PICK_ARTIFACT_ROOT/zerith_pick_eval.dmd.yaml" --scene-package-xml "$SCENE_ROOT/package.xml" --pick-home-json "$PICK_ARTIFACT_ROOT/pick_home.json" --output-root "$HANDOFF_OUTPUT/picklift" --seed 500 --episodes 1 --max-steps 1200 --maximum-joint-step 0.1 --maximum-cartesian-joint-step 0.02 --closed-width 0 --write-final-dmd
+```
+
+本轮实际输出：`Episode 0: success=True, reason=lift_held, steps=277`。
+记录在 `output/closure_audit/fixed_picklift/episode_000_seed_500/`：JSON、CSV、
+final DMD；本轮不重复生成大HTML。需要另一次可视化时在命令末加
+`--meshcat --record-html`，使用新的输出目录。
+
+同一旧入口的 `hold`、`joint-step` 不再要求 `--pick-home-json`；本轮均不传
+专家参数实际运行2步，输出 `success=False, reason=max_steps, steps=2`，这是
+预算截断，不是抓取失败。若显式传了旧专家参数，它们在这两种策略下不读取。
+
+旧默认 joint-step 上限0.01、closed-width 0.03继续保留；上面显式传0.1/0，
+与新专家工厂一致。自定义初态用 `--environment-json`，专家标定不一致直接
+报错，不再偷偷用专家home覆盖环境。旧7+1数组wrapper仍是机器人专用兼容层；
+新客户端使用具名typed动作。
+
+### 7.3 TAMP 执行前状态同步
+
+已有 `execute_validated_joint_goal(env=env, goal_positions=...)` 自动取得
+`env.get_planning_query()`；无需用户记得刷新旧查询。旧 `query/observation`
+参数保留调用兼容，但不会覆盖当前执行状态。该helper要求内置环境的规划能力；
+通用 `EnvironmentConfig` 不因此强制所有第三方环境必须实现Drake规划。
+
+本轮轮驱移动后实测：旧独立查询t=0，新执行前快照t=4.5s；导航参考点从
+`(0.054397, -0.000000043)`移动到`(0.144782, 0.005879)`m。传入旧查询和旧
+obs也使用新快照；不是只写文档要求调用方刷新。只验证当前静态直接边执行，
+没有实现完整TAMP或动态避障。

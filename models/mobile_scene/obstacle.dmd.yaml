@@ -1,0 +1,7 @@
+directives:
+- add_model:
+    name: ground
+    file: package://mobile_scene/floor.sdf
+- add_model:
+    name: obstacle
+    file: package://mobile_scene/obstacle.sdf

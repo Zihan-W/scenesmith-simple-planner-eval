@@ -94,7 +94,9 @@ class _FakeAdapter:
     ) -> RobotObservation:
         return _robot_observation()
 
-    def gripper_position_targets(self, width_m: float):
+    def gripper_position_targets(self, width_m: float, name: str | None = None):
+        if name is not None:
+            raise ValueError(f"Unknown gripper: {name}")
         return {"finger_left": -0.5 * width_m, "finger_right": 0.5 * width_m}
 
 
@@ -166,9 +168,9 @@ class _ThreeJointMockAdapter:
             end_effector_twist=twist,
         )
 
-    def gripper_position_targets(self, width_m: float):
-        del width_m
-        return {}
+    def gripper_position_targets(self, width_m: float, name: str | None = None):
+        del width_m, name
+        raise ValueError("This mock adapter has no gripper")
 
 
 class _MockAdapterRuntimeBackend:

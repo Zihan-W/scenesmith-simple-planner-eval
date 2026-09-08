@@ -1,0 +1,10 @@
+directives:
+- add_model:
+    name: ground
+    file: package://mobile_scene/floor.sdf
+- add_model:
+    name: left_contact_target
+    file: package://runtime_fixture/contact_block.sdf
+- add_model:
+    name: right_contact_target
+    file: package://runtime_fixture/contact_block.sdf

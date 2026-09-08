@@ -199,6 +199,7 @@ class ScenarioSpec:
     )
     renderer: RendererSpec = dataclasses.field(default_factory=RendererSpec)
     output_directory: Path | None = None
+    ground_body_names: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Freeze path sequences and validate contact parameters."""
@@ -311,6 +312,7 @@ class GripperSpec:
     joint_names: tuple[str, ...]
     minimum_width_m: float
     maximum_width_m: float
+    contact_body_names: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate gripper names and width bounds."""
@@ -422,6 +424,9 @@ class RobotSpec:
     gripper: GripperSpec | None = None
     safety_exempt_body_pairs: tuple[tuple[str, str], ...] = ()
     cameras: tuple[CameraSpec, ...] = ()
+    arm_groups: Mapping[str, tuple[str, ...]] = dataclasses.field(default_factory=dict)
+    end_effector_frames: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    grippers: Mapping[str, GripperSpec] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate robot names, mappings, and ordered home positions."""
@@ -478,6 +483,23 @@ class RobotSpec:
         if len(set(camera_names)) != len(camera_names):
             raise ValueError("RobotSpec camera names must be unique")
         object.__setattr__(self, "cameras", cameras)
+        groups = {name: tuple(members) for name, members in self.arm_groups.items()}
+        assigned = [joint for members in groups.values() for joint in members]
+        if any(not name or not members for name, members in groups.items()):
+            raise ValueError("Arm groups require a name and at least one joint")
+        if len(assigned) != len(set(assigned)) or not set(assigned).issubset(joint_names):
+            raise ValueError("Arm groups must contain unique controlled joints")
+        if set(self.end_effector_frames) != set(groups):
+            raise ValueError("Each named arm must declare exactly one end-effector frame")
+        gripper_joints = [joint for gripper in self.grippers.values() for joint in gripper.joint_names]
+        if (len(gripper_joints) != len(set(gripper_joints))
+                or not set(gripper_joints).issubset(joint_names)
+                or set(gripper_joints).intersection(assigned)):
+            raise ValueError("Named gripper joints must be controlled and disjoint from arms")
+        object.__setattr__(self, "arm_groups", groups)
+        object.__setattr__(self, "end_effector_frames", dict(self.end_effector_frames))
+        object.__setattr__(self, "grippers", dict(self.grippers))
+        object.__setattr__(self, "locked_joint_positions", dict(self.locked_joint_positions))
 
     @property
     def controlled_joint_names(self) -> tuple[str, ...]:

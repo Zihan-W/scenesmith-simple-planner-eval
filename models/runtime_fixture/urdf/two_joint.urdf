@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<robot name="two_joint_fixture">
+  <link name="pedestal"/>
+  <link name="upper">
+    <inertial><origin xyz="0 0 0.1"/><mass value="1"/><inertia ixx="0.01" iyy="0.01" izz="0.002" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0.1"/><geometry><cylinder radius="0.025" length="0.2"/></geometry></visual>
+    <collision><origin xyz="0 0 0.1"/><geometry><cylinder radius="0.025" length="0.2"/></geometry></collision>
+  </link>
+  <joint name="hinge_a" type="revolute"><parent link="pedestal"/><child link="upper"/><axis xyz="0 1 0"/><limit lower="-1.5" upper="1.5" effort="10" velocity="2"/></joint>
+  <link name="tip">
+    <inertial><origin xyz="0 0 0.1"/><mass value="0.5"/><inertia ixx="0.005" iyy="0.005" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 0.1"/><geometry><cylinder radius="0.02" length="0.2"/></geometry></visual>
+    <collision><origin xyz="0 0 0.1"/><geometry><cylinder radius="0.02" length="0.2"/></geometry></collision>
+  </link>
+  <joint name="hinge_b" type="revolute"><origin xyz="0 0 0.2"/><parent link="upper"/><child link="tip"/><axis xyz="0 1 0"/><limit lower="-1.5" upper="1.5" effort="10" velocity="2"/></joint>
+</robot>

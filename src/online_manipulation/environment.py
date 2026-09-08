@@ -124,6 +124,14 @@ class OnlineManipulationEnv:
         """Write selected final object poses without changing the input DMD."""
         return self._backend.write_updated_scenario(Path(output_path))
 
+    def get_planning_query(self):
+        """Return a planning snapshot synchronized to current base and objects.
+
+        Reacquire after step/reset. Querying or changing candidate configurations
+        affects only its planning Context, never the simulated robot.
+        """
+        return self._backend.get_planning_query()
+
     def finalize_episode(self) -> dict:
         """Return task-owned final metadata for the current episode."""
         if self._observation is None:

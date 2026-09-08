@@ -13,7 +13,7 @@ import numpy as np
 
 from src.online_manipulation.actions import RobotAction
 from src.online_manipulation.observations import Observation
-from src.online_manipulation.protocols import OnlineEnvironment, Policy
+from src.online_manipulation.protocols import OnlineEnvironment, Policy, StoppablePolicy
 
 
 @dataclasses.dataclass(frozen=True)
@@ -147,6 +147,9 @@ def _trace_row(
             _object_poses(observation),
             separators=(",", ":"),
         ),
+        "base_json": json.dumps(dict(observation.base), separators=(",", ":")),
+        "end_effectors_json": json.dumps({name: pose.as_dict() for name, pose in observation.robot.end_effectors.items()}),
+        "gripper_widths_json": json.dumps(dict(observation.robot.gripper_widths_m)),
         "max_tracking_error": _tracking_error(observation),
         "saturated_joint_count": sum(
             observation.robot.torque_saturated
@@ -317,7 +320,7 @@ def run_episode(
                 row["minimum_collision_distance_is_lower_bound"]
             )
         contact_events.extend(_contact_rows(observation, step=step))
-        policy_failure = _policy_diagnostics(policy).get("failure_reason")
+        policy_failure = policy.stop_reason if isinstance(policy, StoppablePolicy) else None
         if policy_failure:
             reason = f"policy_failed:{policy_failure}"
             truncated = True

@@ -147,6 +147,12 @@ class ZerithRobotAdapterTest(unittest.TestCase):
         )
         self.assertEqual(observation.q, zeros)
         self.assertAlmostEqual(observation.gripper_width_m, GRIPPER_MAX_OPENING_M)
+        self.assertEqual(
+            observation.end_effectors["left"], observation.end_effector_pose
+        )
+        self.assertEqual(
+            observation.gripper_widths_m["left"], observation.gripper_width_m
+        )
         self.assertAlmostEqual(
             sum(
                 value * value

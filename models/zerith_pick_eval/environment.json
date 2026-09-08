@@ -1,0 +1,25 @@
+{
+  "description": "PickLift episode recipe: scene bindings, robot initial state, control settings and task criteria. Independent of expert policy/IK files, but NOT scene- or task-independent robot defaults.",
+  "initial_state": {
+    "robot_xyz": [2.65, 2.95, 0.1815],
+    "robot_yaw_deg": 180.0,
+    "rail_position": 0.4,
+    "q_home_left": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  },
+  "control": {
+    "timing": {"physics_dt": 0.001, "controller_dt": 0.005, "policy_dt": 0.1},
+    "episode_duration": 120.1,
+    "max_joint_delta": 0.1,
+    "maximum_cartesian_joint_delta": 0.02
+  },
+  "scene_bindings": {
+    "target_model_name": "living_room_box_0",
+    "target_body_name": "base_link",
+    "support_contact_bodies": ["living_room_coffee_table_0::base_link"]
+  },
+  "task": {
+    "target_observation_name": "pick_target",
+    "required_lift_m": 0.08,
+    "required_hold_s": 3.0
+  }
+}

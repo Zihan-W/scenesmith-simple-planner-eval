@@ -2,7 +2,10 @@
 
 import dataclasses
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from types import MappingProxyType
+
+from src.online_manipulation.observations import Pose
 
 
 def _finite_values(
@@ -34,7 +37,7 @@ def _joint_names(values: Sequence[str]) -> tuple[str, ...]:
 
 @dataclasses.dataclass(frozen=True)
 class HoldAction:
-    """Keep the current arm and gripper command targets unchanged."""
+    """Keep arm/gripper targets; on a mobile base request controlled braking."""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -78,6 +81,10 @@ class CartesianDeltaAction:
     Translation is measured in meters. ``rotation_vector_rad`` is an
     axis-angle vector whose direction is the rotation axis and whose norm is
     the rotation angle in radians.
+
+    The current adapter supports ``reference_frame='world'``. The delta is
+    applied at the held arm target's forward kinematics, not accumulated from
+    the measured pose. Rotation increments are world-expressed (left applied).
     """
 
     end_effector_frame: str
@@ -110,6 +117,29 @@ class CartesianDeltaAction:
 
 
 @dataclasses.dataclass(frozen=True)
+class CartesianPoseAction:
+    """Advance toward an absolute end-effector pose with one bounded IK step.
+
+    ``pose`` is expressed in ``reference_frame``: meters and a wxyz quaternion.
+    The current adapter supports only ``world``. Send the same goal each policy
+    tick until observation confirms arrival; this is not a blocking move or a
+    teleport. Joint-step limits and collision edge checks still apply. Local
+    differential IK does not guarantee reachability or obstacle avoidance.
+    """
+
+    end_effector_frame: str
+    reference_frame: str
+    pose: Pose
+
+    def __post_init__(self) -> None:
+        """Require explicit frames and a validated public pose."""
+        if not self.end_effector_frame or not self.reference_frame:
+            raise ValueError("Cartesian action frame names must be nonempty")
+        if not isinstance(self.pose, Pose):
+            raise TypeError("pose must be a Pose")
+
+
+@dataclasses.dataclass(frozen=True)
 class GripperAction:
     """Set the physical gripper opening width in meters."""
 
@@ -132,6 +162,7 @@ ArmAction = (
     | JointPositionAction
     | JointDeltaAction
     | CartesianDeltaAction
+    | CartesianPoseAction
 )
 
 
@@ -148,4 +179,39 @@ class CompositeAction:
             raise ValueError("CompositeAction must contain a command")
 
 
-RobotAction = ArmAction | GripperAction | CompositeAction
+@dataclasses.dataclass(frozen=True)
+class BaseVelocityAction:
+    """Forward velocity (m/s), counterclockwise yaw rate (rad/s), one tick."""
+
+    velocity_m_s: float
+    yaw_rate_rad_s: float
+    control_owner: str | None = None
+    release_control: bool = False
+
+    def __post_init__(self):
+        if not all(math.isfinite(v) for v in (self.velocity_m_s, self.yaw_rate_rad_s)):
+            raise ValueError("Base command must be finite")
+        if self.control_owner is not None and not self.control_owner:
+            raise ValueError("control_owner must be nonempty")
+        if self.release_control and (self.control_owner is None or self.velocity_m_s != 0 or self.yaw_rate_rad_s != 0):
+            raise ValueError("Releasing control requires an owned zero command")
+
+
+@dataclasses.dataclass(frozen=True)
+class RobotCommand:
+    """Named simultaneous commands; any rejection prevents all new targets.
+
+    Omitted arms/grippers hold; omitted base requests zero velocity. Names
+    belong to the adapter's group definitions, not array positions.
+    """
+
+    arms: Mapping[str, ArmAction] = dataclasses.field(default_factory=dict)
+    grippers: Mapping[str, GripperAction] = dataclasses.field(default_factory=dict)
+    base: BaseVelocityAction | None = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "arms", MappingProxyType(dict(self.arms)))
+        object.__setattr__(self, "grippers", MappingProxyType(dict(self.grippers)))
+
+
+RobotAction = ArmAction | GripperAction | CompositeAction | BaseVelocityAction | RobotCommand

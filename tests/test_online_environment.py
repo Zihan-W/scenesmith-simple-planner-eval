@@ -1,6 +1,7 @@
 """Contract tests for the generic OnlineManipulationEnv facade."""
 
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 
 from src.online_manipulation import (
@@ -52,6 +53,17 @@ def _observation(
     return Observation(time_s, robot, objects, tuple(contacts), {})
 
 
+def _carrier_query(pose):
+    """Minimal planning contract for task-only tests, not a physical simulator."""
+    return SimpleNamespace(
+        robot_adapter=SimpleNamespace(spec=SimpleNamespace(
+            model_instance_name="robot", grippers={},
+            gripper=SimpleNamespace(contact_body_names=("left", "right"), joint_names=()),
+            arm_groups={}, end_effector_frames={}, controlled_joint_names=("joint",),
+            end_effector_frame_name="tool")),
+        frame_pose=lambda *args: pose)
+
+
 class _FakeRuntimeBackend:
     """Deterministic backend used to isolate facade behavior."""
 
@@ -77,6 +89,9 @@ class _FakeRuntimeBackend:
     def write_updated_scenario(self, output_path):
         self.output_path = Path(output_path)
         return ("target",)
+
+    def get_planning_query(self):
+        return _carrier_query(_observation(self.time_s).robot.end_effector_pose)
 
 
 class OnlineManipulationEnvTest(unittest.TestCase):
@@ -265,6 +280,7 @@ class OnlineManipulationEnvTest(unittest.TestCase):
 
         env = _Env()
         env.observation = observation
+        env.get_planning_query = lambda: _carrier_query(observation.robot.end_effector_pose)
         action = CompositeAction(
             arm=CartesianDeltaAction(
                 end_effector_frame="tool",

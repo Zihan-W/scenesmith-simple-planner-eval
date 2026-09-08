@@ -259,12 +259,12 @@ class ZerithCameraTest(unittest.TestCase):
         )
 
         def mount_error(env, observation) -> float:
-            runtime = env.backend.runtime
+            runtime = env.backend
             plant = runtime.plant
             context = runtime.plant_context
             parent = plant.GetFrameByName(
                 camera_spec.parent_frame,
-                runtime.robot_model_instance,
+                runtime.instance,
             )
             X_WP = plant.CalcRelativeTransform(
                 context,
@@ -390,9 +390,9 @@ class ZerithCameraTest(unittest.TestCase):
         env = make_env(_config(camera_names=()))
         observation, _ = env.reset(seed=0)
         self.assertEqual(observation.sensors, {})
-        self.assertEqual(env.backend.runtime._camera_systems, {})
+        self.assertEqual(env.backend.cameras.systems, {})
         self.assertFalse(
-            env.backend.runtime.scene_graph.HasRenderer(
+            env.backend.scene_graph.HasRenderer(
                 env.backend.scenario.renderer.name
             )
         )

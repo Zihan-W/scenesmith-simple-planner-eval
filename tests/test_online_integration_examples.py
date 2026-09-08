@@ -48,6 +48,10 @@ class _InstantEnvironment:
     def __init__(self) -> None:
         self.observation = _observation()
         self.actions = []
+        self.query = None
+
+    def get_planning_query(self):
+        return self.query
 
     def step(self, action):
         self.actions.append(action)
@@ -113,6 +117,7 @@ class OnlineIntegrationExamplesTest(unittest.TestCase):
     def test_tamp_checks_edge_before_online_execution(self) -> None:
         env = _InstantEnvironment()
         query = _PlanningQuery()
+        env.query = query
         result = execute_validated_joint_goal(
             env=env,
             query=query,
@@ -129,6 +134,7 @@ class OnlineIntegrationExamplesTest(unittest.TestCase):
     def test_tamp_rejects_invalid_edge_without_stepping(self) -> None:
         env = _InstantEnvironment()
         query = _PlanningQuery(edge_valid=False)
+        env.query = query
         with self.assertRaisesRegex(RuntimeError, "direct edge is invalid"):
             execute_validated_joint_goal(
                 env=env,

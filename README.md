@@ -4,11 +4,12 @@ This repository is a companion to [SceneSmith](https://scenesmith.github.io/), p
 
 For the main SceneSmith codebase and research, please visit the [SceneSmith GitHub repository](https://github.com/nepfaff/scenesmith).
 
-The general online environment is being migrated under the contracts in
-[`docs/ONLINE_ENV_REQUIREMENTS.md`](docs/ONLINE_ENV_REQUIREMENTS.md). See
-[`docs/ONLINE_ENV_ARCHITECTURE.md`](docs/ONLINE_ENV_ARCHITECTURE.md) for module
-boundaries and [`docs/ONLINE_ENV_PROGRESS.md`](docs/ONLINE_ENV_PROGRESS.md) for
-verified commands and exact regression results.
+在线环境入口：先看[中文 Quickstart](docs/QUICKSTART_ONLINE_ENV.md)，再看
+[通用环境、策略及控制契约](docs/GENERIC_ONLINE_EXAMPLE.md)。当前开发工作树
+包含双臂和移动底盘，尚未发布；`online-env-v0.2` 只包含此前固定底座和相机 API。
+实施依据为[需求](docs/mobile_manipulation_requirements.md)、
+[架构](docs/mobile_manipulation_architecture.md)。原三份 ONLINE_ENV
+文档已删除，必要控制/相机契约和版本化历史已迁入上述现存文档。
 
 ## Robot Evaluation Pipeline
 
@@ -92,7 +93,10 @@ raw, applied, and saturation values are written to
 `zerith_online_control.csv`; the run is recorded in
 `zerith_online_control.html`.
 
-Policies can use the environment directly:
+The following is the legacy 7+1 compatibility API, retained for old clients.
+New clients should use `make_env`, typed actions and the five-value `step`
+interface in [the generic example](docs/GENERIC_ONLINE_EXAMPLE.md), rather than
+copying this robot-specific wrapper:
 
 ```python
 from pathlib import Path
@@ -425,9 +429,11 @@ project-specific tree. Tree state remains outside the environment.
 ### TAMP query and execution handoff
 
 [`examples/online_manipulation/tamp_execution.py`](examples/online_manipulation/tamp_execution.py)
-shows the intended TAMP boundary. The planner synchronizes observed free-body
-poses, validates the current configuration and complete direct edge in an
-independent context, then sends absolute typed joint targets online:
+implements the execution handoff: immediately before checking a goal, the helper
+obtains a fresh planning query from the environment, including the actual base,
+joint, and free-body state. It validates the current configuration and complete
+direct edge in an independent context, then sends absolute typed joint targets
+online. Callers do not need to refresh or pass an independent query:
 
 ```python
 from examples.online_manipulation import execute_validated_joint_goal
@@ -435,15 +441,15 @@ from examples.online_manipulation import execute_validated_joint_goal
 observation, info = env.reset(seed=0)
 execution = execute_validated_joint_goal(
     env=env,
-    query=planning_query,
-    observation=observation,
     goal_positions={"left_shoulder_pitch_joint": 0.1},
 )
 ```
 
 An invalid start or edge fails before `env.step()` is called. This helper does
-not search a path or perform TOPPRA; a full TAMP system can supply multiple
-validated edges through the same query/action interface.
+not search a path or perform TOPPRA. Automatic execution-time state synchronization
+has been verified after actual mobile-base motion; this is a completed handoff
+example, not a complete TAMP planner. A full TAMP system is outside this scope and
+can supply multiple validated edges through the same query/action interface.
 
 ### Replace task or scene
 

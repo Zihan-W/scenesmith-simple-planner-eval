@@ -114,6 +114,11 @@ class _FailingPolicy(_Policy):
 class _TerminalDiagnosticPolicy(_Policy):
     """Expose a terminal policy reason after one environment step."""
 
+    @property
+    def stop_reason(self):
+        """Use the public lifecycle signal, not a diagnostic convention."""
+        return "no_safe_action"
+
     def diagnostics(self):
         """Return one explicit external-policy failure reason."""
         return {

@@ -1,0 +1,4 @@
+directives:
+- add_model:
+    name: ground
+    file: package://mobile_scene/floor.sdf

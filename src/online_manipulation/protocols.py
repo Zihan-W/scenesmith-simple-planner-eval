@@ -48,7 +48,13 @@ class RobotAdapter(Protocol):
         """Register packages and add exactly one robot model."""
 
     def configure_model(self, plant: Any, model_instance: Any) -> None:
-        """Weld the base and perform pre-Finalize model configuration."""
+        """Configure robot topology before Finalize; mobile roots stay movable.
+
+        Each controlled single-DOF joint must have exactly one actuator named
+        <joint_name>_actuator attached to that joint. Runtime validates this
+        convention at construction, before reset or stepping. Additional wheel
+        actuators are owned by the base adapter.
+        """
 
     def initialize_state(
         self,
@@ -67,8 +73,16 @@ class RobotAdapter(Protocol):
     ) -> RobotObservation:
         """Map Drake state and controller telemetry to the public schema."""
 
-    def gripper_position_targets(self, width_m: float) -> Mapping[str, float]:
-        """Map physical gripper width to named joint targets."""
+    def gripper_position_targets(
+        self,
+        width_m: float,
+        name: str | None = None,
+    ) -> Mapping[str, float]:
+        """Map width in meters to joints of a named or explicit default gripper.
+
+        Unknown names and robots without that gripper must raise ValueError.
+        None selects spec.gripper, never an arbitrary entry in spec.grippers.
+        """
 
 
 @runtime_checkable
@@ -104,6 +118,15 @@ class Policy(Protocol):
 
     def act(self, observation: Observation) -> RobotAction:
         """Return the next action from the latest observation."""
+
+
+@runtime_checkable
+class StoppablePolicy(Protocol):
+    """Optional explicit failure signal; diagnostics never control runs."""
+
+    @property
+    def stop_reason(self) -> str | None:
+        """Return a machine-readable failure reason, or None to continue."""
 
 
 @dataclasses.dataclass(frozen=True)

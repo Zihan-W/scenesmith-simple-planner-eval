@@ -2,6 +2,7 @@
 
 import dataclasses
 import math
+from collections.abc import Mapping
 from collections.abc import Iterable
 
 from src.online_manipulation.observations import Pose
@@ -91,3 +92,44 @@ class PairContactPolicy:
 
 
 FREE_MOTION_CONTACT_POLICY = PairContactPolicy(name="free_motion")
+
+
+@dataclasses.dataclass(frozen=True)
+class SupportContactPolicy:
+    """Compose robot-ground support with a task without relaxing task contacts.
+
+    Support thresholds are pair-specific. A wheel's compressible floor contact
+    must never increase the allowed penetration of fingers into a target.
+    """
+
+    task_policy: object
+    support_limits_m: Mapping[tuple[str, str], float]
+
+    @property
+    def name(self):
+        return f"support+{self.task_policy.name}"
+
+    def permits(self, body_a, body_b):
+        return (_canonical_pair(body_a, body_b) in self.support_limits_m
+                or self.task_policy.permits(body_a, body_b))
+
+    @property
+    def monitored_bodies(self):
+        return self.task_policy.monitored_bodies
+
+    @property
+    def carried_bodies(self):
+        return self.task_policy.carried_bodies
+
+    @property
+    def maximum_allowed_penetration_m(self):
+        return self.task_policy.maximum_allowed_penetration_m
+
+
+def penetration_limit(policy, body_a, body_b):
+    """Return a pair-scoped contact bound, preserving ordinary task semantics."""
+    if isinstance(policy, SupportContactPolicy):
+        pair = _canonical_pair(body_a, body_b)
+        if pair in policy.support_limits_m:
+            return policy.support_limits_m[pair]
+    return policy.maximum_allowed_penetration_m if policy.permits(body_a, body_b) else 0.0
