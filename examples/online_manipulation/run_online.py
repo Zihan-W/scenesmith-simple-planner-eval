@@ -15,6 +15,7 @@ from src.online_manipulation import (
     Policy,
     make_env,
     run_episodes,
+    run_configured_episodes,
 )
 
 
@@ -34,14 +35,8 @@ def run(
     The policy owns action generation. The public runner owns reset/step,
     termination, diagnostics, and artifact writing; do not duplicate that loop.
     """
-    if max_steps <= 0 or not seeds:
-        raise ValueError("max_steps must be positive and seeds must be nonempty")
-    if not isinstance(policy, Policy):
-        raise TypeError("policy must implement reset(observation, info) and act")
-    env = make_env(config)
-    return run_episodes(
-        env=env,
-        policy=policy,
+    return run_configured_episodes(
+        config, policy,
         seeds=seeds,
         max_steps=max_steps,
         output_root=output_root,

@@ -1,0 +1,19 @@
+{
+  "robot": "zerith_dual",
+  "base": {
+    "mode": "wheel_dynamic",
+    "base_height_m": 0.1808
+  },
+  "control": "smoke",
+  "initial_state": "mobile",
+  "scene": "mobile",
+  "policy": "hold",
+  "task": "null",
+  "evaluator": "task_result",
+  "run": {
+    "seeds": [
+      0
+    ],
+    "max_steps": 10
+  }
+}

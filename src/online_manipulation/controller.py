@@ -10,6 +10,27 @@ from pydrake.all import MultibodyForces
 from src.online_manipulation.specs import JointSpec
 
 
+def configure_joint_servos(joints, settings):
+    """Apply run-time gains/effort caps without changing model joint limits.
+
+    Settings are keyed by joint name; kp/kd are acceleration-domain gains.
+    The adapter's declared effort limit remains an upper bound. This function
+    never modifies URDF, TCP geometry, position limits, or velocity limits.
+    """
+    unknown = set(settings) - {j.name for j in joints}
+    if unknown:
+        raise ValueError(f"Unknown servo joints: {sorted(unknown)}")
+    configured = []
+    for joint in joints:
+        values = settings.get(joint.name, {})
+        if set(values) - {"kp", "kd", "effort_limit"}:
+            raise ValueError(f"Only kp/kd/effort_limit are runtime servo settings: {joint.name}")
+        if values.get("effort_limit", joint.effort_limit) > joint.effort_limit:
+            raise ValueError(f"Runtime effort cap exceeds adapter limit: {joint.name}")
+        configured.append(dataclasses.replace(joint, **values))
+    return tuple(configured)
+
+
 @dataclasses.dataclass(frozen=True)
 class ServoOutput:
     """One controller update in configured joint order."""

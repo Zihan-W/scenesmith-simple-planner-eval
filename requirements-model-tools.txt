@@ -1,0 +1,3 @@
+# Only needed to regenerate the derived OBJ assets from the Zerith submodule.
+-r requirements-online.txt
+trimesh==4.11.0

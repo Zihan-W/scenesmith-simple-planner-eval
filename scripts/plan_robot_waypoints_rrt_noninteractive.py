@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
-"""
-plan_robot_waypoints_rrt.py
+"""Plan saved grasp/place waypoints with RRT and export a trajectory JSON.
 
-Planning script skeleton:
-1) Load the world and set up the simulation (DONE)
-2) Load waypoints from task/waypoints file (TODO)
-3) For each consecutive waypoint pair, plan a path using RRT (TODO)
-4) Concatenate the paths (TODO)
-5) Visualize the full plan in a loop: <enter> replays, 'q'+<enter> quits (TODO)
+This noninteractive legacy IIWA pipeline is separate from the online robot
+environment. It does not wait for keyboard-driven trajectory replay.
 """
 
 import argparse

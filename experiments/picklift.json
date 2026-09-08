@@ -1,0 +1,22 @@
+{
+  "robot": "zerith_left",
+  "control": "picklift",
+  "initial_state": "picklift",
+  "scene": "scenesmith",
+  "scene_options": {
+    "variant": "furniture_welded",
+    "overrides": "experiments/inputs/pick_lift/scene_overrides.yaml",
+    "additional_package_xmls": [
+      "models/zerith_pick_eval/package.xml"
+    ]
+  },
+  "policy": "picklift",
+  "task": "picklift",
+  "evaluator": "task_result",
+  "run": {
+    "seeds": [
+      500
+    ],
+    "max_steps": 1200
+  }
+}

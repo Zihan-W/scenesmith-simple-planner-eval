@@ -104,6 +104,7 @@ class SupportContactPolicy:
 
     task_policy: object
     support_limits_m: Mapping[tuple[str, str], float]
+    geometry_limits_m: Mapping[tuple, float] = dataclasses.field(default_factory=dict)
 
     @property
     def name(self):
@@ -126,9 +127,21 @@ class SupportContactPolicy:
         return self.task_policy.maximum_allowed_penetration_m
 
 
-def penetration_limit(policy, body_a, body_b):
+def permits_contact(policy, body_a, body_b, geometry_a="", geometry_b=""):
+    """Test exact support geometries without broadening task body rules."""
+    if isinstance(policy, SupportContactPolicy):
+        pair = tuple(sorted(((body_a, geometry_a), (body_b, geometry_b))))
+        if pair in policy.geometry_limits_m:
+            return True
+    return policy.permits(body_a, body_b)
+
+
+def penetration_limit(policy, body_a, body_b, geometry_a="", geometry_b=""):
     """Return a pair-scoped contact bound, preserving ordinary task semantics."""
     if isinstance(policy, SupportContactPolicy):
+        geometry_pair = tuple(sorted(((body_a, geometry_a), (body_b, geometry_b))))
+        if geometry_pair in policy.geometry_limits_m:
+            return policy.geometry_limits_m[geometry_pair]
         pair = _canonical_pair(body_a, body_b)
         if pair in policy.support_limits_m:
             return policy.support_limits_m[pair]

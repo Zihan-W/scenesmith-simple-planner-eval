@@ -1,0 +1,5 @@
+# Online runtime, scenes, cameras and JSON/profile entry; no SceneSmith service.
+drake==1.49.0
+numpy==2.4.6
+pillow==12.3.0
+PyYAML==6.0.3

@@ -19,9 +19,9 @@ class GenericOnlineExampleTest(unittest.TestCase):
         policy = MyPolicy()
         results = (object(),)
         with (
-            mock.patch.object(run_online, "make_env", return_value=env) as build,
-            mock.patch.object(
-                run_online, "run_episodes", return_value=results
+            mock.patch("src.online_manipulation.assembly.make_env", return_value=env) as build,
+            mock.patch(
+                "src.online_manipulation.assembly.run_episodes", return_value=results
             ) as episodes,
         ):
             actual = run_online.run(
@@ -37,7 +37,7 @@ class GenericOnlineExampleTest(unittest.TestCase):
 
     def test_invalid_runner_arguments_fail_before_build(self):
         """Reject invalid episode requests before constructing simulator assets."""
-        with mock.patch.object(run_online, "make_env") as build:
+        with mock.patch("src.online_manipulation.assembly.make_env") as build:
             for options in ({"max_steps": 0}, {"seeds": ()}):
                 with self.assertRaises(ValueError):
                     run_online.run(
@@ -90,6 +90,7 @@ class GenericOnlineExampleTest(unittest.TestCase):
         self.assertEqual(public_imports, {
             "EnvironmentConfig", "EpisodeResult", "Policy", "make_env",
             "run_episodes",
+            "run_configured_episodes",
         })
 
 

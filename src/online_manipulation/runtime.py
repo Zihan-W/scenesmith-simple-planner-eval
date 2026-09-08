@@ -36,7 +36,8 @@ from src.online_manipulation.controller import CoupledInverseDynamicsServo
 from src.online_manipulation.dmd_finalizer import write_updated_dmd
 from src.online_manipulation.drake_utils import set_free_body_world_pose
 from src.online_manipulation.environment import OnlineManipulationEnv
-from src.online_manipulation.model import populate_model, support_contact_limits
+from src.online_manipulation.model import populate_model, support_geometry_limits
+from src.online_manipulation.scene_geometry import resolve_ground_geometries
 from src.online_manipulation.observations import (
     ContactObservation,
     ObjectObservation,
@@ -130,7 +131,9 @@ class DrakeRuntime:
             robot_model_instance=self.instance,
             robot_adapter=self.adapter,
             observed_bodies=self.scenario.observed_bodies,
-            support_limits_m=support_contact_limits(self.adapter, self.scenario),
+            support_geometry_limits_m=support_geometry_limits(
+                self.adapter, self.scenario, self.plant, self.scene_graph.model_inspector()
+            ),
         )
         self.simulator = None
         self.control_log = []
@@ -419,17 +422,9 @@ class DrakeRuntime:
         if self.simulator is None or self._done:
             raise RuntimeError("Call reset before step (or after episode end)")
         if isinstance(self.base_backend, WheelDrivenDynamicBase):
-            support_names = (
-                self.adapter.support_body_names + self.adapter.wheel_body_names
+            contact_policy = SupportContactPolicy(
+                contact_policy, {}, self.planning.support_geometry_limits_m
             )
-            limits = {
-                tuple(
-                    sorted((f"{self.spec.model_instance_name}::{body}", ground))
-                ): self.adapter.base_config.support_contact_allowance_m
-                for body in support_names
-                for ground in self.scenario.ground_body_names
-            }
-            contact_policy = SupportContactPolicy(contact_policy, limits)
         if isinstance(action, RobotCommand):
             candidate, decision = self._combined_candidate(action, contact_policy)
         elif self.action_resolver is not None:
@@ -584,6 +579,10 @@ class DrakeRuntime:
         context = self.planning.context
         joint = self.plant.GetJointByName(self.adapter.planar_joint_name, self.instance)
         robot_bodies = set(self.plant.GetBodyIndices(self.instance))
+        floor_ids = resolve_ground_geometries(
+            self.plant, self.scene_graph.model_inspector(),
+            self.scenario.ground_body_names, self.scenario.ground_geometries
+        )
         failures = []
         # Physics increments are small, but always include the entire edge.
         for alpha in np.linspace(0, 1, 3):
@@ -599,12 +598,15 @@ class DrakeRuntime:
                     continue
                 environment = b if a.index() in robot_bodies else a
                 environment_name = f"{self.plant.GetModelInstanceName(environment.model_instance())}::{environment.name()}"
-                if environment_name in self.scenario.ground_body_names:
+                environment_geometry = p.id_B if a.index() in robot_bodies else p.id_A
+                if environment_geometry in floor_ids:
                     continue
                 failures.append(
                     {
                         "body_a": a.name(),
                         "body_b": b.name(),
+                        "geometry_a": inspector.GetName(p.id_A),
+                        "geometry_b": inspector.GetName(p.id_B),
                         "distance_m": float(p.distance),
                         "alpha": float(alpha),
                     }

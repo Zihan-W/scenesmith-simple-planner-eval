@@ -1,0 +1,15 @@
+{
+  "robot": "zerith_left",
+  "control": "smoke",
+  "initial_state": "minimal",
+  "scene": "minimal",
+  "policy": "hold",
+  "task": "null",
+  "evaluator": "task_result",
+  "run": {
+    "seeds": [
+      0
+    ],
+    "max_steps": 10
+  }
+}

@@ -200,6 +200,8 @@ class ScenarioSpec:
     renderer: RendererSpec = dataclasses.field(default_factory=RendererSpec)
     output_directory: Path | None = None
     ground_body_names: tuple[str, ...] = ()
+    ground_geometries: tuple[tuple[str, str], ...] = ()
+    """Exact (model::body, collision name) floor selectors, not whole rooms."""
 
     def __post_init__(self) -> None:
         """Freeze path sequences and validate contact parameters."""

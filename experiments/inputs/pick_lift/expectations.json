@@ -1,0 +1,6 @@
+{
+  "source_dmd_semantic_sha256": "fe2de6d7b5bebd315bb5cd20aa71c7b5a21e523fe70ca6a68bc248c8da2da0b3",
+  "robot_urdf_sha256": "6823d04e61b96f17c7b5c8dfb7c29cc51763d8e696574d05783d3bf454fcc9bc",
+  "target_sdf_sha256": "b9ab4aa67e5a95bd64988004ddabfbb3b8def2cdfce0d1fdad896f1fdd64cb15",
+  "scope": "Accepted fixed-base left PickLift, fixed rail 0.4 m; relocation allowed, a changed scene/robot requires explicit policy re-calibration."
+}

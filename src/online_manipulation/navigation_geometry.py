@@ -5,6 +5,7 @@ import numpy as np
 from pydrake.all import Box, Sphere, Cylinder, Capsule, Mesh, Convex, Role
 
 from src.online_manipulation.navigation import StaticNavigationMap
+from src.online_manipulation.scene_geometry import resolve_ground_geometries
 
 
 def shape_corners(shape):
@@ -29,7 +30,8 @@ def build_navigation_map(
     planning_query,
     *,
     navigation_frame,
-    ground_body_names,
+    ground_body_names=(),
+    ground_geometries=(),
     bounds=(-4.5, -4.5, 4.5, 4.5),
     margin_m=0.03,
 ):
@@ -37,12 +39,15 @@ def build_navigation_map(
 
     Includes mast, arms and grippers, not just chassis. The swept disk is
     deliberately conservative and admits all yaw orientations. Ground is
-    explicitly identified by qualified body name. Free objects are snapshotted
+    explicitly identified by body and geometry name; the legacy body-only
+    selector is accepted only for a body with exactly one collision geometry.
+    Free objects are snapshotted
     as static obstacles; moving obstacles are outside this navigator's scope.
     """
     plant, context = planning_query.plant, planning_query.context
     query = plant.get_geometry_query_input_port().Eval(context)
     inspector = query.inspector()
+    floor_ids = resolve_ground_geometries(plant, inspector, ground_body_names, ground_geometries)
     robot = set(plant.GetBodyIndices(planning_query.robot_model_instance))
     X_WN = plant.GetFrameByName(
         navigation_frame, planning_query.robot_model_instance
@@ -56,7 +61,7 @@ def build_navigation_map(
         qualified = (
             f"{plant.GetModelInstanceName(body.model_instance())}::{body.name()}"
         )
-        if qualified in ground_body_names:
+        if geometry in floor_ids:
             continue
         X_WG = query.GetPoseInWorld(geometry)
         vertices = (X_WG @ shape_corners(inspector.GetShape(geometry)).T).T

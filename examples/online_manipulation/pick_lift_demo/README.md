@@ -1,108 +1,53 @@
-# 一个 PickLift 环境，三个独立策略
+# PickLift 示例：正式组装与专家输入
 
-环境配置只在 `minimal_setup.py`；脚本专家只在 `policy.py`。两者通过统一
-`examples.online_manipulation.run_online` 运行，不再复制执行器。
+当前工作树的日常入口是 `python -m src.online_manipulation`，
+完整、实际验证过的命令见[中文 Quickstart 第0、4节](../../../docs/QUICKSTART_ONLINE_ENV.md)。
+这次结构迁移尚未发布，不在旧 `online-env-v0.3` tag 中。
 
-## 1. 所需文件
+## 文件职责
 
-环境所需：
+- `experiments/picklift.json`：短实验配置，引用有限的机器人、控制、初态、场景、Task、Policy、evaluator profiles。
+- `experiments/profiles.json`：完整配置来源，不要求用户每次复制全部参数。
+- `experiments/inputs/pick_lift/{pick_home.json,pregrasp_ik.json,pick_lift_calibration.json}`：已验收专家输入；只有专家 Policy 构造需要读取。
+- `experiments/inputs/pick_lift/scene_overrides.yaml`：显式目标替换与物体初态，不在启动时重新标定或移动目标。
+- 完整外部 `SCENE_ROOT`：原始 SceneSmith 场景，只读。
+- 用户指定的新 cache 根：依赖闭包、重定位后的 DMD、与替换物体一致的 metadata、源哈希。
+- 用户指定的 output 根：HTML、JSON、CSV、最终 DMD，不是下一次运行的必要输入。
 
-- 完整 SceneSmith `scene_000` 目录及其 `package.xml`；
-- 已生成的 `zerith_pick_eval.dmd.yaml`；
-- 仓库的 Zerith Drake 模型和 `models/zerith_pick_eval/environment.json`。
+固定专家明确要求原 `furniture_welded` 基准及匹配的源场景/模型指纹。
+普通实验可以选 `free`，但不能冒充固定专家基准。
 
-只有脚本专家额外需要：
+## 换策略而不换环境
 
-- `pick_home.json`、`pregrasp_ik.json`；
-- `models/zerith_pick_eval/pick_lift_calibration.json`。
+复制 `experiments/picklift.json` 为自己的小配置：
 
-Hold、关节增量和未来其他策略不需要这些专家文件。外部场景资产仍须存在，
-这并未把 PickLift 变成只靠仓库即可重建的自包含场景。
+- 保持原 `robot/control/initial_state/scene/task`，将 `policy` 改成 `hold`：不读专家 IK。
+- 用自己的 `my_module:make_policy`：明确加 `--trust-factories`，实现公共 Policy 协议。
+- 把 `task` 改为 `null` 时不需要复制机器人参数。
+- 使用仓库外 `my_module:make_evaluator` 可替换评分，不修改 Task 的接触许可或 Runtime。
 
-## 2. 命令
+工厂是可信本地 Python 代码，不是可执行任意第三方代码的安全沙箱。
+接口、生命周期与完整仓库外示例见[通用文档第9节](../../../docs/GENERIC_ONLINE_EXAMPLE.md)。
 
-在当前机器的 eval 仓库根目录执行；其他机器修改两个资产变量：
+## 旧示例文件为什么还在
 
-```bash
-export REPO_ROOT="$(pwd)"
-export PYTHON="$REPO_ROOT/.venv/bin/python"
-export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
-export SCENE_ROOT="/root/workspace/scenesmith/outputs/2026-09-02/10-01-49/scene_000"
-export PICK_ARTIFACT_ROOT="$REPO_ROOT/output/zerith_pick_eval"
-export RUN_OUTPUT="$(mktemp -d "$REPO_ROOT/output/policy-swap.XXXXXX")"
-cd /tmp
-```
+本目录的 `minimal_setup.py`、`policy.py` 只转发正式
+`src/online_manipulation/recipes/pick_environment.py` 和 `pick_policy.py`；
+`examples/online_manipulation/run_online.py` 转发正式 assembly 和既有 runner。
+正式模块不反向依赖这些示例。
 
-同一个环境先运行 Hold：
+旧环境工厂仍接受显式 `SCENE_ROOT/PICK_ARTIFACT_ROOT`，并按旧约定找
+`zerith_pick_eval.dmd.yaml`；它不会猜测新 cache 的路径，也不会自动回读旧 output。
+迁移后的日常用法选择短实验入口，不再照抄旧的历史输出路径。
 
-```bash
-"$PYTHON" -B -m examples.online_manipulation.run_online \
-  --env-factory examples.online_manipulation.pick_lift_demo.minimal_setup:make_env_config \
-  --policy-factory examples.online_manipulation.example_policies:make_hold_policy \
-  --output-root "$RUN_OUTPUT/hold" --seeds 500 --max-steps 10
-```
+## 验证边界
 
-同一个环境运行一次小关节增量：
+固定专家仍在线执行 PREGRASP → APPROACH → CLOSE → VERIFY → LIFT → HOLD，
+10 Hz策略、200 Hz伺服、1000 Hz物理。成功需要真实双指接触、脱离桌面、
+至少8 cm抬升并保持3秒。不使用 weld/attach/瞬移/全局摩擦倍增。
 
-```bash
-"$PYTHON" -B -m examples.online_manipulation.run_online \
-  --env-factory examples.online_manipulation.pick_lift_demo.minimal_setup:make_env_config \
-  --policy-factory examples.online_manipulation.example_policies:make_joint_step_policy \
-  --output-root "$RUN_OUTPUT/joint-step" --seeds 500 --max-steps 10
-```
-
-运行脚本抓取并录制。这里仅额外开启环境可视化，不改变物理初态和任务：
-
-```bash
-"$PYTHON" -B -u -m examples.online_manipulation.run_online \
-  --env-factory examples.online_manipulation.pick_lift_demo.minimal_setup:make_visual_env_config \
-  --policy-factory examples.online_manipulation.pick_lift_demo.policy:make_policy \
-  --output-root "$RUN_OUTPUT/picklift" --seeds 500 --max-steps 1200 \
-  --record-html --write-final-dmd
-```
-
-不开可视化时，三个命令的 `--env-factory` 完全相同；换 Policy 不会换 Task，
-Hold 和关节增量仍接受 PickLift 的评分，只是在 10 步预算结束时尚未完成任务。
-
-## 3. 自己写循环
-
-设置好上面的变量后，这段 Python 可直接运行：
-
-```python
-from examples.online_manipulation.pick_lift_demo.minimal_setup import make_env_config
-from examples.online_manipulation.example_policies import MyPolicy
-from src.online_manipulation import make_env
-
-env = make_env(make_env_config())
-policy = MyPolicy()
-obs, info = env.reset(seed=500)
-policy.reset(obs, info)
-for _ in range(10):
-    obs, reward, terminated, truncated, info = env.step(policy.act(obs))
-    if terminated or truncated:
-        break
-print(env.finalize_episode())
-```
-
-需要完整记录时使用公共 runner，不要让策略自己保存环境状态或调用 reset。
-
-## 4. 行为与验证范围
-
-专家继续使用原来的在线 PickLiftPolicy：PREGRASP → APPROACH → CLOSE →
-VERIFY → LIFT → HOLD。任务要求真实双指接触、脱离桌面、抬升至少 8 cm 并
-稳定保持 3 秒；没有 weld、attach 或全局摩擦倍增。
-
-当前工作树已统一 Runner 的 `StoppablePolicy.stop_reason` 与 Task 评价，
-并验证单物体具名携带关系在旧动作和 RobotCommand 的 joint/Cartesian
-分支中一致。详情见[通用接口契约](../../../docs/GENERIC_ONLINE_EXAMPLE.md)。
-没有实现 RL wrapper，不把几何测试或关节增量冒烟测试当作新的真实抓取验证。
-
-所有生成结果仍在 Git 忽略的 output 或临时目录中；没有创建新 tag。
-
-历史分离工厂工作树 seed 500 输出：`success=True reason=lift_held steps=277`。
-红盒抬升 10.29 cm、保持 3.1 秒。结果目录为
-`output/decoupled_picklift_seed500/episode_000_seed_500/`。
-另外验证了同一环境实例切换 Hold/关节增量并 reset；构造环境时不需要专家文件。
-
-当前收尾回归见 `output/closure_audit/fixed_picklift`：旧CLI经相同工厂/runner，
-seed500仍277步、`lift_held`。两次均为固定场景，不是随机鲁棒性验证。
+本轮独立缓存运行 seed500：277步、27.7秒、抬升10.29cm、保持3.1秒，
+`lift_held`。这是固定基准，不是随机鲁棒性或双臂共同抓物验收。
+完整记录及最终 DMD 格式衔接修复见[结构迁移进度](../../../docs/EVAL_STRUCTURE_PROGRESS.md)。
+历史 `output/decoupled_picklift_seed500` 和 `output/closure_audit/fixed_picklift`
+只保留其对应旧代码状态的证据，不作为当前运行输入。

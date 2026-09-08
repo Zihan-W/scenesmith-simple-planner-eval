@@ -209,6 +209,7 @@ def main():
         query,
         navigation_frame=adapter.navigation_frame_name,
         ground_body_names=config.scenario.ground_body_names,
+        ground_geometries=config.scenario.ground_geometries,
     )
     policy = NavigateExercisePolicy(
         Navigator(navigation_map), goal, joint_targets, widths

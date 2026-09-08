@@ -61,7 +61,7 @@ from src.zerith_servo_config import (
     ZERITH_PACKAGE_NAME,
     ZERITH_URDF_RELATIVE_PATH,
 )
-from src.zerith_grasp_geometry import (
+from src.zerith_tcp import (
     LEFT_GRASP_FRAME_NAME,
     add_left_grasp_frame,
 )
@@ -1299,6 +1299,7 @@ class ZerithEnvironmentConfig:
     locked_joint_position_overrides: Mapping[str, float] = dataclasses.field(
         default_factory=dict
     )
+    joint_servo_settings: Mapping[str, Mapping[str, float]] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Normalize paths and sequences and validate runtime limits."""
@@ -1361,6 +1362,10 @@ class ZerithEnvironmentConfig:
                 ),
             )
         )
+        from src.online_manipulation.controller import configure_joint_servos
+        adapter = ZerithRobotAdapter(dataclasses.replace(
+            adapter.spec, controlled_joints=configure_joint_servos(
+                adapter.spec.controlled_joints, self.joint_servo_settings)))
         from src.online_manipulation.runtime import RuntimeConfig
 
         # Public fixed-baseline composition now uses the same real runtime as
@@ -1387,7 +1392,7 @@ class ZerithFixedCommandResolver:
     def __init__(self, runtime, *, enable_planning, maximum_cartesian_joint_delta):
         self.runtime = runtime
         self.translator = ZerithLegacyActionTranslator(
-            runtime.spec, planning_query=runtime.planning if enable_planning else None,
+            runtime.spec, planning_query=runtime.planning,
             maximum_joint_delta=runtime.config.maximum_joint_delta,
             maximum_cartesian_joint_delta=maximum_cartesian_joint_delta)
 
@@ -1414,7 +1419,7 @@ class ZerithFixedCommandResolver:
         decision = self.translator.last_decision
         decision["accepted"] = decision["status"] != "rejected"
         arm_action = action.arm if isinstance(action, CompositeAction) else action
-        if (decision["accepted"] and contact_policy.carried_bodies
+        if (decision["accepted"]
                 and isinstance(arm_action, (JointDeltaAction, JointPositionAction))):
             edge = runtime.check_command_edge(observation.robot.q, candidate, contact_policy)
             decision["edge"] = dataclasses.asdict(edge)

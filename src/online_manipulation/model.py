@@ -3,6 +3,7 @@
 from pydrake.all import LoadModelDirectives, ProcessModelDirectives
 
 from src.online_manipulation.drake_utils import register_package_xml
+from src.online_manipulation.scene_geometry import proximity_records, resolve_ground_geometries
 
 
 def populate_model(parser, scenario, adapter):
@@ -11,6 +12,11 @@ def populate_model(parser, scenario, adapter):
     for package_xml in scenario.package_xmls:
         register_package_xml(parser, package_xml)
     ProcessModelDirectives(LoadModelDirectives(str(scenario.dmd_path)), parser)
+    if parser.plant().HasModelInstanceNamed(adapter.spec.model_instance_name):
+        raise ValueError(
+            f"Scene already contains robot instance {adapter.spec.model_instance_name}; "
+            "select a robot-free scene or explicitly prepare a derived scene"
+        )
     instance = adapter.add_model(parser)
     adapter.configure_model(parser.plant(), instance)
     validate_actuator_mapping(parser.plant(), instance, adapter.spec)
@@ -42,14 +48,20 @@ def validate_actuator_mapping(plant, instance, spec):
             )
 
 
-def support_contact_limits(adapter, scenario):
-    """Return only the declared dynamic wheels' compressible ground contacts."""
+def support_geometry_limits(adapter, scenario, plant, inspector):
+    """Resolve exact wheel/support-to-floor pairs; walls never inherit them."""
+    floors = resolve_ground_geometries(
+        plant, inspector, scenario.ground_body_names, scenario.ground_geometries
+    )
     if getattr(adapter, "base_mode", "fixed") != "wheel_dynamic":
         return {}
+    records = proximity_records(plant, inspector)
+    bodies = {
+        f"{adapter.spec.model_instance_name}::{name}"
+        for name in adapter.support_body_names + adapter.wheel_body_names
+    }
     return {
-        tuple(
-            sorted((f"{adapter.spec.model_instance_name}::{body}", ground))
-        ): adapter.base_config.support_contact_allowance_m
-        for body in adapter.support_body_names + adapter.wheel_body_names
-        for ground in scenario.ground_body_names
+        tuple(sorted(((rb, rg), (fb, fg)))): adapter.base_config.support_contact_allowance_m
+        for _, rb, rg in records if rb in bodies
+        for gid, fb, fg in records if gid in floors
     }

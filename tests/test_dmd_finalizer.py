@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pydrake.all import RigidTransform, RollPitchYaw
+from pydrake.all import LoadModelDirectives, RigidTransform, RollPitchYaw
 
 from src.online_manipulation import ObservedBodySpec, write_updated_dmd
 
@@ -69,6 +69,31 @@ class _FakePlant:
 
 class DmdFinalizerTest(unittest.TestCase):
     """Validate explicit selection, frame conversion, and source safety."""
+
+    def test_cached_block_translation_reloads_in_drake(self):
+        """Scene preparation emits block lists, including indentless YAML lists."""
+        for sequence_indent in (8, 10):
+            with self.subTest(sequence_indent=sequence_indent):
+                text = _SOURCE_DMD.replace(
+                    "translation: [1.0, 2.0, 3.0]",
+                    "translation:\n" + "\n".join(
+                        " " * sequence_indent + "- " + value
+                        for value in ("1.0", "2.0", "3.0")
+                    ),
+                )
+                with tempfile.TemporaryDirectory() as directory:
+                    source = Path(directory) / "source.dmd.yaml"
+                    output = Path(directory) / "final.dmd.yaml"
+                    source.write_text(text)
+                    write_updated_dmd(
+                        input_path=source, output_path=output, plant=_FakePlant(),
+                        plant_context=object(), body_specs=(
+                            ObservedBodySpec("target", "movable", "base_link", write_back=True),
+                        ),
+                    )
+                    directives = LoadModelDirectives(str(output))
+                    self.assertEqual(len(directives.directives), 2)
+                    self.assertEqual(source.read_text(), text)
 
     def test_only_selected_body_is_rewritten_in_original_base_frame(self):
         with tempfile.TemporaryDirectory() as directory:

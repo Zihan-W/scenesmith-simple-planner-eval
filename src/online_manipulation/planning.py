@@ -22,6 +22,7 @@ from src.online_manipulation.contact import (
     CarriedBody,
     FREE_MOTION_CONTACT_POLICY,
     penetration_limit,
+    permits_contact,
     SupportContactPolicy,
 )
 from src.online_manipulation.drake_utils import (
@@ -165,6 +166,7 @@ class PlanningQuery:
         robot_adapter: RobotAdapter,
         observed_bodies: Sequence[ObservedBodySpec] = (),
         support_limits_m: Mapping[tuple[str, str], float] | None = None,
+        support_geometry_limits_m: Mapping[tuple, float] | None = None,
     ):
         """Create and initialize a context owned only by planning queries."""
         self.diagram = diagram
@@ -173,6 +175,7 @@ class PlanningQuery:
         self.robot_adapter = robot_adapter
         self.observed_bodies = tuple(observed_bodies)
         self.support_limits_m = dict(support_limits_m or {})
+        self.support_geometry_limits_m = dict(support_geometry_limits_m or {})
         self._root_context = diagram.CreateDefaultContext()
         self._plant_context = plant.GetMyMutableContextFromRoot(
             self._root_context
@@ -236,8 +239,8 @@ class PlanningQuery:
 
     def _contact_policy(self, policy):
         """Keep robot support limits separate from task-specific contacts."""
-        if self.support_limits_m and not isinstance(policy, SupportContactPolicy):
-            return SupportContactPolicy(policy, self.support_limits_m)
+        if (self.support_limits_m or self.support_geometry_limits_m) and not isinstance(policy, SupportContactPolicy):
+            return SupportContactPolicy(policy, self.support_limits_m, self.support_geometry_limits_m)
         return policy
 
     def configuration(self) -> tuple[float, ...]:
@@ -474,8 +477,8 @@ class PlanningQuery:
         nonpenetrating = all(
             pair.distance_m
             >= (
-                -penetration_limit(contact_policy, pair.body_a, pair.body_b)
-                if contact_policy.permits(pair.body_a, pair.body_b)
+                -penetration_limit(contact_policy, pair.body_a, pair.body_b, pair.geometry_a, pair.geometry_b)
+                if permits_contact(contact_policy, pair.body_a, pair.body_b, pair.geometry_a, pair.geometry_b)
                 else 0.0
             )
             for pair in pairs
@@ -990,7 +993,7 @@ class PlanningQuery:
         contact_policy: ContactPolicy,
     ) -> bool:
         """Return whether a pair is excluded only from safety clearance."""
-        if contact_policy.permits(pair.body_a, pair.body_b):
+        if permits_contact(contact_policy, pair.body_a, pair.body_b, pair.geometry_a, pair.geometry_b):
             return True
         canonical = tuple(sorted((pair.body_a, pair.body_b)))
         if canonical in self._safety_exempt_pairs:
@@ -1059,8 +1062,8 @@ class PlanningQuery:
     ) -> float:
         """Return signed distance above the pair-specific lower bound."""
         lower_bound = (
-            -penetration_limit(contact_policy, pair.body_a, pair.body_b)
-            if contact_policy.permits(pair.body_a, pair.body_b)
+            -penetration_limit(contact_policy, pair.body_a, pair.body_b, pair.geometry_a, pair.geometry_b)
+            if permits_contact(contact_policy, pair.body_a, pair.body_b, pair.geometry_a, pair.geometry_b)
             else 0.0
         )
         return pair.distance_m - lower_bound
@@ -1121,7 +1124,7 @@ def build_planning_query(
 ) -> PlanningQuery:
     """Build a planning-only RobotDiagram from public specifications."""
     builder = RobotDiagramBuilder(time_step=timing.physics_dt)
-    from src.online_manipulation.model import populate_model, support_contact_limits
+    from src.online_manipulation.model import populate_model, support_geometry_limits
 
     parser = builder.parser()
     plant = builder.plant()
@@ -1134,7 +1137,9 @@ def build_planning_query(
         robot_model_instance=robot_model_instance,
         robot_adapter=robot_adapter,
         observed_bodies=scenario.observed_bodies,
-        support_limits_m=support_contact_limits(robot_adapter, scenario),
+        support_geometry_limits_m=support_geometry_limits(
+            robot_adapter, scenario, plant, diagram.scene_graph().model_inspector()
+        ),
     )
     query.set_observed_body_poses(scenario.initial_object_poses)
     return query

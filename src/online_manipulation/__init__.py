@@ -38,6 +38,9 @@ from src.online_manipulation.planning import (
     build_planning_query,
 )
 from src.online_manipulation.factory import make_env
+from src.online_manipulation.assembly import run as run_configured_episodes
+from src.online_manipulation.evaluation import Evaluator, EvaluatedTask, TaskResultEvaluator
+from src.online_manipulation.scene_input import PreparedScene, prepare_scene, inspect_dependencies
 from src.online_manipulation.runtime import RuntimeConfig
 from src.online_manipulation.base import BaseConfig
 from src.online_manipulation.navigation import NavigationConfig, NavigationGoal, Navigator, StaticNavigationMap
@@ -159,4 +162,21 @@ __all__ = [
     "VisualizationConfig",
     "ZerithEnvironmentConfig",
     "ZerithRobotAdapter",
+]
+
+# Lazy entry preserves a small import graph; importing the API never loads an
+# experiment, expert JSON, optional weight library, or external service.
+def load_experiment(*args, **kwargs):
+    """Resolve a finite-profile experiment; see experiment.load_experiment."""
+    from src.online_manipulation.experiment import load_experiment as load
+    return load(*args, **kwargs)
+
+
+__all__ += [
+    "Evaluator", "EvaluatedTask", "TaskResultEvaluator", "PreparedScene",
+    "prepare_scene", "inspect_dependencies", "load_experiment", "RuntimeConfig",
+    "BaseConfig", "BaseVelocityAction", "RobotCommand", "NavigationConfig",
+    "NavigationGoal", "Navigator", "StaticNavigationMap", "build_navigation_map",
+    "ZerithMobileRobotAdapter", "ZerithDualRobotAdapter", "make_zerith_dual_spec",
+    "DescriptionRobotAdapter", "run_configured_episodes",
 ]

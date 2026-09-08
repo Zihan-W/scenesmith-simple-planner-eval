@@ -1,8 +1,8 @@
 # Online Environment v0.3 快速开始
 
 需要接入自己的场景、Task 和 Policy 时，请看
-[通用在线运行示例](GENERIC_ONLINE_EXAMPLE.md)。本文入口均包含在
-`online-env-v0.3` 中，公共 API 版本为 `0.3`；兼容变化及能力边界见
+[通用在线运行示例](GENERIC_ONLINE_EXAMPLE.md)。已发布基线为
+`online-env-v0.3`，公共 API 版本为 `0.3`；第0、4节明确描述尚未发布的结构迁移，不能在旧tag上执行。发布基线的兼容变化及能力边界见
 [v0.3 发布说明](RELEASE_ONLINE_ENV_V0.3.md)。v0.1/v0.2 tag 不修改。
 
 本文面向第一次使用仓库的同事。第1节只用于全新clone，不要覆盖有改动的工作树。
@@ -16,10 +16,56 @@ v0.3 的交付内容分为两类：
   几何标定、两种底盘及导航停车后双臂空手操作。这些功能只依赖本仓库和 Zerith submodule，可以从全新 clone
   直接运行。
 - **非便携 PickLift 演示**：还依赖一棵完整的 SceneSmith `scene_000` 场景
-  目录，以及四个未纳入 Git 的 PickLift 派生文件。只有仓库本身不能重建或
-  运行该演示，详见“PickLift 非便携演示”。
+  目录。发布 tag v0.3 仍有旧的 ignored 输入依赖；当前工作树已迁移小型输入并支持从场景重建缓存，见第0、4节。
 
-## 1. 全新 clone、checkout 与安装
+
+## 0. 当前工作树：有限 profile 实验入口（尚未发布）
+
+本轮 M0—M4 代码仍是**未提交工作树**，不在 `online-env-v0.3` tag 中。不要为了执行
+以下命令切换 tag 或覆盖现有修改。第1—3节保留发布基线的安装/相机用法；第5节明确是历史证据。
+新入口复用原 Runtime，并不新增控制模式。下列命令从当前 eval 仓库根目录执行：
+
+```bash
+export REPO_ROOT="$(pwd)"
+export PYTHON="$REPO_ROOT/.venv/bin/python"
+export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export RUN_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/eval-experiment-XXXXXX")"
+export MPLCONFIGDIR="$RUN_ROOT/matplotlib"
+
+"$PYTHON" -B -m src.online_manipulation "$REPO_ROOT/experiments/minimal.json" --repository-root "$REPO_ROOT" --cache-root "$RUN_ROOT/cache-minimal" --output-root "$RUN_ROOT/minimal"
+```
+
+minimal 不读任何专家 JSON，也不需要 SCENE_ROOT/API key。10步后打印 `max_steps`；
+NullTask 的 `success=false` 是没有定义任务成功，不是初始化失败。旧 minimal fixture
+的自由 floor/box 存在环境间初始重叠，仅用于 API smoke，不用于稳定接触质量验收。
+`resolved_config.json` 位于输出根；episode 的 JSON/CSV 使用既有输出契约。
+
+- 日常只改 `experiments/minimal.json`、`mobile.json`、`picklift.json` 这类短配置。
+- `experiments/profiles.json` 是有限、无继承的 profile 目录。每组只展开一次；
+  `*_options` 是该组的显式浅覆盖，不支持隐式递归合并。
+- 硬件/安装定义在 RobotAdapter/URDF；控制算法在 controller，运行时 `control_options`
+  可设 `joint_servo_settings`（具名 kp/kd/effort_limit，不能超过 Adapter 上限）。
+- 全部展开参数、robot spec、base配置、Task/Policy、源文件hash写入 resolved_config。
+- 导航/VLM/RRT 未启用不加载其专属依赖；**核心动作碰撞检查始终保留**。
+
+两种底盘都可用同一个入口。`experiments/mobile.json` 默认 wheel_dynamic：
+
+```bash
+"$PYTHON" -B -m src.online_manipulation "$REPO_ROOT/experiments/mobile.json" --repository-root "$REPO_ROOT" --cache-root "$RUN_ROOT/cache-mobile" --output-root "$RUN_ROOT/mobile"
+```
+
+选择 planar_kinematic 时，在自己的实验 JSON 中同时选择
+`"initial_state":"mobile_planar"` 和 `"base":{"mode":"planar_kinematic","base_height_m":0.1816}`。
+wheel_dynamic 对应 `mobile` / 0.1808；两者不同的是实际运动机制，不是渲染外观。
+这里 HOLD 仅验证环境组装；导航和停车后双臂示例仍见第6节，不把 HOLD 当作导航验收。
+
+可选依赖安装分层：`requirements-online.txt` 为在线、相机和场景准备；
+`requirements-model-tools.txt` 另含 OBJ 转换所需 trimesh；原 `requirements.txt`
+保留离线 IIWA/RRT 流程。不需要把 SceneSmith 的生成环境装进 eval。
+本轮使用已有依赖完整环境，另做禁止可选模块导入的实际 reset/step 检查，
+没有声称重新做了一次联网的全新虚拟环境安装。
+
+## 1. 已发布 v0.3 的全新 clone、checkout 与安装
 
 先进入准备存放仓库的空目录，然后在**同一个终端**中执行：
 
@@ -202,125 +248,59 @@ RGB、原始米制深度、深度彩色图、label 彩色图和
 | 左腕 | [RGB](assets/zerith_camera_calibration/left_wrist_camera_rgb.png) | [depth](assets/zerith_camera_calibration/left_wrist_camera_depth_color.png) | [label](assets/zerith_camera_calibration/left_wrist_camera_label_color.png) |
 | 右腕 | [RGB](assets/zerith_camera_calibration/right_wrist_camera_rgb.png) | [depth](assets/zerith_camera_calibration/right_wrist_camera_depth_color.png) | [label](assets/zerith_camera_calibration/right_wrist_camera_label_color.png) |
 
-## 4. PickLift 非便携演示
+## 4. 当前工作树的固定 PickLift：外部场景 + 版本化专家输入
 
-### 为什么不能仅靠 v0.3 tag 运行
+大场景仍是外部依赖；不提供下载系统。必须取得原 A 场景完整依赖，不能只拿 DMD。
+当前工作树已版本化 `experiments/inputs/pick_lift/` 中的两个 IK JSON、专家标定、
+显式 scene_overrides 和 fingerprints；**不再需要维护者提供四个 ignored 文件**。
+小红盒模型仍在 `models/zerith_pick_eval/small_red_box.sdf`，没有改变质量/摩擦/碰撞代理。
 
-固定 PickLift 已经验证成功，但它目前不是自包含交付。全新 clone 还需要：
-
-1. 一棵完整的 SceneSmith 生成场景目录，记为 `$SCENE_ROOT`。至少直接使用：
-   - `$SCENE_ROOT/package.xml`；
-   - `$SCENE_ROOT/combined_house/house_furniture_welded.dmd.yaml`；
-   - 该 DMD 通过 package URI 引用的全部 SDF、glTF、mesh 和材质。因此只复制
-     上面两个文件不够，最稳妥的做法是复制完整 `scene_000` 目录。
-2. 一个由维护者提供的 PickLift 派生文件目录，记为
-   `$PICK_ARTIFACT_ROOT`，必须包含：
-   - `zerith_pick_eval.dmd.yaml`；
-   - `task_metadata.yaml`；
-   - `pregrasp_ik.json`；
-   - `pick_home.json`。
-
-仓库已跟踪小红盒模型、任务标定和 package 定义：
-
-- `$REPO_ROOT/models/zerith_pick_eval/small_red_box.sdf`；
-- `$REPO_ROOT/models/zerith_pick_eval/pick_lift_calibration.json`；
-- `$REPO_ROOT/models/zerith_pick_eval/package.xml`。
-
-派生链是“替换目标物体 → 静置验证 → 碰撞范围验证 → PREGRASP IK → PICK_HOME
-搜索”。v0.2旧脚本的循环导入已随共享Runtime迁移修复，但v0.3没有重新验收
-从原始SceneSmith场景到全部专家JSON的独立生成链。因此这里不提供未经验证的
-全链重建命令，仍按**需要维护者提供场景与派生文件的非便携演示**交付。
-环境构造本身不依赖专家文件；这些文件是固定PickLift专家Policy的前置条件。
-
-### 检查外部资产
-
-取得完整场景和派生文件后，在同一个终端设置两个路径。下面两个值必须替换为
-你实际收到的**绝对目录**：
+在取得场景后设置 `SCENE_ROOT`（交互输入实际目录，不把别人的绝对路径写死）：
 
 ```bash
-export SCENE_ROOT="/absolute/path/to/scene_000"
-export PICK_ARTIFACT_ROOT="/absolute/path/to/zerith_pick_eval_artifacts"
-
+read -r -p 'SceneSmith scene_000 完整目录: ' SCENE_ROOT
+export SCENE_ROOT
 test -f "$SCENE_ROOT/package.xml"
 test -f "$SCENE_ROOT/combined_house/house_furniture_welded.dmd.yaml"
-test -f "$PICK_ARTIFACT_ROOT/zerith_pick_eval.dmd.yaml"
-test -f "$PICK_ARTIFACT_ROOT/task_metadata.yaml"
-test -f "$PICK_ARTIFACT_ROOT/pregrasp_ik.json"
-test -f "$PICK_ARTIFACT_ROOT/pick_home.json"
+
+"$PYTHON" -B -m src.online_manipulation "$REPO_ROOT/experiments/picklift.json" --repository-root "$REPO_ROOT" --scene-root "$SCENE_ROOT" --cache-root "$RUN_ROOT/pick-cache" --output-root "$RUN_ROOT/pick" --meshcat --record-html --write-final-dmd
 ```
 
-所有 `test` 都无输出且退出码为 0，才可以继续。
+这一条命令先检查 DMD→SDF/URDF→mesh/material/image 的完整依赖，再复制到新缓存，
+按已验收覆盖替换小盒及初态，生成派生 DMD、metadata、manifest，最后运行专家策略。
+既不改上游，也不重新搜索专家 IK；原数值是版本化输入，不承诺搜索器逐位重现人工选择。
+缓存根需是**尚不存在的新目录**；当前不提供自动缓存复用/过期清理，重复运行显式选择新根。
+完整缓存可以搬家，`package://` 和内部相对引用仍有效；manifest 中绝对路径只用于源出处。
 
-### 可选：验证真实 PickLift 场景中的相机
+固定 profile 明确选择 `furniture_welded`。普通实验可以显式选择 `free`，但这不是
+固定 PickLift 的原基准；改场景/模型/初态不能继续冒充同一专家标定。指纹或标定不匹配会报错。
+B 示例场景目前缺 Wood094 的 Color/NormalGL/Roughness 三张纹理：会列出实际缺失路径，
+不会静默换纹理；B 尚未完成视觉验收，不妨碍 A 场景运行。
+
+首轮本次迁移实测：seed500、277步、27.7s、`lift_held`；抬升约10.29cm，保持约3.1s，
+双指接触且无桌面支撑。这是**固定回归**，不是扰动鲁棒性验证。
+
+产物：
+
+- `$RUN_ROOT/pick/resolved_config.json`：展开配置、输入及参数来源；
+- `$RUN_ROOT/pick/benchmark_summary.json`、`benchmark_episodes.csv`；
+- `$RUN_ROOT/pick/episode_000_seed_500/{summary.json,trace.csv,simulation.html,final.dmd.yaml}`；
+- `$RUN_ROOT/pick-cache/scene_metadata.json`：实际模型名/body、语义ID映射、替换后几何事实；
+- `$RUN_ROOT/pick-cache/manifest.json`：源sha256及显式覆盖；
+- `$RUN_ROOT/pick-cache/packages/scene/combined_house/house_furniture_welded.dmd.yaml`：派生初态。
+
+Meshcat 在终端打印本机地址；远程使用需转发对应端口。HTML可以下载后本地浏览。
+final DMD 只写 `ObservedBodySpec(write_back=True)` 指定自由物体的新位姿，不是完整机器人/关节状态快照。
+原始 metadata 不是运行后的真实状态；替换模型未可靠重建的 bbox/support-surface 等字段标为未知。
+
+可选相机审核（同样读取新缓存与版本化 IK）：
 
 ```bash
-mkdir -p "$QUICKSTART_ROOT/picklift-camera-review"
-
-"$PYTHON" "$REPO_ROOT/scripts/validate_zerith_camera_geometry.py" \
-  --repository-root "$REPO_ROOT" \
-  --output-dir "$QUICKSTART_ROOT/picklift-camera-review" \
-  --picklift-dmd "$PICK_ARTIFACT_ROOT/zerith_pick_eval.dmd.yaml" \
-  --picklift-scene-package-xml "$SCENE_ROOT/package.xml" \
-  --pick-home-json "$PICK_ARTIFACT_ROOT/pick_home.json" \
-  --picklift-additional-package-xml "$REPO_ROOT/models/zerith_pick_eval/package.xml" \
-  --neck-pitch-rad 0.0
+"$PYTHON" -B -m tools.calibration.validate_zerith_camera_geometry --repository-root "$REPO_ROOT" --output-dir "$RUN_ROOT/pick-cameras" --picklift-dmd "$RUN_ROOT/pick-cache/packages/scene/combined_house/house_furniture_welded.dmd.yaml" --picklift-scene-package-xml "$RUN_ROOT/pick-cache/packages/scene/package.xml" --pick-home-json "$REPO_ROOT/experiments/inputs/pick_lift/pick_home.json" --picklift-additional-package-xml "$RUN_ROOT/pick-cache/packages/zerith_pick_eval/package.xml" --neck-pitch-rad 0.0
 ```
 
-成功时打印：
-
-```json
-{"calibration": true, "picklift": true}
-```
-
-### 运行固定 PickLift
-
-下面的命令启用实时 Meshcat，同时保存离线 HTML、JSON、CSV 和最终 DMD。
-固定 seed 500 的验证运行约需数分钟：
-
-```bash
-export PICK_OUTPUT="$REPO_ROOT/output/quickstart_pick_lift_seed_500"
-
-cd "$REPO_ROOT"
-"$PYTHON" -B "$REPO_ROOT/scripts/run_zerith_online_example.py" \
-  pick-lift \
-  "$PICK_ARTIFACT_ROOT/zerith_pick_eval.dmd.yaml" \
-  --scene-package-xml "$SCENE_ROOT/package.xml" \
-  --pick-home-json "$PICK_ARTIFACT_ROOT/pick_home.json" \
-  --output-root "$PICK_OUTPUT" \
-  --episodes 1 \
-  --seed 500 \
-  --max-steps 1200 \
-  --maximum-joint-step 0.1 \
-  --maximum-cartesian-joint-step 0.02 \
-  --closed-width 0 \
-  --meshcat \
-  --meshcat-port 7025 \
-  --record-html \
-  --write-final-dmd
-```
-
-终端先打印 Meshcat 地址；在普通本机或已正确转发端口的远程机器上用浏览器打开
-该地址即可实时查看。若 7025 已占用，请选择一个空闲端口并同步修改
-`--meshcat-port`。
-
-v0.3最终实现的固定seed回归结束输出为（启用Meshcat时另打印地址）：
-
-```text
-Meshcat URL: http://localhost:7025
-Episode 0: success=True, reason=lift_held, steps=277
-```
-
-输出位于 `$PICK_OUTPUT`：
-
-- `benchmark_summary.json`：批次汇总；
-- `benchmark_episodes.csv`：逐 episode 汇总；
-- `episode_000_seed_500/simulation.html`：独立 Meshcat 录像；
-- `episode_000_seed_500/summary.json`：完整 episode 指标；
-- `episode_000_seed_500/trace.csv`：每个 10 Hz policy step 一行；
-- `episode_000_seed_500/final.dmd.yaml`：从最终仿真状态写出的新 DMD。
-
-输入 DMD 不会被修改。输出目录不能预先存在；重新运行时请使用新的
-`PICK_OUTPUT` 或先选择另一个空目录。
+旧 `scripts/run_zerith_online_example.py` 仍接受旧参数，但它转发正式 recipes/assembly；
+专家路径仍须显式传入，不能找不到新输入时偷偷回读 output。
 
 ## 5. 历史v0.2全新 checkout 验证记录（不是v0.3重测）
 

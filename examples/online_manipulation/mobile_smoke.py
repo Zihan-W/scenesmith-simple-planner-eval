@@ -19,34 +19,7 @@ from src.online_manipulation import (
 )
 
 
-def make_config(mode, *, meshcat=False, obstacle=False):
-    """Select a self-contained scene and explicit mobile base mode."""
-    root = Path(__file__).resolve().parents[2]
-    scene = root / "models/mobile_scene"
-    # Ideal planar mode clears the original CAD supports; wheel dynamics
-    # settles onto its explicitly levelled tire/support collision surfaces.
-    base = BaseConfig(
-        mode=mode, base_height_m=0.1816 if mode == "planar_kinematic" else 0.1808
-    )
-    spec = make_zerith_dual_spec(
-        robot_model_dir=root / "models/zerith_drake",
-        robot_xyz=(0, 0, base.base_height_m),
-        robot_yaw_deg=0,
-        rail_position=0.4,
-        q_home_left=(0,) * 7,
-    )
-    adapter = ZerithMobileRobotAdapter(spec, base)
-    return RuntimeConfig(
-        ScenarioSpec(
-            scene / ("obstacle.dmd.yaml" if obstacle else "empty.dmd.yaml"),
-            (scene / "package.xml",),
-            ground_body_names=("ground::floor",),
-            visualization=VisualizationConfig(enabled=meshcat),
-        ),
-        adapter,
-        episode_duration=60,
-    )
-
+from src.online_manipulation.recipes.mobile import make_config
 
 def main():
     """Run settle, forward, reverse, spin, curve and stop; report, never fake PASS."""

@@ -1,11 +1,9 @@
-"""Shared calibrated placement for Zerith in the pick-evaluation scene."""
+"""Legacy calibration-tool placement, read from the single experiment profile."""
 
-# This placement was intentionally moved beside the coffee table. Keep it as
-# the single default used by visualization, dynamics, IK, and task metadata.
-ROBOT_BASE_XYZ_METERS = (2.65, 2.95, 0.1815)
-ROBOT_BASE_YAW_DEG = 180.0
+import json
+from pathlib import Path
 
-# Fixed task height selected by manual multi-view inspection. The upstream
-# URDF still lacks meaningful rail effort and velocity limits, so the first
-# pick task locks the rail at this position instead of actuating it.
-PICK_RAIL_POSITION_METERS = 0.4
+_PROFILE = json.loads((Path(__file__).resolve().parents[1] / "experiments/profiles.json").read_text())["initial_state"]["picklift"]
+ROBOT_BASE_XYZ_METERS = tuple(_PROFILE["robot_xyz"])
+ROBOT_BASE_YAW_DEG = _PROFILE["robot_yaw_deg"]
+PICK_RAIL_POSITION_METERS = _PROFILE["rail_position"]

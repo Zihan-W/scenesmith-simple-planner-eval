@@ -141,11 +141,23 @@ def _replace_pose_block(
             f"Pose for {update.model_name}::{update.body_name} must contain "
             "translation and rotation"
         )
-    translation_indent = " " * _indent(result[translation_index])
-    result[translation_index] = (
+    translation_indent_count = _indent(result[translation_index])
+    translation_end = translation_index + 1
+    while translation_end < len(result):
+        line = result[translation_end]
+        # YAML allows a block sequence at the same indent as its key.
+        if line.strip() and not (
+            _indent(line) > translation_indent_count
+            or (_indent(line) == translation_indent_count
+                and line.lstrip().startswith("- "))
+        ):
+            break
+        translation_end += 1
+    translation_indent = " " * translation_indent_count
+    translation_lines = [
         f"{translation_indent}translation: "
         f"{_format_vector(update.translation)}\n"
-    )
+    ]
     rotation_indent_count = _indent(result[rotation_index])
     rotation_end = rotation_index + 1
     while rotation_end < len(result):
@@ -156,10 +168,15 @@ def _replace_pose_block(
         rotation_end += 1
     rotation_indent = " " * rotation_indent_count
     child_indent = " " * (rotation_indent_count + 2)
-    result[rotation_index:rotation_end] = [
+    rotation_lines = [
         f"{rotation_indent}rotation: !Rpy\n",
         f"{child_indent}deg: {_format_vector(update.rpy_deg)}\n",
     ]
+    for start, end, replacement in sorted(
+        ((translation_index, translation_end, translation_lines),
+         (rotation_index, rotation_end, rotation_lines)), reverse=True
+    ):
+        result[start:end] = replacement
     return result
 
 

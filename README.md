@@ -15,8 +15,18 @@ For the main SceneSmith codebase and research, please visit the [SceneSmith GitH
 [进度与整体验收表](docs/mobile_manipulation_progress.md)。原三份 ONLINE_ENV
 文档已删除，必要控制/相机契约和版本化历史已迁入上述现存文档。
 
+当前还有**未提交、未发布的 M0—M4 结构迁移**，不属于上述 v0.3 tag。
+日常 profile 入口见 Quickstart 第0、4节；实际阶段证据和限制见
+[结构执行记录](docs/EVAL_STRUCTURE_PROGRESS.md)。原始 SceneSmith 场景只读，
+实验覆盖进入独立 cache；小型专家输入在 `experiments/inputs/pick_lift/`，
+不再把旧 output 当作必需输入。核心运行仍是原 Shared Runtime。
+
 首次使用请复制Quickstart的完整命令。下方研究/标定脚本中带`<scene-root>`、
 `<x>`等的命令是需填写参数的模板，不是可原样粘贴的发布smoke命令。
+下方 `output/zerith_pick_eval` 路径仅属于显式重做标定的工具链，不能作为当前
+日常入口的隐式依赖。已验收 IK/标定在 `experiments/inputs/pick_lift`；日常准备
+使用 `prepare_scene`/profile 把已确认覆盖写入 cache，**不重新根据夹爪位置移动目标**。
+旧手工标定命令仍会读写它们指定的输出目录，因此清理前应区分是否还需重做该工具链。
 
 ## Robot Evaluation Pipeline
 
@@ -509,20 +519,30 @@ If `policy.act()` or `env.step()` raises during an episode, the runner re-raises
 the original exception after writing `failure.json`, the partial `trace.csv`,
 and the current `simulation.html` recording when enabled.
 
-## Usage
+## Legacy Offline IIWA Pipeline
+
+The following commands run the original offline grasp/plan/simulate workflow,
+not the Zerith online `reset()/step()` environment. For the latter, use the
+[online Quickstart](docs/QUICKSTART_ONLINE_ENV.md).
+
+The deprecated interactive grasp, RRT, simulation scripts and their single-scene
+wrapper have been retired. Use the noninteractive entry points below; scene
+visualization remains available separately. Historical interactive scripts can
+still be retrieved from the unchanged `online-env-v0.3` tag. This cleanup does
+not change the retained noninteractive planner or simulator parameters; their
+defaults are not claimed to be identical to the removed interactive versions.
 
 ### Running Experiments
 
-To run a standard interactive evaluation on a single scene:
+To run a **non-interactive** evaluation on one scene, activate the installed
+virtual environment and choose a fresh output directory. The wrapper clears
+its named outputs in `WORKDIR` before running and may take a long time:
 
 ```bash
-bash run_experiment.sh models/21-20-10_cleaned/scene_000
-```
-
-To run a **non-interactive** evaluation (best for unattended runs or clusters):
-
-```bash
-bash run_experiment_noninteractive.sh models/21-20-10_cleaned/scene_000
+source .venv/bin/activate
+mkdir -p output
+export LEGACY_RUN_ROOT="$(mktemp -d "$PWD/output/legacy_iiwa_XXXXXX")"
+WORKDIR="$LEGACY_RUN_ROOT" bash run_experiment_noninteractive.sh models/21-20-10_cleaned/scene_000
 ```
 
 To run evaluations on an entire folder of scenes:
@@ -540,7 +560,10 @@ bash run_experiment_folder_parallel.sh models/21-20-10_cleaned/ 4
 
 ## Manual Pipeline Workflow
 
-If you need to run the stages of the evaluation pipeline manually, follow these steps from the root of the repository:
+If you need to run the noninteractive stages manually, follow these steps from
+the root of the repository with the virtual environment activated. The manual
+commands write named results in the current directory; preserve any existing
+results first. They do not require the retired interactive entry points.
 
 ### 1. Prepare Scene Directives
 Add the robot to the scene directives:
@@ -569,17 +592,18 @@ python3 -m pydrake.visualization.model_visualizer scene_000.dmd.yaml
 ### 3. Compute Grasp Configuration
 Compute a valid grasp and place configuration:
 ```bash
-python3 scripts/compute_grasp_config.py \
+python3 scripts/compute_grasp_config_noninteractive.py \
     models/21-20-10_cleaned/scene_000/combined_house/robot_commands.json \
     scene_000.dmd.yaml \
     --package-xml models/21-20-10_cleaned/scene_000/package.xml \
-    --package-xml models/iiwa/package.xml
+    --package-xml models/iiwa/package.xml \
+    --out-waypoints robot_waypoints.json
 ```
 
 ### 4. Planning
 Compute a plan given the generated robot waypoints:
 ```bash
-python3 scripts/plan_robot_waypoints_rrt.py \
+python3 scripts/plan_robot_waypoints_rrt_noninteractive.py \
     models/21-20-10_cleaned/scene_000/combined_house/robot_commands.json \
     scene_000.dmd.yaml \
     robot_waypoints.json \
@@ -591,12 +615,19 @@ python3 scripts/plan_robot_waypoints_rrt.py \
 ### 5. Simulation
 Simulate the generated plan:
 ```bash
-python3 scripts/simulate.py \
+python3 scripts/simulate_noninteractive.py \
     scene_000.dmd.yaml \
     robot_plan.json \
     --package-xml models/21-20-10_cleaned/scene_000/package.xml \
     --package-xml models/iiwa/package.xml \
     --ee-vel 1 \
     --ee-accel 1 \
-    --write-updated-scenario out.dmd.yaml
+    --write-updated-scenario out.dmd.yaml \
+    --record-html simulation.html
 ```
+
+The simulator exits after recording the run; open `simulation.html` to replay
+it. Recording creates a potentially large generated file. The legacy simulator
+also has a `--friction-mult` setting (default 5; the batch wrapper uses 10),
+which is unrelated to the online environment's contact configuration. This
+offline workflow must not be used as evidence of online contact-grasp validity.

@@ -76,7 +76,7 @@ class PickLiftDemoExampleTest(unittest.TestCase):
             return expert.build_policy(
                 config, pick_artifact_root=self.artifacts,
                 calibration_json=(
-                    self.root / "models/zerith_pick_eval/pick_lift_calibration.json"
+                    self.root / "experiments/inputs/pick_lift/pick_lift_calibration.json"
                 ),
             )
 

@@ -12,33 +12,7 @@ from src.online_manipulation import (
 )
 
 
-def make_config(repository_root: Path) -> ZerithEnvironmentConfig:
-    """Build a portable config for the repository-owned minimal scene."""
-    root = Path(repository_root).resolve()
-    scene_root = root / "models" / "online_env_minimal_scene"
-    return ZerithEnvironmentConfig(
-        scenario=ScenarioSpec(
-            dmd_path=scene_root / "scene.dmd.yaml",
-            package_xmls=(scene_root / "package.xml",),
-            observed_bodies=(
-                ObservedBodySpec(
-                    observation_name="portable_object",
-                    model_instance_name="portable_test_box",
-                    body_name="base_link",
-                    write_back=True,
-                ),
-            ),
-        ),
-        robot_model_dir=root / "models" / "zerith_drake",
-        # The floor top is z=0.0. This leaves the wheel collision proxies
-        # 1.6 mm above it in the default configuration.
-        robot_xyz=(0.0, 0.0, 0.2315),
-        robot_yaw_deg=0.0,
-        rail_position=0.4,
-        q_home_left=(0.0,) * 7,
-        episode_duration=1.0,
-        task=NullTask(),
-    )
+from src.online_manipulation.recipes.minimal import make_config
 
 
 def make_env_config() -> ZerithEnvironmentConfig:

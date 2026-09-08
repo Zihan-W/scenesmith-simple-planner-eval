@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from src.item_locking_monitor import (
+from src.geometry_bounds import (
     BoundingBox,
     _CalcAabb,
     _MergeAabbs,

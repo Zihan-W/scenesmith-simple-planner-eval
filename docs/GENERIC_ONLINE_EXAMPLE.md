@@ -1,14 +1,18 @@
 # 通用在线环境：配置、控制与接入契约
 
-本说明适用于 `online-env-v0.3`（公共 API `0.3`），不修改已发布的 v0.1/v0.2
-tag。旧 `scripts/run_zerith_online_example.py` 已转发到相同工厂和 runner；
+> 当前 M0—M4 工作树新增的有限 profile / evaluator / 资产准备见第9节；
+> 其余控制与相机语义沿用下文，不借整理目录改变动作坐标系、增量基准或接触动力学。
+
+控制契约继承 `online-env-v0.3`（公共 API `0.3`），第9节为尚未发布的配置迁移，不修改任何已发布
+tag。旧 `scripts/run_zerith_online_example.py` 已转发到正式 recipes 和 runner；
 旧参数差异和专家文件的职责见第7节。
 
 ## 1. 先看清楚边界
 
 配置字段的逐项归属，以及单臂 joint/delta pose/abs pose 控制接口，见
-本文第7—8节。`environment.json` 是一个组合
-episode 配置，并不是与场景、任务无关的机器人默认配置。
+本文第7—8节。当前未发布工作树已把 `environment.json` 收敛为 profile 引用，
+不是与场景、任务无关的机器人默认配置；原完整用户 JSON 仍可由旧 CLI 显式传入。
+新入口不在既有 v0.3 tag 中，见本页第9节和 Quickstart 第0节。
 
 ```text
 minimal_setup.make_env_config() ──→ 环境配置 ──→ make_env(config)
@@ -23,12 +27,12 @@ minimal_setup.make_env_config() ──→ 环境配置 ──→ make_env(config
 
 | 文件 | 职责 |
 |---|---|
-| `examples/online_manipulation/minimal_setup.py` | 最小场景 + Zerith + NullTask 环境配置 |
+| `examples/online_manipulation/minimal_setup.py` | 薄转发 src/online_manipulation/recipes/minimal.py |
 | `examples/online_manipulation/example_policies.py` | 独立 MyPolicy、Hold 和关节增量工厂 |
-| `examples/online_manipulation/pick_lift_demo/minimal_setup.py` | PickLift 场景及 Task 配置，无 IK 文件依赖 |
-| `models/zerith_pick_eval/environment.json` | 机器人初始状态、控制周期、任务绑定与阈值 |
-| `examples/online_manipulation/pick_lift_demo/policy.py` | 专家策略配置；只有它读取 PREGRASP 等标定 |
-| `examples/online_manipulation/run_online.py` | 唯一示例入口，调用公共 make_env/run_episodes |
+| `examples/online_manipulation/pick_lift_demo/minimal_setup.py` | 薄转发 recipes/pick_environment.py，无 IK 文件依赖 |
+| `models/zerith_pick_eval/environment.json` | 旧入口 profile 引用；实际数据在 experiments/profiles.json |
+| `examples/online_manipulation/pick_lift_demo/policy.py` | 薄转发 recipes/pick_policy.py；仅专家策略构造读取 PREGRASP 等标定 |
+| `examples/online_manipulation/run_online.py` | 通用示例薄转发；正式实现是 assembly.run 和既有 runner |
 
 策略工厂可以读取环境的配置，用于匹配机器人名称和任务目标；它不接收 Drake
 Context 或 runtime，不应修改配置。环境工厂既不导入策略工厂，也不创建策略。
@@ -163,8 +167,10 @@ def make_policy(config):
 ## 7. 配置归属与旧入口迁移
 
 `models/zerith_pick_eval/environment.json` 由
-`pick_lift_demo/minimal_setup.py::make_config` 唯一读取。它是一个特定 episode
-配方，不是机器人默认定义；结构分组已经进入代码，不只是改了说明。
+旧入口由 `recipes/settings.py::read_pick_settings` 展开 profile，再由
+`recipes/pick_environment.py::make_config` 消费。下表是展开后的字段，不再要求
+用户在 environment.json 保存重复数据；新 profile 的字段名和归属见第9节。
+显式传入的旧用户 JSON 仍按原字段读取，不做隐藏回退。
 
 | 字段 | 实际用途/读取后去向 | 归属 |
 | --- | --- | --- |
@@ -262,8 +268,9 @@ PickLift 的单物体携带关系属于 Task：双指实际接触后绑定 carri
 抓住后的进一步受限闭合是夹持力目标，不是穿过物体的几何位置目标：仅对
 Task 已证实携带、指—目标关系吻合且继续闭合的手指，几何边使用实际手指位置；
 放开和机械臂动作仍检查候选几何。真实控制目标/力矩上限、物理状态、碰撞过滤
-不因此改变。旧关节动作在**携物状态**新增这项共同边检查；空手旧分支保留原语义。
-这项安全修复可能拒绝过去遗漏检查的携物关节动作，是明确的行为修正。
+不因此改变。v0.3 在**携物状态**增加共同边检查；本轮 M0—M4 进一步让固定单臂
+空手关节动作也执行候选边检查。关闭可选规划查询不再绕过核心碰撞检查。
+这可能拒绝过去漏检而接受的关节动作，是明确的安全修正，不改动作坐标/累加语义。
 
 不支持双手共同搬一个物体，也不以本单物体 Task 支持移动中搬运；携物时非零
 base 命令明确报错。新接触等价测试是几何/解析验证，物理基准仍为固定单臂
@@ -313,3 +320,117 @@ TAMP 的 `execute_validated_joint_goal(env=..., goal_positions=...)` 自动调�
 历史回归目录：`output/online_env_final_audit/{fixed_pick_lift,randomized_pick_lift}`；
 相机图像/指标见 `docs/assets` 与相机清单。大型output是本地证据，不随Git交付。
 文档记录与仍存在的历史日志可引用，未重跑的实验不得改称本轮执行。
+
+
+## 9. 当前工作树：实验组装与替换接口（未发布）
+
+```text
+短实验 JSON → 有限 profiles + 显式 options → load_experiment
+  ├─ SceneSmith 依赖适配 → 只读输入 / 派生 cache / 对象映射
+  ├─ RobotAdapter + 初态 + control → 既有 RuntimeConfig / ZerithEnvironmentConfig
+  ├─ 独立 Policy factory（仅专家策略读取 IK/权重）
+  └─ Task（绑定/接触）+ Evaluator（决策结果）
+                ↓
+        make_env → reset → policy.act(obs) → step → 原 Runner 记录
+```
+
+正式工厂位于 `src/online_manipulation/recipes/`，不能反向依赖 examples/scripts。
+`assembly.run` 是新旧入口共用的装配调用，`runtime.py` 仍是唯一实际积分/控制循环。
+旧 CLI 保留 .01 joint-step / .03 closed-width 等旧默认差异，按参数明确覆盖，
+Hold/JointStep 不会提前读取专家文件。
+
+### 参数归属
+
+| 数据 | 单一来源 / 使用位置 |
+| --- | --- |
+| 机器人模型、关节、执行器/TCP/夹爪/相机安装 | Adapter + 模型包；TCP 位于 src/zerith_tcp.py，不再导入盒子/桌子参数 |
+| 运行初态：站位、yaw、导轨、手臂 q | profiles.initial_state；旧标定工具的 zerith_robot_config 也读取同一 profile |
+| 时钟、动作上限、servo 设置 | profiles.control；controller.configure_joint_servos 仅允许 kp/kd/effort cap，不改位置/速度硬件限位 |
+| 场景资产、显式 free/welded、观察对象 | profiles.scene + scene_options；物体替换/位姿覆盖写入 cache |
+| 目标、支撑、双指绑定和 Task 条件 | profiles.task + task_options；不写入机器人定义 |
+| 已验收 IK、专家相对位姿/权重 | profiles.policy；experiments/inputs/pick_lift；不属于初态构造的必要输入 |
+| episode 时序、结果和记录 | 原 runner；实验根下追加 resolved_config.json，不向 trace 内联图像 |
+
+`control_options.joint_servo_settings` 示例：
+`{"left_wrist_pitch_joint":{"kp":800,"kd":60,"effort_limit":8}}`。
+这是可选运行设置，不是新的硬件标定。默认仍用 src/zerith_servo_config.py 的既有
+验证值；所有最终 JointSpec 数值进入 resolved_config。未知关节或超出 Adapter 上限明确报错。
+
+### 最小公共 API
+
+以下代码在设好 REPO_ROOT/PYTHONPATH 后可从仓库外运行；不需要专家文件：
+
+```python
+import os
+import tempfile
+from pathlib import Path
+from src.online_manipulation import load_experiment, make_env
+
+root = Path(os.environ["REPO_ROOT"])
+with tempfile.TemporaryDirectory() as cache:
+    experiment = load_experiment(root / "experiments/minimal.json",
+                                 repository_root=root, cache_root=cache)
+    env = make_env(experiment.environment_config)
+    obs, info = env.reset(seed=0)
+    experiment.policy.reset(obs, info)
+    for _ in range(10):
+        obs, reward, terminated, truncated, info = env.step(experiment.policy.act(obs))
+        if terminated or truncated:
+            break
+    print(obs.time_s, info["task"])
+```
+
+换场景主要改 `scene`、`scene_options`、必要 `task_options.bindings` 和
+`initial_state_options`。直接 DMD 可用 `scene_options.kind="dmd"`、`dmd`、
+`package_xmls`、`observed_bodies`；路径可为显式绝对路径或仓库相对路径。
+SceneSmith 的 `variant` 必填 free/furniture_welded。地面和墙若共用 body，
+必须指定 `ground_geometries=[["model::body","collision_name"]]`。
+独立地面的旧 `ground_body_names` 只在该 body 恰有一个 collision 时兼容；混合 body 会报错。
+
+`prepare_scene` 也接受显式 `dmd_relative` 与 `metadata_path` 处理单房间产物。
+不根据 JSON 再加房间偏移：DMD 的 base_frame 决定世界变换；派生索引记录初态而非动态真值。
+源场景已有与 Adapter 同名的机器人会报错；未知名字的机器人不能靠模型名可靠识别，
+用户必须选明确的 robot-free 输入或另做显式派生，不支持自动拆掉任意机器人。
+
+通过profile启用机载相机：在实验中加
+`"robot_options":{"camera_options":{"enabled_names":["head_camera","left_wrist_camera","right_wrist_camera"]}}`。
+width/height/fov_y_rad/update_period_s等仍是显式仿真配置，安装外参来自同一Adapter，
+不随场景复制。缺省enabled_names为空，不创建渲染系统。本轮新入口已在fixed/minimal和
+wheel_dynamic/mobile双臂配置中实际reset/step并采样三帧；空场景测试仅证明接线，
+真实可见性另由A场景PREGRASP验证。
+
+### 仓库外 Policy / evaluator
+
+把 `examples/online_manipulation/external_evaluator.py` 复制到你自己的工作目录，
+命名为 `my_components.py`。在自己的短 JSON 里选择：
+
+```json
+{
+  "robot": "zerith_left", "control": "smoke", "initial_state": "minimal",
+  "scene": "minimal", "task": "null",
+  "policy": "my_components:make_policy",
+  "evaluator": "my_components:make_evaluator",
+  "run": {"seeds": [7, 8], "max_steps": 10}
+}
+```
+
+把这个目录和 REPO_ROOT 加入 PYTHONPATH，以统一 CLI 加 `--trust-factories` 运行。
+未显式信任时 module:function 会被拒绝；启用后相当于执行本地 Python，**不是安全沙箱**，
+不能加载来源不明的配置/工厂。不需要修改中央分支或 Runtime。
+
+公开协议：
+
+- `Policy.reset(observation, info)` / `act(observation) -> RobotAction`。
+- Policy factory 接收 FactoryContext：environment_config、robot_spec、options、repository_root；没有真实 Context/内部索引。
+- `Evaluator.reset(observation, task_reset_info)` 每个 episode 调用一次，负责清空自己的状态。
+- `Evaluator.evaluate(observation, baseline: TaskEvaluation) -> TaskEvaluation` 每个 step 调用一次。
+- 结果包含 reward、terminated、truncated、success、reason、metrics。分类器状态归每个 evaluator 实例；不放 Runtime/global。
+- 默认 `TaskResultEvaluator` 原样返回 Task 的判定，保持 PickLift 已有双指/脱桌/抬升/保持时长逻辑。
+- `EvaluatedTask` 委托原 Task 的 observe/contact/finalize；外部 evaluator 只替换评估结果，不获得物理修改权限。
+- evaluator factory 接收 options；Task factory 接收 `(options, robot_spec)`，返回公开 Task；Robot factory 接收 `(options, initial_state, control, base, repository_root)`，返回 RobotAdapter。
+- Policy 可声明 `required_capabilities`（joints/arms/grippers/sensors 名称集合）；实验的 `requires` 合并检查。不兼容时报错，不假定任意权重/动作维度天然兼容。
+
+VLM 离线 success classifier 仍是 episode artifacts 的外部消费者；本轮不实现 VLM/VLA、
+新导航器或完整 TAMP。原 TAMP helper 继续使用 env.get_planning_query 的实时同步，
+核心动作检查不受可选 planner 是否启用影响。已验证双臂基本动作/两种底盘/相机继承，
+没有因此宣称双手共同搬物、任意工作空间抓取或完整 TAMP 已实现。

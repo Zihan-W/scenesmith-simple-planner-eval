@@ -10,9 +10,9 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from examples.online_manipulation.pick_lift_demo.minimal_setup import make_config
-from examples.online_manipulation.pick_lift_demo.policy import build_policy
-from examples.online_manipulation.run_online import run
+from src.online_manipulation.recipes.pick_environment import make_config
+from src.online_manipulation.recipes.pick_policy import build_policy
+from src.online_manipulation.assembly import run
 from src.online_manipulation import (
     HoldPolicy,
     JointStepPolicy,
@@ -25,7 +25,7 @@ from src.online_manipulation import (
 EVAL_PACKAGE_XML = REPOSITORY_ROOT / "models/zerith_pick_eval/package.xml"
 ROBOT_MODEL_DIR = REPOSITORY_ROOT / "models/zerith_drake"
 PICK_LIFT_CALIBRATION_JSON = (
-    REPOSITORY_ROOT / "models/zerith_pick_eval/pick_lift_calibration.json"
+    REPOSITORY_ROOT / "experiments/inputs/pick_lift/pick_lift_calibration.json"
 )
 
 

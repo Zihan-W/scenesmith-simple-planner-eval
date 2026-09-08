@@ -210,7 +210,7 @@ def run_case(mode, navigation, settings, output):
 
     if navigation:
         query = env.get_planning_query()
-        navmap = build_navigation_map(query, navigation_frame=config.robot_adapter.navigation_frame_name, ground_body_names=config.scenario.ground_body_names)
+        navmap = build_navigation_map(query, navigation_frame=config.robot_adapter.navigation_frame_name, ground_body_names=config.scenario.ground_body_names, ground_geometries=config.scenario.ground_geometries)
         navigator = Navigator(navmap)
         for _ in range(20):
             advance(BaseVelocityAction(0, 0), "settle")

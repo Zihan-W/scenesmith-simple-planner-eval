@@ -1,0 +1,39 @@
+living_room_box_0:
+  file: package://zerith_pick_eval/small_red_box.sdf
+  default_free_body_pose:
+    base_link:
+      base_frame: room_living_room_frame
+      translation:
+      - -1.516890566402065
+      - 0.020001050000000742
+      - 0.5107438948291487
+      rotation: !Rpy
+        deg:
+        - -0.053500924720153026
+        - -0.016319007640476276
+        - 0.24786760187990559
+  geometry_facts:
+    shape: box
+    dimensions_m:
+    - 0.06
+    - 0.04
+    - 0.03
+    mass_kg: 0.1
+    inertial_origin: center
+    unknown_fields:
+    - source_mesh_bbox
+    - source_support_surfaces
+    - source_image
+living_room_vase_0:
+  default_free_body_pose:
+    base_link:
+      base_frame: room_living_room_frame
+      translation:
+      - -1.516890566402065
+      - 0.3799989499999996
+      - 0.49509834431265365
+      rotation: !Rpy
+        deg:
+        - -0.31241903928751763
+        - 0.596823421503217
+        - -0.16386307016386936

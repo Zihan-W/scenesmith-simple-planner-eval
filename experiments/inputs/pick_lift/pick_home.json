@@ -1,0 +1,329 @@
+{
+  "search_succeeded": true,
+  "calibration_status": "fixed_rail_pick_home_to_pregrasp_validated",
+  "daogui_joint_position_m": 0.4,
+  "q_zero": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "q_pick_home": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "q_pregrasp": [
+    -0.15013564573397511,
+    0.20084277459330974,
+    -0.04716138444209928,
+    0.7484451066352585,
+    0.015162031989565278,
+    -0.35742551768721414,
+    -0.33386829327075784
+  ],
+  "ranking_order": [
+    "double_layer_collision_constraints",
+    "whole_wrist_gripper_table_workspace_constraint",
+    "direct_edge_connected_to_pregrasp",
+    "minimum_distance_from_q_zero"
+  ],
+  "safety_objective_clearance_m": 0.007,
+  "safety_acceptance_clearance_m": 0.005,
+  "workspace_safety_margin_m": 0.005,
+  "search_edge_sample_step_rad": 0.01,
+  "validation_edge_sample_step_rad": 0.002,
+  "selected": {
+    "q_left": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "distance_from_q_zero": 0.0,
+    "collision_constraints_satisfied": true,
+    "workspace_constraint_satisfied": true,
+    "connected_to_pregrasp": true,
+    "clearance_metrics": {
+      "minimum_nonpenetration_distance": 0.0016412699999999864,
+      "minimum_nonpenetration_distance_is_lower_bound": false,
+      "nearest_nonpenetration_pair": {
+        "distance_m": 0.0016412699999999864,
+        "category": "fixed_robot_environment",
+        "collision_type": "RobotCollisionType.kEnvironmentCollision",
+        "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_middle_wheel_link",
+        "body_b": "room_geometry_living_room::room_geometry_body_link",
+        "geometry_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::Mesh",
+        "geometry_b": "room_geometry_living_room::floor_collision",
+        "raw_geometry_distance_m": 0.0016412699999999864
+      },
+      "minimum_safety_clearance": 0.020037650047172152,
+      "minimum_safety_clearance_is_lower_bound": false,
+      "nearest_safety_pair": {
+        "distance_m": 0.020037650047172152,
+        "category": "fixed_robot_robot",
+        "collision_type": "RobotCollisionType.kSelfCollision",
+        "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::daogui_link",
+        "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+        "geometry_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::Mesh",
+        "geometry_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::Mesh",
+        "raw_geometry_distance_m": 0.020037650047172152
+      }
+    },
+    "workspace_constraint": {
+      "satisfied": true,
+      "whole_wrist_gripper_above_table": true,
+      "whole_wrist_gripper_outside_expanded_xy_projection": false,
+      "vertical_clearance_above_table_m": 0.1732928723785706,
+      "outside_axis_clearances_m": [
+        -0.32679224834544784,
+        -0.2107538486420349
+      ],
+      "required_safety_margin_m": 0.005,
+      "table_xy_expansion_for_wrist_gripper_m": [
+        0.17288999999999988,
+        0.07750000000000024
+      ],
+      "table_aabb_min_xyz_m": [
+        1.1499973435480073,
+        2.631747201357966,
+        -0.0006758114169256868
+      ],
+      "table_aabb_max_xyz_m": [
+        2.3499922493454477,
+        3.2651151788775112,
+        0.4960119176214294
+      ],
+      "wrist_gripper_aabb_min_xyz_m": [
+        2.0232000009999997,
+        2.6975010500000005,
+        0.66930479
+      ],
+      "wrist_gripper_aabb_max_xyz_m": [
+        2.3589800009999995,
+        2.842501050000001,
+        0.7898369577247224
+      ],
+      "wrist_gripper_body_names": [
+        "left_wrist_roll_link",
+        "left_wrist_yaw_link",
+        "left_wrist_pitch_link",
+        "left_end_effector_link",
+        "left_jaw_camera_link",
+        "left_jaw_left_finger_link",
+        "left_jaw_right_finger_link"
+      ],
+      "bounding_volume": "conservative world-axis-aligned collision-geometry AABB"
+    },
+    "q_pick_home_to_pregrasp_edge": {
+      "minimum_nonpenetration_distance": 0.0016412699999999864,
+      "minimum_safety_clearance": 0.020037650047172152,
+      "nearest_nonpenetration_pair": {
+        "distance_m": 0.0016412699999999864,
+        "category": "fixed_robot_environment",
+        "collision_type": "RobotCollisionType.kEnvironmentCollision",
+        "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_middle_wheel_link",
+        "body_b": "room_geometry_living_room::room_geometry_body_link"
+      },
+      "nearest_safety_pair": {
+        "distance_m": 0.020037650047172152,
+        "category": "fixed_robot_robot",
+        "collision_type": "RobotCollisionType.kSelfCollision",
+        "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::daogui_link",
+        "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link"
+      },
+      "minimum_nonpenetration_alpha": 0.0,
+      "minimum_safety_alpha": 0.0,
+      "sample_count": 376,
+      "maximum_joint_sample_step_rad": 0.002,
+      "validation_kind": "high_density_numerical_joint_edge_sampling"
+    },
+    "q_pick_home_to_pregrasp_workspace_edge": {
+      "workspace_constraint_satisfied": true,
+      "first_unsatisfied_alpha": null,
+      "minimum_vertical_clearance_above_table_m": 0.013640011911204009,
+      "minimum_best_outside_axis_clearance_m": -0.2107538486420349,
+      "sample_count": 376,
+      "maximum_joint_sample_step_rad": 0.002,
+      "validation_kind": "high_density_numerical_joint_edge_sampling"
+    }
+  },
+  "pregrasp_endpoint": {
+    "q_left": [
+      -0.15013564573397511,
+      0.20084277459330974,
+      -0.04716138444209928,
+      0.7484451066352585,
+      0.015162031989565278,
+      -0.35742551768721414,
+      -0.33386829327075784
+    ],
+    "distance_from_q_zero": 0.9299052270068225,
+    "collision_constraints_satisfied": true,
+    "workspace_constraint_satisfied": true,
+    "connected_to_pregrasp": true,
+    "clearance_metrics": {
+      "minimum_nonpenetration_distance": 0.0016412699999999864,
+      "minimum_nonpenetration_distance_is_lower_bound": false,
+      "nearest_nonpenetration_pair": {
+        "distance_m": 0.0016412699999999864,
+        "category": "fixed_robot_environment",
+        "collision_type": "RobotCollisionType.kEnvironmentCollision",
+        "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_middle_wheel_link",
+        "body_b": "room_geometry_living_room::room_geometry_body_link",
+        "geometry_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::Mesh",
+        "geometry_b": "room_geometry_living_room::floor_collision",
+        "raw_geometry_distance_m": 0.0016412699999999864
+      },
+      "minimum_safety_clearance": 0.020037650047172152,
+      "minimum_safety_clearance_is_lower_bound": false,
+      "nearest_safety_pair": {
+        "distance_m": 0.020037650047172152,
+        "category": "fixed_robot_robot",
+        "collision_type": "RobotCollisionType.kSelfCollision",
+        "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::daogui_link",
+        "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+        "geometry_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::Mesh",
+        "geometry_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::Mesh",
+        "raw_geometry_distance_m": 0.020037650047172152
+      }
+    },
+    "workspace_constraint": {
+      "satisfied": true,
+      "whole_wrist_gripper_above_table": true,
+      "whole_wrist_gripper_outside_expanded_xy_projection": false,
+      "vertical_clearance_above_table_m": 0.013640011911204009,
+      "outside_axis_clearances_m": [
+        -0.3138877263842127,
+        -0.17622495786110354
+      ],
+      "required_safety_margin_m": 0.005,
+      "table_xy_expansion_for_wrist_gripper_m": [
+        0.17570879688244678,
+        0.10568154897078263
+      ],
+      "table_aabb_min_xyz_m": [
+        1.1499973435480073,
+        2.631747201357966,
+        -0.0006758114169256868
+      ],
+      "table_aabb_max_xyz_m": [
+        2.3499922493454477,
+        3.2651151788775112,
+        0.4960119176214294
+      ],
+      "wrist_gripper_aabb_min_xyz_m": [
+        2.036104522961235,
+        2.6066090612775046,
+        0.5096519295326334
+      ],
+      "wrist_gripper_aabb_max_xyz_m": [
+        2.3775221167261282,
+        2.8079721592190694,
+        0.703240115880762
+      ],
+      "wrist_gripper_body_names": [
+        "left_wrist_roll_link",
+        "left_wrist_yaw_link",
+        "left_wrist_pitch_link",
+        "left_end_effector_link",
+        "left_jaw_camera_link",
+        "left_jaw_left_finger_link",
+        "left_jaw_right_finger_link"
+      ],
+      "bounding_volume": "conservative world-axis-aligned collision-geometry AABB"
+    },
+    "q_pick_home_to_pregrasp_edge": {
+      "minimum_nonpenetration_distance": 0.0016412699999999864,
+      "minimum_safety_clearance": 0.020037650047172152,
+      "nearest_nonpenetration_pair": {
+        "distance_m": 0.0016412699999999864,
+        "category": "fixed_robot_environment",
+        "collision_type": "RobotCollisionType.kEnvironmentCollision",
+        "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_middle_wheel_link",
+        "body_b": "room_geometry_living_room::room_geometry_body_link"
+      },
+      "nearest_safety_pair": {
+        "distance_m": 0.020037650047172152,
+        "category": "fixed_robot_robot",
+        "collision_type": "RobotCollisionType.kSelfCollision",
+        "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::daogui_link",
+        "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link"
+      },
+      "minimum_nonpenetration_alpha": 0.0,
+      "minimum_safety_alpha": 0.0,
+      "sample_count": 2,
+      "maximum_joint_sample_step_rad": 0.002,
+      "validation_kind": "high_density_numerical_joint_edge_sampling"
+    },
+    "q_pick_home_to_pregrasp_workspace_edge": {
+      "workspace_constraint_satisfied": true,
+      "first_unsatisfied_alpha": null,
+      "minimum_vertical_clearance_above_table_m": 0.013640011911204009,
+      "minimum_best_outside_axis_clearance_m": -0.17622495786110354,
+      "sample_count": 2,
+      "maximum_joint_sample_step_rad": 0.002,
+      "validation_kind": "high_density_numerical_joint_edge_sampling"
+    }
+  },
+  "accepted_search_step_count": 19,
+  "evaluated_candidate_count": 208,
+  "safety_clearance_filters": [
+    {
+      "body_a": "room_geometry_living_room::room_geometry_body_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_middle_wheel_link",
+      "reason": "relative geometry is invariant to the active left-arm seven-joint configuration and lies within the safety constraint influence distance"
+    },
+    {
+      "body_a": "room_geometry_living_room::room_geometry_body_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_middle_wheel_link",
+      "reason": "relative geometry is invariant to the active left-arm seven-joint configuration and lies within the safety constraint influence distance"
+    },
+    {
+      "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_shoulder_roll_link",
+      "reason": "relative geometry is invariant to the active left-arm seven-joint configuration and lies within the safety constraint influence distance"
+    },
+    {
+      "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_end_effector_link",
+      "reason": "relative geometry is invariant to the active left-arm seven-joint configuration and lies within the safety constraint influence distance"
+    },
+    {
+      "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_end_effector_link",
+      "reason": "relative geometry is invariant to the active left-arm seven-joint configuration and lies within the safety constraint influence distance"
+    },
+    {
+      "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_left_finger_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_end_effector_link",
+      "reason": "relative geometry is invariant to the active left-arm seven-joint configuration and lies within the safety constraint influence distance"
+    },
+    {
+      "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_right_finger_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_end_effector_link",
+      "reason": "relative geometry is invariant to the active left-arm seven-joint configuration and lies within the safety constraint influence distance"
+    },
+    {
+      "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::neck_yaw_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::neck_camera_link",
+      "reason": "relative geometry is invariant to the active left-arm seven-joint configuration and lies within the safety constraint influence distance"
+    },
+    {
+      "body_a": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+      "body_b": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_roll_link",
+      "reason": "explicit safety-margin whitelist for the mechanically close left-shoulder assembly; nonpenetration remains active"
+    }
+  ],
+  "connectivity_validation": "high-density numerical joint-edge sampling, not a mathematical proof"
+}

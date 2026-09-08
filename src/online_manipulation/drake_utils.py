@@ -12,7 +12,11 @@ def register_package_xml(parser: Any, package_xml: Path) -> None:
     name = root.findtext("name")
     if name is None:
         raise ValueError(f"Missing <name> in {path}")
-    parser.package_map().Add(name.strip(), str(path.parent.resolve()))
+    name = name.strip()
+    packages = parser.package_map()
+    if packages.Contains(name) and Path(packages.GetPath(name)).resolve() != path.parent.resolve():
+        raise ValueError(f"Conflicting package {name}: {packages.GetPath(name)} and {path.parent}")
+    packages.Add(name, str(path.parent.resolve()))
 
 
 def set_free_body_world_pose(

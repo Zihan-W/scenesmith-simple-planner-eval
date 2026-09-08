@@ -57,6 +57,7 @@ def main():
         query,
         navigation_frame=config.robot_adapter.navigation_frame_name,
         ground_body_names=config.scenario.ground_body_names,
+        ground_geometries=config.scenario.ground_geometries,
     )
     (args.output / "map.json").write_text(
         json.dumps(dataclasses.asdict(navigation_map), indent=2)
