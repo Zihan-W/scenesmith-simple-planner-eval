@@ -8,7 +8,8 @@ For the main SceneSmith codebase and research, please visit the [SceneSmith GitH
 [通用环境、策略及控制契约](docs/GENERIC_ONLINE_EXAMPLE.md)。当前开发工作树
 包含双臂和移动底盘，尚未发布；`online-env-v0.2` 只包含此前固定底座和相机 API。
 实施依据为[需求](docs/mobile_manipulation_requirements.md)、
-[架构](docs/mobile_manipulation_architecture.md)。原三份 ONLINE_ENV
+[架构](docs/mobile_manipulation_architecture.md)及
+[进度与整体验收表](docs/mobile_manipulation_progress.md)。原三份 ONLINE_ENV
 文档已删除，必要控制/相机契约和版本化历史已迁入上述现存文档。
 
 ## Robot Evaluation Pipeline

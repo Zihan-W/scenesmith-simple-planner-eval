@@ -460,12 +460,15 @@ Navigator只生成action，调用者仍负责`env.step(navigator.act(obs))`。
 
 动力学四辅助轮为零摩擦滑动支撑，非真实脚轮标定；导轨固定0.4m。尚未验证动态障碍、坡地、随机场景鲁棒性、移动中精细操作、双臂闭链/协同抓取、导轨动力学。本轮未重跑大规模测试或重新做全新clone交付验证，不把旧记录冒称新结果。
 
+- [实现核验与曲线说明](BASE_MODE_IMPLEMENTATION_AUDIT.md)
+- [进度、操作阶段最大偏差及待提交分类](mobile_manipulation_progress.md)
 - `output/mobile_manipulation/manipulation_handoff_metrics.json`：已有HTML对应CSV的10Hz操作阶段统计，含参考时刻、全部样本、峰值时刻、源CSV哈希；物理子步峰值没有记录，明确缺失。
 
 ## 7. 当前工作树：通用入口及收尾修复
 
 配置归属、单/双臂动作语义、RobotAdapter 执行器约定、相机采样和版本历史，
-统一见[通用接口契约](GENERIC_ONLINE_EXAMPLE.md)。
+统一见[通用接口契约](GENERIC_ONLINE_EXAMPLE.md)。整套变更与验收的对应表见
+[progress 第15节](mobile_manipulation_progress.md#15-整套迁移收尾2026-09-08)。
 
 ### 7.1 无专家文件的最小运行
 
