@@ -1,6 +1,6 @@
 # 通用在线环境：配置、控制与接入契约
 
-本说明适用于当前开发工作树的新增示例，不修改已发布的 `online-env-v0.2`
+本说明适用于 `online-env-v0.3`（公共 API `0.3`），不修改已发布的 v0.1/v0.2
 tag。旧 `scripts/run_zerith_online_example.py` 已转发到相同工厂和 runner；
 旧参数差异和专家文件的职责见第7节。
 
@@ -137,8 +137,9 @@ def make_policy(config):
 - 环境时长以秒配置，CLI `max_steps` 是执行预算；两者仍独立，任一先到
   都会结束。Hold 冒烟测试的 max_steps 截断不是 PickLift 成功。
 - 旧未发布的 `--factory` 混合工厂接口已替换为两个独立工厂；实验性的
-  `pick_lift_demo/run_online.py` 重复文件已移除。已发布 API 和旧 scripts
-  命令保持不变。
+  `pick_lift_demo/run_online.py` 重复文件已移除。reset/step形式及合理旧CLI参数
+  保留；具名RobotAdapter契约、配置迁移和携物安全检查的兼容变化见
+  [v0.3发布说明](RELEASE_ONLINE_ENV_V0.3.md)，并非所有扩展接口完全不变。
 - 本版不提供 Gymnasium wrapper、action_space/observation_space、close、
   向量化训练或学习算法。
 - Runner 通过公共 `StoppablePolicy.stop_reason` 处理策略主动失败，不解析
@@ -306,8 +307,8 @@ TAMP 的 `execute_validated_joint_goal(env=..., goal_positions=...)` 自动调�
 | v0.1，25eb9a4 | 固定底座、导轨0.4m、单臂真实PickLift；固定3/3、扰动2/3，seed402是策略鲁棒性失败 | 历史记录，不能推导当前随机成功率；当时未验证第二真实机器人、PLACE、移动/导轨动力学 |
 | v0.2代码，23d656c | 可迁移相机、三相机几何/可见性人工验收及hardening | 后续相机改造应保留接口/采样契约，不代表完成视觉策略 |
 | v0.2本地/远端tag，682ba7c | 上述代码加中文全新clone Quickstart；23d656c之后两次仅文档提交 | 只读核验记录见progress；本轮不改tag |
-| b433ee6（当前HEAD） | 修复指部contact几何、开口标定0.07628m、转换器v5 | 已提交，不能算当前未提交新功能 |
-| HEAD之后当前工作树 | 配置/核心迁移、具名双臂、两底盘、导航及本轮收尾 | 验收按progress逐项查证；尚无新发布tag |
+| b433ee6（v0.2之后的模型修复） | 修复指部contact几何、开口标定0.07628m、转换器v5 | v0.3继承该修复，首次运行需要生成本版本OBJ |
+| v0.3，API 0.3 | 配置/核心迁移、具名双臂、两底盘、静态导航、TAMP执行前同步 | 最终实现150项通过；固定PickLift一次回归不是扰动鲁棒性验证，详见[发布说明](RELEASE_ONLINE_ENV_V0.3.md) |
 
 历史回归目录：`output/online_env_final_audit/{fixed_pick_lift,randomized_pick_lift}`；
 相机图像/指标见 `docs/assets` 与相机清单。大型output是本地证据，不随Git交付。

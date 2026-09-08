@@ -5,12 +5,18 @@ This repository is a companion to [SceneSmith](https://scenesmith.github.io/), p
 For the main SceneSmith codebase and research, please visit the [SceneSmith GitHub repository](https://github.com/nepfaff/scenesmith).
 
 在线环境入口：先看[中文 Quickstart](docs/QUICKSTART_ONLINE_ENV.md)，再看
-[通用环境、策略及控制契约](docs/GENERIC_ONLINE_EXAMPLE.md)。当前开发工作树
-包含双臂和移动底盘，尚未发布；`online-env-v0.2` 只包含此前固定底座和相机 API。
+[通用环境、策略及控制契约](docs/GENERIC_ONLINE_EXAMPLE.md)。当前发布为
+`online-env-v0.3`，公共 API 版本 `0.3`：配置/策略解耦、共享 Runtime、
+单臂/双臂控制、夹爪/相机继承、两种移动底盘、静态 pose 导航及 TAMP 执行同步。
+兼容变化、模型生成和验证边界见[v0.3 发布说明](docs/RELEASE_ONLINE_ENV_V0.3.md)。
+`online-env-v0.1`、`online-env-v0.2` 保持原指向，不包含本次整套改造。
 实施依据为[需求](docs/mobile_manipulation_requirements.md)、
 [架构](docs/mobile_manipulation_architecture.md)及
 [进度与整体验收表](docs/mobile_manipulation_progress.md)。原三份 ONLINE_ENV
 文档已删除，必要控制/相机契约和版本化历史已迁入上述现存文档。
+
+首次使用请复制Quickstart的完整命令。下方研究/标定脚本中带`<scene-root>`、
+`<x>`等的命令是需填写参数的模板，不是可原样粘贴的发布smoke命令。
 
 ## Robot Evaluation Pipeline
 

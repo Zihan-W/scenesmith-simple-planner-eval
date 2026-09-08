@@ -1,15 +1,19 @@
-# Online Environment v0.2 快速开始
+# Online Environment v0.3 快速开始
 
-开发分支补充：需要接入自己的场景、Task 和 Policy 时，请看
-[通用在线运行示例](GENERIC_ONLINE_EXAMPLE.md)。该示例是 tag 发布后的新增
-内容，不包含在原 `online-env-v0.2` tag 中。
+需要接入自己的场景、Task 和 Policy 时，请看
+[通用在线运行示例](GENERIC_ONLINE_EXAMPLE.md)。本文入口均包含在
+`online-env-v0.3` 中，公共 API 版本为 `0.3`；兼容变化及能力边界见
+[v0.3 发布说明](RELEASE_ONLINE_ENV_V0.3.md)。v0.1/v0.2 tag 不修改。
 
-本文面向第一次使用仓库的同事。**第1—5节是v0.2发布版的历史安装与验证记录；第6—7节是当前未提交工作树的交接入口，不在v0.2 tag内。** 不要在当前有改动的工作树执行第1节的checkout；那一节仅用于全新clone。第1—5节命令此前在全新clone和`.venv`验证；本次没有重新做全新安装。
+本文面向第一次使用仓库的同事。第1节只用于全新clone，不要覆盖有改动的工作树。
+第2—3节是最小API/相机，第4节是外部资产PickLift，第6节是移动双臂，第7节是
+可替换工厂入口。第5节单独标记v0.2历史安装证据；v0.3复用已验证依赖，未重新
+做全新虚拟环境安装，不把历史安装记录当成新版本实测。
 
-v0.2 的交付内容分为两类：
+v0.3 的交付内容分为两类：
 
 - **自包含功能**：最小 state-only 公共 API、机器人相机公共 API、三相机
-  几何标定。这些功能只依赖本仓库和 Zerith submodule，可以从全新 clone
+  几何标定、两种底盘及导航停车后双臂空手操作。这些功能只依赖本仓库和 Zerith submodule，可以从全新 clone
   直接运行。
 - **非便携 PickLift 演示**：还依赖一棵完整的 SceneSmith `scene_000` 场景
   目录，以及四个未纳入 Git 的 PickLift 派生文件。只有仓库本身不能重建或
@@ -20,16 +24,16 @@ v0.2 的交付内容分为两类：
 先进入准备存放仓库的空目录，然后在**同一个终端**中执行：
 
 ```bash
-mkdir -p online-env-v0.2-work
-cd online-env-v0.2-work
+mkdir -p online-env-v0.3-work
+cd online-env-v0.3-work
 export WORK_ROOT="$(pwd)"
 
 git clone https://github.com/Zihan-W/scenesmith-simple-planner-eval.git
 export REPO_ROOT="$WORK_ROOT/scenesmith-simple-planner-eval"
 cd "$REPO_ROOT"
 
-git checkout online-env-v0.2
-test "$(git rev-parse HEAD)" = "$(git rev-parse 'online-env-v0.2^{commit}')"
+git checkout online-env-v0.3
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'online-env-v0.3^{commit}')"
 echo $?
 git submodule update --init --recursive
 ```
@@ -42,7 +46,7 @@ git submodule update --init --recursive
 
 ```bash
 cd "$REPO_ROOT"
-python3 -m venv "$REPO_ROOT/.venv"
+python3.11 -m venv "$REPO_ROOT/.venv"
 source "$REPO_ROOT/.venv/bin/activate"
 export PYTHON="$REPO_ROOT/.venv/bin/python"
 
@@ -51,15 +55,16 @@ export PYTHON="$REPO_ROOT/.venv/bin/python"
   -r "$REPO_ROOT/requirements.txt"
 ```
 
-本次验证安装得到 `drake 1.49.0`、`trimesh 4.11.0` 和
+需要已安装Python 3.11及venv支持。现有验证环境为 `drake 1.49.0`、`trimesh 4.11.0` 和
 `manipulation 2025.10.20`。
 
-这里的“本次”指第5节所述历史发布验证，不是当前迁移收尾又做了一次安装。
+依赖版本保持原requirements锁定值；相机时间端口fallback仅为Drake 1.49.0的
+已知导出问题启用，不能随意升级Drake并假定fallback仍适用。
 
 准备运行输出和可写缓存目录：
 
 ```bash
-export QUICKSTART_ROOT="${TMPDIR:-/tmp}/online-env-v0.2-quickstart"
+export QUICKSTART_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/online-env-v0.3-quickstart-XXXXXX")"
 export CACHE_ROOT="$QUICKSTART_ROOT/cache"
 export MPLCONFIGDIR="$CACHE_ROOT/matplotlib"
 export MESA_SHADER_CACHE_DIR="$CACHE_ROOT/mesa"
@@ -69,6 +74,7 @@ export PYTHONPATH="$REPO_ROOT"
 mkdir -p "$MPLCONFIGDIR"
 mkdir -p "$MESA_SHADER_CACHE_DIR"
 mkdir -p "$PYTHONPYCACHEPREFIX"
+mkdir -p "$REPO_ROOT/output"
 ```
 
 ### 生成 Zerith OBJ
@@ -85,15 +91,17 @@ cd "$REPO_ROOT"
 成功时检查结果包含：
 
 ```text
-OBJ meshes: 35
+OBJ meshes: 43
 Source URDF mesh references: 70
-Generated URDF mesh references: 57
+Generated URDF mesh references: 65
 Collision geometries: 53
 ```
 
-以上是 v0.2 历史转换器输出。当前 HEAD `b433ee6` 的指部碰撞修复使用转换器
-v5：35个visual OBJ加8个collision OBJ（共43个），53个collision；不要拿
-旧输出数量检查当前开发工作树，也不要为匹配旧数量回退模型。
+v0.3继承 `b433ee6` 的指部碰撞修复，使用转换器v5：35个visual OBJ加8个
+collision OBJ（共43个），53个collision。源submodule固定为
+`ddd6dc76ec9ec0a8ebd597d5576e466e11aa72be`，清单位于
+`models/zerith_drake/conversion_manifest.json`。转换器版本5是模型格式/生成器
+版本，不是PUBLIC_API_VERSION，不应改成0.3。不要复用旧v0.2指部OBJ来省略生成。
 
 ## 2. 自包含 smoke：最小公共 API
 
@@ -109,7 +117,7 @@ cd "$QUICKSTART_ROOT/public-api"
   --seed 0
 ```
 
-本次验证的实际输出为：
+该客户端的预期输出结构如下（浮点末位可能略有差异）：
 
 ```json
 {"seed": 0, "action_type": "HoldAction", "simulation_time_s": 0.10000000000000002, "joint_count": 9, "object_names": ["portable_object"], "reward": 0.0, "terminated": false, "truncated": false, "action_status": "accepted"}
@@ -196,7 +204,7 @@ RGB、原始米制深度、深度彩色图、label 彩色图和
 
 ## 4. PickLift 非便携演示
 
-### 为什么不能仅靠 v0.2 tag 运行
+### 为什么不能仅靠 v0.3 tag 运行
 
 固定 PickLift 已经验证成功，但它目前不是自包含交付。全新 clone 还需要：
 
@@ -218,18 +226,11 @@ RGB、原始米制深度、深度彩色图、label 彩色图和
 - `$REPO_ROOT/models/zerith_pick_eval/pick_lift_calibration.json`；
 - `$REPO_ROOT/models/zerith_pick_eval/package.xml`。
 
-理论上的派生链是“替换目标物体 → 静置验证 → 碰撞范围验证 → PREGRASP IK
-→ PICK_HOME 搜索”。但是在原样的 `online-env-v0.2` checkout 中，第一批旧版
-生成/验证脚本直接启动会在 `src.zerith_online_env` 与
-`src.online_manipulation.adapters.zerith` 之间触发循环导入：
-
-```text
-ImportError: cannot import name 'ALL_SERVO_CONFIGS' from partially initialized module 'src.zerith_online_env'
-```
-
-因此本文不提供一套声称能从原始场景独立重建上述四个文件的假命令，也不采用
-临时 import hack。v0.2 的 PickLift 应明确视为**需要维护者提供场景与派生文件
-的非便携演示**。修复该生成入口属于后续代码工作，不在本次文档修正范围内。
+派生链是“替换目标物体 → 静置验证 → 碰撞范围验证 → PREGRASP IK → PICK_HOME
+搜索”。v0.2旧脚本的循环导入已随共享Runtime迁移修复，但v0.3没有重新验收
+从原始SceneSmith场景到全部专家JSON的独立生成链。因此这里不提供未经验证的
+全链重建命令，仍按**需要维护者提供场景与派生文件的非便携演示**交付。
+环境构造本身不依赖专家文件；这些文件是固定PickLift专家Policy的前置条件。
 
 ### 检查外部资产
 
@@ -302,11 +303,11 @@ cd "$REPO_ROOT"
 该地址即可实时查看。若 7025 已占用，请选择一个空闲端口并同步修改
 `--meshcat-port`。
 
-本次全新 checkout 验证的结束输出为：
+v0.3最终实现的固定seed回归结束输出为（启用Meshcat时另打印地址）：
 
 ```text
 Meshcat URL: http://localhost:7025
-Episode 0: success=True, reason=lift_held, steps=276
+Episode 0: success=True, reason=lift_held, steps=277
 ```
 
 输出位于 `$PICK_OUTPUT`：
@@ -321,7 +322,7 @@ Episode 0: success=True, reason=lift_held, steps=276
 输入 DMD 不会被修改。输出目录不能预先存在；重新运行时请使用新的
 `PICK_OUTPUT` 或先选择另一个空目录。
 
-## 5. 本文档的全新 checkout 验证记录
+## 5. 历史v0.2全新 checkout 验证记录（不是v0.3重测）
 
 验证基线：
 
@@ -329,11 +330,10 @@ Episode 0: success=True, reason=lift_held, steps=276
 - 完整运行验证所用的代码基线：`23d656c75e31391bba843e59462f50610b3969f4`；
 - Zerith submodule：`ddd6dc76ec9ec0a8ebd597d5576e466e11aa72be`。
 
-发布后的 v0.2 tag 已更新，包含本中文 Quickstart。上述旧 commit 只记录
-完整运行验证的历史代码基线，不是更新后的 tag 指向；两者之间只修改了本文档，
-运行代码和模型保持一致。当前发布 commit 应以
-`git rev-parse 'online-env-v0.2^{commit}'` 的输出为准，checkout 检查也使用
-tag 解引用结果，避免把旧 commit 写死。
+历史v0.2 tag解引用为`682ba7c1168c49d2be4e71d7ba3d9fd48308d082`，包含中文
+Quickstart。上述23d656c只记录当时完整运行的代码基线；其后的两次提交仅修改
+Quickstart。该历史tag本次不动。**当前v0.3发布commit**使用
+`git rev-parse 'online-env-v0.3^{commit}'` 查询，第1节checkout也是v0.3。
 
 实际结果：
 
@@ -349,18 +349,19 @@ tag 解引用结果，避免把旧 commit 写死。
 | 补齐外部场景和四个派生文件后的 PickLift 相机验证 | 通过，`{"calibration": true, "picklift": true}` |
 | 补齐外部资产后的固定 PickLift | 通过，`lift_held`，276 steps |
 
-## 6. 当前工作树：移动底盘与双臂交接
+## 6. v0.3：移动底盘与双臂交接
 
-本节针对当前开发工作树，不意味着远端或`online-env-v0.2`已包含这些文件。安装/submodule/OBJ准备沿用上文；移动演示的场景在`models/mobile_scene`，不依赖SceneSmith外部场景或专家IK文件。不要为运行本节去切换tag、覆盖现有工作。
+本节随v0.3发布。安装/submodule/OBJ准备沿用上文；移动演示的场景在
+`models/mobile_scene`，不依赖SceneSmith外部场景或专家IK文件。
 
 ### 6.1 最快运行两种模式
 
 在当前仓库根、同一终端执行；直接使用`.venv`，无需activate：
 
 ```bash
-# 先在实际的 eval 仓库根目录执行；不要切换或覆盖当前工作树。
-export REPO_ROOT="$(pwd)"
+cd "$REPO_ROOT"
 export PYTHON="$REPO_ROOT/.venv/bin/python"
+mkdir -p "$REPO_ROOT/output"
 export MOBILE_OUTPUT="$(mktemp -d "$REPO_ROOT/output/mobile_handoff_XXXXXX")"
 
 "$PYTHON" -m examples.online_manipulation.navigation_manipulation --mode wheel_dynamic --output "$MOBILE_OUTPUT/wheel" --meshcat
@@ -458,13 +459,13 @@ Navigator只生成action，调用者仍负责`env.step(navigator.act(obs))`。
 
 已运行同一步双臂/夹爪、两模式直倒转、静态pose绕障、local目标固定、取消/无路径、零轮力矩隔离、移动相机和固定PickLift回归。完整端到端示例是在满足到达与停车阈值后做双臂关节动作及**空夹爪开合**，不是双臂协同抓物。
 
-动力学四辅助轮为零摩擦滑动支撑，非真实脚轮标定；导轨固定0.4m。尚未验证动态障碍、坡地、随机场景鲁棒性、移动中精细操作、双臂闭链/协同抓取、导轨动力学。本轮未重跑大规模测试或重新做全新clone交付验证，不把旧记录冒称新结果。
+动力学四辅助轮为零摩擦滑动支撑，非真实脚轮标定；导轨固定0.4m。尚未验证动态障碍、坡地、随机场景鲁棒性、移动中精细操作、双臂闭链/协同抓取、导轨动力学。最终实现已补跑既有150项全量（581.234s，全部通过）；发布收口不重跑已充分验收的底盘机制实验，也没有重新做全新安装。
 
 - [实现核验与曲线说明](BASE_MODE_IMPLEMENTATION_AUDIT.md)
 - [进度、操作阶段最大偏差及待提交分类](mobile_manipulation_progress.md)
 - `output/mobile_manipulation/manipulation_handoff_metrics.json`：已有HTML对应CSV的10Hz操作阶段统计，含参考时刻、全部样本、峰值时刻、源CSV哈希；物理子步峰值没有记录，明确缺失。
 
-## 7. 当前工作树：通用入口及收尾修复
+## 7. v0.3：通用入口及执行同步
 
 配置归属、单/双臂动作语义、RobotAdapter 执行器约定、相机采样和版本历史，
 统一见[通用接口契约](GENERIC_ONLINE_EXAMPLE.md)。整套变更与验收的对应表见

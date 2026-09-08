@@ -648,3 +648,78 @@ mobile架构文档承接后，再保留删除；不恢复旧文件。
 HEAD保持`b433ee6dd5b20017fd141adbbb5910347526c3a2`，v0.1/v0.2的tag对象及解引用
 commit均未变，三份旧文档删除保留。`git diff --check`通过。
 未暂存、提交、推送或修改tag；测试日志是ignored本地产物，不属于提交清单。
+
+## 17. v0.3提交与发布收口（2026-09-08）
+
+用户在§16核对后明确授权本地提交、推送用户fork、创建并推送annotated
+`online-env-v0.3`。因此前文“不提交/不推送/tag只读”保留为各阶段历史约束，
+不再代表本次发布授权；v0.1/v0.2依然不可移动。
+
+### 17.1 两组提交与版本提交
+
+- `a22da6c7c906c2f080efc3490f54aacfd2d00d3b`：第一组73个显式路径，运行链、
+  共享Runtime、具名接口/配置、示例、测试/fixtures和必要文档一起提交。
+- `7f33fc7`：第二组6个归属路径及README/Quickstart的报告链接hunk，保留
+  三份旧文档删除。独立审计工具不混入生产运行链。
+- 后续版本收口提交：`PUBLIC_API_VERSION`及唯一对应测试断言0.2→0.3；
+  README/Quickstart/GENERIC/架构映射更新，新增中文
+  `RELEASE_ONLINE_ENV_V0.3.md`。没有新增控制模式、修改抓取/物理/相机参数。
+  该最终commit由`online-env-v0.3^{commit}`标识，不在自己的文件内硬编码自身hash。
+
+每组均使用明确文件清单暂存、检查cached diff/stat及空白、核对内容归属和大小；
+第一组仅延后新审计报告链接，避免不可运行代码拆分和中间断链。输出、临时文件、
+OBJ、环境目录均未暂存，原先已提交的b433ee6模型修复通过历史继承。
+
+### 17.2 验证复用与版本针对性检查
+
+两组提交后实现/配置聚合指纹仍为§16.1的
+`ba5985d5c181f57fa5efedee614b38e684c13244afbdbdc49c6491f53b23a3e5`。
+版本收口的Python差异仅为公开版本字符串和测试期待值；没有实现变化或合并
+冲突，因此复用最终全量**150项/581.234s/OK**，不重复大规模物理实验。
+
+本次实际命令（仓库根起步，使用本地既有.venv）：
+
+```bash
+export REPO_ROOT="$(pwd)"
+export PYTHON="$REPO_ROOT/.venv/bin/python"
+PYTHONPATH=tests:. MPLCONFIGDIR=/tmp/mpl "$PYTHON" -B -m unittest tests.test_online_api_contracts -v
+"$PYTHON" -B scripts/convert_zerith_for_drake.py --check
+cd /tmp
+PYTHONPATH="$REPO_ROOT" MPLCONFIGDIR=/tmp/mpl "$PYTHON" -B "$REPO_ROOT/examples/online_manipulation/public_api_client.py" --repository-root "$REPO_ROOT" --seed 0
+```
+
+结果分别为：
+
+- 14项/0.002s/OK，公开版本断言0.3；这是重叠针对性测试，不加成164项。
+- `Check passed`，源commit `ddd6dc76ec9ec0a8ebd597d5576e466e11aa72be`，
+  OBJ=43、源引用70、派生引用65、collision=53。仅check，本次没有重新生成模型。
+- 仓库外客户端退出0，实际stdout：
+
+```json
+{"seed": 0, "action_type": "HoldAction", "simulation_time_s": 0.10000000000000002, "joint_count": 9, "object_names": ["portable_object"], "reward": 0.0, "terminated": false, "truncated": false, "action_status": "accepted"}
+```
+
+本次没有重新做全新.venv安装、移动底盘机制实验或PickLift物理episode；
+已有150项全量、固定277步及底盘机制证据按对应阶段归属复用。
+
+发布文档检查：Quickstart的15个bash块、发布说明的2个bash块均通过`bash -n`；
+README/Quickstart/GENERIC/发布说明的本地文件链接均存在。首次对README所有
+bash块做语法检查时，旧研究脚本模板的`<x>`占位符触发语法错误；已明确标记
+这些为参数模板，发布smoke以Quickstart完整命令为准，不声称模板可直接执行。
+
+### 17.3 远端基线与发布约束
+
+发布前只读核验：当前分支`dev/wzh`；origin fetch仍指向作者仓库，**push URL**
+为`git@github.com:Zihan-W/scenesmith-simple-planner-eval.git`。
+只向此用户fork推送`dev/wzh`及v0.3指定tag，禁用隐式followTags，不force push。
+初次检查远端dev/wzh为682ba7c，是本地HEAD祖先，无远端独有提交需合并；
+本地和远端均无v0.3。
+
+v0.1保留对象`2781df041d2382d8d9d3680e1edda321e3b81403`，解引用
+`25eb9a40586c6234ae71b87b8ac4c6629702d0f6`；v0.2保留对象
+`d80d1b41b329b6c047b67b3b18f62f143d6f4c74`，解引用
+`682ba7c1168c49d2be4e71d7ba3d9fd48308d082`。
+
+发布门禁：正常推送分支后在最终版本提交创建annotated v0.3并显式推送；
+若远端已出现同名tag则不覆盖。最终核对分支commit、tag对象及解引用commit、
+旧tag不变和本地工作树；结果由发布回报及远端Git refs给出，不伪造提前成功记录。
