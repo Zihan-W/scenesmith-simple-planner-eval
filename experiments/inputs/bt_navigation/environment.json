@@ -3,7 +3,7 @@
   "extraction": {
     "method": "scenesmith_runtime_reset_and_drake_proximity_geometry",
     "extractor": "scripts/extract_bt_environment.py",
-    "generated_at_utc": "2026-09-10T11:13:54.016018+00:00",
+    "generated_at_utc": "2026-09-10T11:47:06.646722+00:00",
     "reset_seed": 0,
     "reset_time_s": 0.0,
     "experiment": "/root/workspace/scenesmith-simple-planner-eval/experiments/navigation_wheel_dynamic.json",

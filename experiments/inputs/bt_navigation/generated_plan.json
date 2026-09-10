@@ -1,88 +1,97 @@
 {
   "schema": "scenesmith.vlm_bt.generated.v1",
-  "raw_response": "{\"MAIN_SEQUENCE\":\"sequence {action [Wait, \\\"2.0\\\"] action [NavigateTo, \\\"2.8\\\", \\\"0.0\\\", \\\"0.0\\\", \\\"world\\\"] action [SetDualJointTargets, \\\"-0.08\\\", \\\"0.06\\\", \\\"0.055\\\", \\\"0.4\\\"]}\",\"ULTIMATE_GOAL\":\"ParkedDualTargetsReached\"}\n",
+  "raw_response": "{\n  \"MAIN_SEQUENCE\": \"sequence {\\naction [Wait, \\\"2.0\\\"]\\naction [NavigateTo, \\\"2.8\\\", \\\"0.0\\\", \\\"0.0\\\", \\\"world\\\"]\\naction [SetDualJointTargets, \\\"-0.08\\\", \\\"0.06\\\", \\\"0.055\\\", \\\"0.4\\\"]\\n}\",\n  \"ULTIMATE_GOAL\": \"ParkedDualTargetsReached\"\n}\n",
   "parsed_response": {
-    "MAIN_SEQUENCE": "sequence {action [Wait, \"2.0\"] action [NavigateTo, \"2.8\", \"0.0\", \"0.0\", \"world\"] action [SetDualJointTargets, \"-0.08\", \"0.06\", \"0.055\", \"0.4\"]}",
+    "MAIN_SEQUENCE": "sequence {\naction [Wait, \"2.0\"]\naction [NavigateTo, \"2.8\", \"0.0\", \"0.0\", \"world\"]\naction [SetDualJointTargets, \"-0.08\", \"0.06\", \"0.055\", \"0.4\"]\n}",
     "ULTIMATE_GOAL": "ParkedDualTargetsReached"
   },
   "generation": {
-    "mode": "vlm_runtime_extracted_metadata",
-    "transport": "chat_completions_curl",
-    "created_at": "2026-09-10T11:28:46.037012+00:00",
+    "mode": "multimodal_vlm_scene_image_and_runtime_extracted_metadata",
+    "transport": "chat_completions_curl_http1_1",
+    "created_at": "2026-09-10T11:50:57.761337+00:00",
+    "requested_model": "gpt-4.1-mini-2025-04-14",
     "calls": [
       {
         "attempt": 1,
-        "model": "gpt-4o-mini-2024-07-18",
+        "model": "gpt-4.1-mini-2025-04-14",
         "usage": {
-          "completion_tokens": 115,
+          "prompt_tokens": 885,
+          "completion_tokens": 108,
+          "total_tokens": 993,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0
+          },
           "completion_tokens_details": {
-            "accepted_prediction_tokens": 0,
-            "audio_tokens": 0,
             "reasoning_tokens": 0,
+            "audio_tokens": 0,
+            "accepted_prediction_tokens": 0,
             "rejected_prediction_tokens": 0
           },
           "latency_checkpoint": {
-            "engine_tbt_ms": 15,
-            "engine_ttft_ms": 65,
-            "engine_ttlt_ms": 1773,
-            "pre_inference_ms": 120,
-            "service_tbt_ms": 15,
-            "service_ttft_ms": 224,
-            "service_ttlt_ms": 1917,
-            "user_visible_ttft_ms": 104
-          },
-          "prompt_tokens": 374,
-          "prompt_tokens_details": {
-            "audio_tokens": 0,
-            "cached_tokens": 0
-          },
-          "total_tokens": 489
+            "service_ttft_ms": 437,
+            "user_visible_ttft_ms": 232,
+            "pre_inference_ms": 205,
+            "service_tbt_ms": 11,
+            "service_ttlt_ms": 1591,
+            "engine_ttft_ms": 93,
+            "engine_ttlt_ms": 1259,
+            "engine_tbt_ms": 11
+          }
         },
         "finish_reason": "stop"
       },
       {
         "attempt": 2,
-        "model": "gpt-4o-mini-2024-07-18",
+        "model": "gpt-4.1-mini-2025-04-14",
         "usage": {
-          "completion_tokens": 80,
+          "prompt_tokens": 1071,
+          "completion_tokens": 93,
+          "total_tokens": 1164,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0
+          },
           "completion_tokens_details": {
-            "accepted_prediction_tokens": 0,
-            "audio_tokens": 0,
             "reasoning_tokens": 0,
+            "audio_tokens": 0,
+            "accepted_prediction_tokens": 0,
             "rejected_prediction_tokens": 0
           },
           "latency_checkpoint": {
-            "engine_tbt_ms": 15,
-            "engine_ttft_ms": 69,
-            "engine_ttlt_ms": 1260,
-            "pre_inference_ms": 121,
-            "service_tbt_ms": 15,
-            "service_ttft_ms": 220,
-            "service_ttlt_ms": 1407,
-            "user_visible_ttft_ms": 100
-          },
-          "prompt_tokens": 600,
-          "prompt_tokens_details": {
-            "audio_tokens": 0,
-            "cached_tokens": 0
-          },
-          "total_tokens": 680
+            "service_ttft_ms": 597,
+            "user_visible_ttft_ms": 227,
+            "pre_inference_ms": 370,
+            "service_tbt_ms": 9,
+            "service_ttlt_ms": 1415,
+            "engine_ttft_ms": 59,
+            "engine_ttlt_ms": 733,
+            "engine_tbt_ms": 7
+          }
         },
         "finish_reason": "stop"
       }
     ],
-    "prompt_file": "planning_prompt_compact.txt",
-    "prompt_sha256": "c38d20dc063d1f3306ce0e5cddcde248a5fa1c3d9022f739383ade68fd3507d5",
+    "transport_failures_before_first_response": 5,
+    "prompt_file": "planning_prompt.txt",
+    "prompt_sha256": "75bc40ac174308c70fb8ba16a767c9704a6b63366751e5963bbc164f3af354d4",
     "full_extracted_environment_file": "extracted_environment.json",
-    "full_extracted_environment_sha256": "bf8f970cc1d63313c9cea56ef5486d9ba4cc74bab8301b4da0d98a1e3c4ff08d",
+    "full_extracted_environment_sha256": "5ec5acf19c10944da018ecf8738be297b3523f0dcbbe830a2ded18f614152d17",
     "metadata_extraction_method": "scenesmith_runtime_reset_and_drake_proximity_geometry",
-    "scene_image_used": false,
+    "scene_image_used": true,
+    "image_path": "scene_input.jpg",
+    "image_sha256": "5d0b4300e604c2fd728b9091f50955dd394f9fef298a61e8d577aca57edfe46f",
+    "image_size_px": [
+      480,
+      360
+    ],
+    "image_description": "Meshcat screenshot of the Zerith mobile robot and blue navigation obstacle.",
     "reference_answer_provided": false,
     "accepted_response_attempt": 2,
     "validation_feedback": [
       {
         "attempt": 1,
-        "error": "Action nodes did not use the required bracketed, comma-separated MDSL signatures."
+        "error": "MAIN_SEQUENCE was a JSON object; strict compiler requires one nonempty MDSL string."
       }
     ]
   },
