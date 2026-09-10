@@ -1,0 +1,28 @@
+{
+  "schema": "scenesmith.bt.task_plan.v1",
+  "task": "navigate_around_obstacle_then_pose_both_arms",
+  "success_condition": "ParkedDualTargetsReached",
+  "steps": [
+    {
+      "skill": "Wait",
+      "duration_s": 2.0
+    },
+    {
+      "skill": "NavigateTo",
+      "goal": {
+        "xyz_m": [2.8, 0.0, 0.0],
+        "yaw_rad": 0.0,
+        "frame_id": "world"
+      }
+    },
+    {
+      "skill": "SetDualJointTargets",
+      "arm_target_rad": -0.08,
+      "gripper_widths_m": {
+        "left": 0.06,
+        "right": 0.055
+      },
+      "hold_s": 0.4
+    }
+  ]
+}

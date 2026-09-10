@@ -1,0 +1,148 @@
+{
+  "schema": "scenesmith.vlm_bt.generated.v1",
+  "raw_response": "{\"MAIN_SEQUENCE\":\"sequence {action [Wait, \\\"2.0\\\"] action [NavigateTo, \\\"2.8\\\", \\\"0.0\\\", \\\"0.0\\\", \\\"world\\\"] action [SetDualJointTargets, \\\"-0.08\\\", \\\"0.06\\\", \\\"0.055\\\", \\\"0.4\\\"]}\",\"ULTIMATE_GOAL\":\"ParkedDualTargetsReached\"}\n",
+  "parsed_response": {
+    "MAIN_SEQUENCE": "sequence {action [Wait, \"2.0\"] action [NavigateTo, \"2.8\", \"0.0\", \"0.0\", \"world\"] action [SetDualJointTargets, \"-0.08\", \"0.06\", \"0.055\", \"0.4\"]}",
+    "ULTIMATE_GOAL": "ParkedDualTargetsReached"
+  },
+  "generation": {
+    "mode": "vlm_runtime_extracted_metadata",
+    "transport": "chat_completions_curl",
+    "created_at": "2026-09-10T11:28:46.037012+00:00",
+    "calls": [
+      {
+        "attempt": 1,
+        "model": "gpt-4o-mini-2024-07-18",
+        "usage": {
+          "completion_tokens": 115,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "latency_checkpoint": {
+            "engine_tbt_ms": 15,
+            "engine_ttft_ms": 65,
+            "engine_ttlt_ms": 1773,
+            "pre_inference_ms": 120,
+            "service_tbt_ms": 15,
+            "service_ttft_ms": 224,
+            "service_ttlt_ms": 1917,
+            "user_visible_ttft_ms": 104
+          },
+          "prompt_tokens": 374,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 489
+        },
+        "finish_reason": "stop"
+      },
+      {
+        "attempt": 2,
+        "model": "gpt-4o-mini-2024-07-18",
+        "usage": {
+          "completion_tokens": 80,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "latency_checkpoint": {
+            "engine_tbt_ms": 15,
+            "engine_ttft_ms": 69,
+            "engine_ttlt_ms": 1260,
+            "pre_inference_ms": 121,
+            "service_tbt_ms": 15,
+            "service_ttft_ms": 220,
+            "service_ttlt_ms": 1407,
+            "user_visible_ttft_ms": 100
+          },
+          "prompt_tokens": 600,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 680
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "prompt_file": "planning_prompt_compact.txt",
+    "prompt_sha256": "c38d20dc063d1f3306ce0e5cddcde248a5fa1c3d9022f739383ade68fd3507d5",
+    "full_extracted_environment_file": "extracted_environment.json",
+    "full_extracted_environment_sha256": "bf8f970cc1d63313c9cea56ef5486d9ba4cc74bab8301b4da0d98a1e3c4ff08d",
+    "metadata_extraction_method": "scenesmith_runtime_reset_and_drake_proximity_geometry",
+    "scene_image_used": false,
+    "reference_answer_provided": false,
+    "accepted_response_attempt": 2,
+    "validation_feedback": [
+      {
+        "attempt": 1,
+        "error": "Action nodes did not use the required bracketed, comma-separated MDSL signatures."
+      }
+    ]
+  },
+  "mdsl": "root {\n    selector {\n        condition [ParkedDualTargetsReached]\n        sequence {\n            action [Wait, \"2.0\"]\n            action [NavigateTo, \"2.8\", \"0.0\", \"0.0\", \"world\"]\n            action [SetDualJointTargets, \"-0.08\", \"0.06\", \"0.055\", \"0.4\"]\n        }\n    }\n}\n",
+  "mdsl_sha256": "431eca2f8473edd30f7bd30832033d444d48a59ce8119b2a28a1e0f5f777052b",
+  "tree": {
+    "kind": "root",
+    "name": "",
+    "args": [],
+    "children": [
+      {
+        "kind": "selector",
+        "name": "",
+        "args": [],
+        "children": [
+          {
+            "kind": "condition",
+            "name": "ParkedDualTargetsReached",
+            "args": [],
+            "children": []
+          },
+          {
+            "kind": "sequence",
+            "name": "",
+            "args": [],
+            "children": [
+              {
+                "kind": "action",
+                "name": "Wait",
+                "args": [
+                  "2.0"
+                ],
+                "children": []
+              },
+              {
+                "kind": "action",
+                "name": "NavigateTo",
+                "args": [
+                  "2.8",
+                  "0.0",
+                  "0.0",
+                  "world"
+                ],
+                "children": []
+              },
+              {
+                "kind": "action",
+                "name": "SetDualJointTargets",
+                "args": [
+                  "-0.08",
+                  "0.06",
+                  "0.055",
+                  "0.4"
+                ],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
