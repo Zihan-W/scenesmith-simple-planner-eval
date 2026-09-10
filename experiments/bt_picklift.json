@@ -1,0 +1,23 @@
+{
+  "robot": "zerith_left",
+  "control": "picklift",
+  "initial_state": "picklift",
+  "scene": "scenesmith",
+  "scene_options": {
+    "variant": "furniture_welded",
+    "overrides": "experiments/inputs/pick_lift/scene_overrides.yaml",
+    "additional_package_xmls": ["models/zerith_pick_eval/package.xml"]
+  },
+  "policy": "examples.online_manipulation.generated_bt_picklift:make_policy",
+  "policy_options": {
+    "environment_input": "experiments/inputs/bt_picklift/environment.json",
+    "task_plan_input": "experiments/inputs/bt_picklift/task_plan.json",
+    "generated_plan_input": "experiments/inputs/bt_picklift/generated_plan.json",
+    "expert_inputs": "experiments/inputs/pick_lift",
+    "expert_calibration": "experiments/inputs/pick_lift/pick_lift_calibration.json"
+  },
+  "task": "picklift",
+  "evaluator": "task_result",
+  "requires": {"arms": ["left"], "grippers": ["left"]},
+  "run": {"seeds": [500], "max_steps": 1200}
+}

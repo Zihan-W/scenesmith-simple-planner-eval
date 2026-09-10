@@ -1,0 +1,275 @@
+{
+  "schema": "scenesmith.verigraph_pick.environment.v1",
+  "runtime_snapshot": {
+    "schema": "scenesmith.picklift.runtime_snapshot.v1",
+    "extraction": {
+      "method": "scenesmith_runtime_reset",
+      "generated_at_utc": "2026-09-10T12:25:17.529926+00:00",
+      "seed": 500,
+      "experiment": "/root/workspace/scenesmith-simple-planner-eval/experiments/picklift.json",
+      "experiment_sha256": "03755b3eaf519bebdaf2f2752b9244bee07c0f68e5ebccd5d1a96f3982dcb448",
+      "scene_dmd": "/tmp/pick-vg-cache-jguvDb/packages/scene/combined_house/house_furniture_welded.dmd.yaml",
+      "scene_dmd_sha256": "e7b736a9e6ddbf280ab7f660fbf98ca7e8549fb8842465608cf67d8110189a25",
+      "robot_model": "/root/workspace/scenesmith-simple-planner-eval/models/zerith_drake",
+      "robot_urdf_sha256": "6823d04e61b96f17c7b5c8dfb7c29cc51763d8e696574d05783d3bf454fcc9bc",
+      "reset_info": {
+        "policy_dt": 0.1,
+        "episode_randomization": {},
+        "base_mode": "fixed",
+        "seed": 500,
+        "task_reset": {
+          "task_name": "pick_lift",
+          "target": "pick_target",
+          "initial_height_m": 0.5107438948291487
+        }
+      }
+    },
+    "robot": {
+      "name": "zerith_left_arm",
+      "controlled_joints": [
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_yaw_joint",
+        "left_wrist_pitch_joint",
+        "left_jaw_left_finger_joint",
+        "left_jaw_right_finger_joint"
+      ],
+      "q": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "gripper_width_m": 0.07628,
+      "end_effector_pose": {
+        "translation_m": [
+          2.0432000009999993,
+          2.7700010500000007,
+          0.7003047899999999
+        ],
+        "quaternion_wxyz": [
+          6.123233995736766e-17,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "objects": {
+      "pick_target": {
+        "pose": {
+          "translation_m": [
+            1.983109433597935,
+            2.7700010500000007,
+            0.5107438948291487
+          ],
+          "quaternion_wxyz": [
+            0.9999975416156278,
+            -0.00046657449015760215,
+            -0.00014341975101351376,
+            0.0021629844476423283
+          ]
+        },
+        "spatial_velocity": {
+          "rotational_rad_s": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "translational_m_s": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "task": {
+      "target_observation_name": "pick_target",
+      "gripper_contact_bodies": [
+        "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+        "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link"
+      ],
+      "target_contact_body": "living_room_box_0::base_link",
+      "support_contact_bodies": [
+        "living_room_coffee_table_0::base_link"
+      ],
+      "required_lift_m": 0.08,
+      "required_hold_s": 3.0,
+      "maximum_target_translational_speed_m_s": 0.02,
+      "maximum_target_rotational_speed_rad_s": 0.5,
+      "maximum_allowed_contact_penetration_m": 0.0001,
+      "carrier_arm_name": "left",
+      "carrier_gripper_name": "left",
+      "reset_observation": {
+        "task_name": "pick_lift",
+        "target": "pick_target",
+        "lift_m": 0.0,
+        "required_lift_m": 0.08,
+        "held_above_threshold_s": 0.0,
+        "required_hold_s": 3.0,
+        "finger_contacts": [
+          false,
+          false
+        ],
+        "bilateral_gripper_contact": false,
+        "support_contact": true,
+        "unexpected_target_contacts": [],
+        "target_translational_speed_m_s": 0.0,
+        "target_rotational_speed_rad_s": 0.0,
+        "success": false,
+        "evaluation": {
+          "success": false,
+          "reason": "running",
+          "metrics": {}
+        }
+      },
+      "initial_relation_from_task_binding": "pick_target, on, living_room_coffee_table_0"
+    },
+    "available_bt_skills": [
+      "Wait",
+      "ExecutePickLift",
+      "PickLiftSucceeded"
+    ]
+  },
+  "verigraph": {
+    "parser": "verigraph.core.parse.parse_llm_response_to_graph",
+    "checker": "verigraph.core.simple_plan_checker.SimplePlanChecker",
+    "upstream_commit": "5c07fb8f228049e228b53637e3867650f6854fa5",
+    "catalog": {
+      "semantic_map_locations": {
+        "pick_station": "SceneSmith living-room PickLift work area"
+      },
+      "location_asset_relations": {
+        "pick_station": [
+          "living_room_coffee_table_0"
+        ]
+      },
+      "check_location": "pick_station",
+      "entities": {
+        "pick_target": {
+          "kind": "object",
+          "movable": true,
+          "can_contain": false,
+          "can_support": false,
+          "description": "small red rectangular PickLift target"
+        },
+        "living_room_coffee_table_0": {
+          "kind": "asset",
+          "movable": false,
+          "can_contain": false,
+          "can_support": true,
+          "description": "living-room coffee table supporting the red target"
+        }
+      }
+    },
+    "scene_graph": {
+      "nodes": [
+        "living_room_coffee_table_0",
+        "pick_target"
+      ],
+      "relations": [
+        "pick_target, on, living_room_coffee_table_0"
+      ]
+    },
+    "metadata": {
+      "environment": {
+        "semantic_map_locations": {
+          "pick_station": "SceneSmith living-room PickLift work area"
+        },
+        "objects_metadata": {
+          "pick_target": {
+            "kind": "object",
+            "movable": true,
+            "can_contain": false,
+            "can_support": false,
+            "description": "small red rectangular PickLift target"
+          }
+        },
+        "assets_metadata": {
+          "living_room_coffee_table_0": {
+            "kind": "asset",
+            "movable": false,
+            "can_contain": false,
+            "can_support": true,
+            "description": "living-room coffee table supporting the red target"
+          }
+        },
+        "asset_object_relations": {
+          "living_room_coffee_table_0": [
+            "(on_something)pick_target"
+          ],
+          "pick_target": []
+        },
+        "location_asset_relations": {
+          "pick_station": [
+            "living_room_coffee_table_0"
+          ]
+        },
+        "scene_graph": {
+          "nodes": [
+            "living_room_coffee_table_0",
+            "pick_target"
+          ],
+          "relations": [
+            "pick_target, on, living_room_coffee_table_0"
+          ]
+        }
+      }
+    },
+    "perception_manifest": {
+      "perception": "vlm",
+      "model_calls": [
+        {
+          "model": "gpt-4.1-mini-2025-04-14",
+          "usage": {
+            "prompt_tokens": 1180,
+            "completion_tokens": 276,
+            "total_tokens": 1456,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "latency_checkpoint": {
+              "service_ttft_ms": 552,
+              "user_visible_ttft_ms": 244,
+              "pre_inference_ms": 308,
+              "service_tbt_ms": 12,
+              "service_ttlt_ms": 3992,
+              "engine_ttft_ms": 115,
+              "engine_ttlt_ms": 3562,
+              "engine_tbt_ms": 12
+            }
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "model_api_calls_completed": 1
+    },
+    "input_sha256": {
+      "catalog": "1fa1216171fc907b99028d318414289a44ec4dcc946aa3a7e1c9cccfd0a496a3",
+      "scene_graph": "92b5a52a73f57e2fc70f210bfbbe434fa3431a7be8b0e7a99968fd07050abf44",
+      "metadata": "e535450726b4ed7d1a11695381e1ddb6b45832fc6d53e4bc9586a266bd98f414",
+      "perception_manifest": "dc803dcee40da7da25e0b24838a6f805a8c08109912e20a50039c5212c58e0c6"
+    }
+  },
+  "available_skills": [
+    "Wait",
+    "ExecutePickLift",
+    "PickLiftSucceeded"
+  ]
+}

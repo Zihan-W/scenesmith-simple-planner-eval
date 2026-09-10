@@ -1,0 +1,153 @@
+{
+  "schema": "scenesmith.microsoft_picklift.generated.v1",
+  "raw_response": "{\n  \"MAIN_SEQUENCE\": \"sequence { action [Wait, \\\"1.0\\\"] action [ExecutePickLift] }\",\n  \"ULTIMATE_GOAL\": \"The red pick_target is lifted by at least 0.08 meters and held stably for at least 3.0 seconds.\"\n}\n",
+  "parsed_response": {
+    "MAIN_SEQUENCE": "sequence { action [Wait, \"1.0\"] action [ExecutePickLift] }",
+    "ULTIMATE_GOAL": "The red pick_target is lifted by at least 0.08 meters and held stably for at least 3.0 seconds."
+  },
+  "generation": {
+    "architecture": "Microsoft scene-aware robot BT planner prompt adaptation",
+    "microsoft_upstream_commit": "efebc2b0883249a63c7b2a47e504727e4f327a21",
+    "microsoft_prompt_sha256": {
+      "system.txt": "bfc00de1a4790959d164987f4ecdd2e1620dfa0f7f63c83ed54f9560851ef70c",
+      "role_prompt.txt": "4e5ebe8c8e7410d9a9993bc55837d5c883a1f42719d8cd87a250a75788fd76db",
+      "environment_prompt.txt": "e982a139c7942d4b13a0eb1221eb834081f1cebcc4c053246514bc1d5cedb33d",
+      "output_prompt.txt": "4ee04bc7caf594021e16b268d3e2c136f757ed03459c168dab5b2f3dfb6309f2",
+      "action_prompt.txt": "904ea1969c46a3c8aa055395881da1c33f87e56dca8580df43d05ad8aceec604",
+      "query.txt": "f48a847e6f0e42851213b9c23769124cccdcbfb8a9609d88a14d7d5b4c2cfc0b"
+    },
+    "microsoft_prompt_files_used": [
+      "system.txt",
+      "role_prompt.txt",
+      "environment_prompt.txt",
+      "output_prompt.txt",
+      "action_prompt.txt",
+      "query.txt"
+    ],
+    "microsoft_example_prompt_used": false,
+    "model_requested": "gpt-4.1-mini-2025-04-14",
+    "multimodal": true,
+    "scene_image": {
+      "path": "/home/hchen82/robot_agent/runs/scenesmith-picklift-verigraph-bt-20260910/input/picklift_initial_planner.jpg",
+      "sha256": "c660570a1be30e6766e54b6f6486a0eb14e669153b70b7c12f31183893bbd25e"
+    },
+    "environment_sha256": "c79ac71d2154dcaba6ca372024e7863821cece3ea54c749558cca564ad284f1a",
+    "independent_generation_trial": 3,
+    "reference_answer_used": false,
+    "generation_contract_contains_complete_bt": false,
+    "model_returned": "gpt-4.1-mini-2025-04-14",
+    "finish_reason": "stop",
+    "provider_response_id": "chatcmpl-EMc7SzKckj0gIbzRJBfBTyJHoLdPY",
+    "api_calls_completed": 2,
+    "accepted_attempt": 2,
+    "attempts": [
+      {
+        "attempt": 1,
+        "provider_response_id": "chatcmpl-EMc6ofK8QSLT5LboZFuzxOR2nHSai",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "usage": {
+          "prompt_tokens": 2345,
+          "completion_tokens": 88,
+          "total_tokens": 2433,
+          "prompt_tokens_details": {
+            "cached_tokens": 2176,
+            "audio_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "audio_tokens": 0,
+            "accepted_prediction_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "latency_checkpoint": {
+            "service_ttft_ms": 1035,
+            "user_visible_ttft_ms": 728,
+            "pre_inference_ms": 307,
+            "service_tbt_ms": 12,
+            "service_ttlt_ms": 2050,
+            "engine_ttft_ms": 149,
+            "engine_ttlt_ms": 1169,
+            "engine_tbt_ms": 12
+          }
+        },
+        "finish_reason": "stop",
+        "validation_error": "Markdown/code fence and MAIN_SEQUENCE list rejected by strict compiler"
+      },
+      {
+        "attempt": 2,
+        "provider_response_id": "chatcmpl-EMc7SzKckj0gIbzRJBfBTyJHoLdPY",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "usage": {
+          "prompt_tokens": 2497,
+          "completion_tokens": 63,
+          "total_tokens": 2560,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "audio_tokens": 0,
+            "accepted_prediction_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "latency_checkpoint": {
+            "service_ttft_ms": 580,
+            "user_visible_ttft_ms": 338,
+            "pre_inference_ms": 243,
+            "service_tbt_ms": 13,
+            "service_ttlt_ms": 1429,
+            "engine_ttft_ms": 192,
+            "engine_ttlt_ms": 1046,
+            "engine_tbt_ms": 14
+          }
+        },
+        "finish_reason": "stop",
+        "validation_error": null
+      }
+    ]
+  },
+  "mdsl": "root {\n    selector {\n        condition [PickLiftSucceeded]\n        sequence {\n            action [Wait, \"1.0\"]\n            action [ExecutePickLift]\n        }\n    }\n}\n",
+  "mdsl_sha256": "4ab878eb8ec17ce0fc2f4f4c2a1f4f13a7df7de1346a59cb26bc100a4f45b62f",
+  "tree": {
+    "kind": "root",
+    "name": "",
+    "args": [],
+    "children": [
+      {
+        "kind": "selector",
+        "name": "",
+        "args": [],
+        "children": [
+          {
+            "kind": "condition",
+            "name": "PickLiftSucceeded",
+            "args": [],
+            "children": []
+          },
+          {
+            "kind": "sequence",
+            "name": "",
+            "args": [],
+            "children": [
+              {
+                "kind": "action",
+                "name": "Wait",
+                "args": [
+                  "1.0"
+                ],
+                "children": []
+              },
+              {
+                "kind": "action",
+                "name": "ExecutePickLift",
+                "args": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
