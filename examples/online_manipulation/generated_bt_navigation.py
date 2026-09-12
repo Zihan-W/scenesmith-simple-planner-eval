@@ -449,6 +449,10 @@ class GeneratedBehaviorTreePolicy:
             "tamp_used": False,
         }
 
+    def behavior_tree_visualization(self):
+        """Return the static tree used by the synchronized Meshcat overlay."""
+        return {"title": "Navigation Behavior Tree", "tree": to_dict(self.root)}
+
     def _tick(self, node, path, observation):
         if node.kind == "root":
             return self._tick(node.children[0], f"{path}.0", observation)

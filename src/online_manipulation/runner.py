@@ -14,6 +14,11 @@ import numpy as np
 from src.online_manipulation.actions import RobotAction
 from src.online_manipulation.observations import Observation
 from src.online_manipulation.protocols import OnlineEnvironment, Policy, StoppablePolicy
+from src.online_manipulation.recording_overlay import (
+    inject_behavior_tree_overlay,
+    policy_behavior_tree_timeline,
+    write_behavior_tree_timeline,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -388,6 +393,16 @@ def run_episode(
             html_path = destination / "simulation.html"
             env.save_recording(html_path)
             artifacts["simulation_html"] = str(html_path)
+            bt_timeline = policy_behavior_tree_timeline(
+                policy=policy,
+                trace=trace,
+                recording_start_time_s=initial_time_s,
+            )
+            if bt_timeline is not None:
+                timeline_path = destination / "bt_timeline.json"
+                write_behavior_tree_timeline(timeline_path, bt_timeline)
+                inject_behavior_tree_overlay(html_path, bt_timeline)
+                artifacts["bt_timeline_json"] = str(timeline_path)
         if write_final_dmd:
             dmd_path = destination / "final.dmd.yaml"
             updated_bodies = env.write_updated_scenario(dmd_path)

@@ -127,6 +127,36 @@ class _TerminalDiagnosticPolicy(_Policy):
         }
 
 
+class _BehaviorTreePolicy(_Policy):
+    """Expose the BT protocol consumed by the recording overlay."""
+
+    def diagnostics(self):
+        return {
+            "controller": "behavior_tree",
+            "tree_status": "RUNNING",
+            "active_path": "0.0",
+            "reason": "",
+        }
+
+    def behavior_tree_visualization(self):
+        return {
+            "title": "Runner test BT",
+            "tree": {
+                "kind": "root",
+                "name": "",
+                "args": [],
+                "children": [
+                    {
+                        "kind": "action",
+                        "name": "Hold",
+                        "args": [],
+                        "children": [],
+                    }
+                ],
+            },
+        }
+
+
 class _Environment:
     """Two-step deterministic online environment used by runner tests."""
 
@@ -199,7 +229,9 @@ class _Environment:
         self.recording = True
 
     def save_recording(self, output_path):
-        Path(output_path).write_text("<html></html>\n", encoding="utf-8")
+        Path(output_path).write_text(
+            "<!doctype html><html><body></body></html>\n", encoding="utf-8"
+        )
 
 
 class EpisodeRunnerTest(unittest.TestCase):
@@ -267,6 +299,30 @@ class EpisodeRunnerTest(unittest.TestCase):
                 {"stage": "hold"},
             )
             self.assertEqual(result.summary["policy"], {"stage": "hold"})
+
+    def test_bt_recording_contains_synchronized_timeline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "episode"
+            result = run_episode(
+                env=_Environment(),
+                policy=_BehaviorTreePolicy(),
+                seed=12,
+                max_steps=4,
+                output_directory=output,
+                record_html=True,
+            )
+
+            timeline = json.loads(
+                (output / "bt_timeline.json").read_text(encoding="utf-8")
+            )
+            recording = (output / "simulation.html").read_text(encoding="utf-8")
+            self.assertEqual(timeline["title"], "Runner test BT")
+            self.assertEqual(timeline["samples"][0]["active_path"], "0.0")
+            self.assertIn("scenesmith-bt-overlay", recording)
+            self.assertEqual(
+                result.artifact_paths["bt_timeline_json"],
+                str(output / "bt_timeline.json"),
+            )
 
     def test_unsuccessful_episode_writes_failure_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -160,6 +160,9 @@ PY
 需要可视化时给同一命令加 `--meshcat --record-html`，并使用新的 output。
 Meshcat URL 由终端打印；远程机器需 SSH 转发对应端口。
 HTML 位于 episode 子目录的 simulation.html，可下载离线查看。
+使用 `behavior_tree` 控制器时，同目录还会生成 `bt_timeline.json`，
+`simulation.html` 左上角会显示行为树。播放或拖动 Meshcat 时间轴时，
+当前节点、祖先路径、节点状态和控制阶段会同步更新。
 
 两份配置复用同一个运行链，分别选择 wheel_dynamic/planar_kinematic，
 匹配的初始高度及导航收拢姿态；控制/停车阈值沿用原演示。

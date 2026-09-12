@@ -248,6 +248,10 @@ class PickLiftBehaviorTreePolicy:
                 "verigraph_metadata_sha256": self.config["environment_sha256"],
                 "tamp_used": False}
 
+    def behavior_tree_visualization(self):
+        """Return the static tree used by the synchronized Meshcat overlay."""
+        return {"title": "PickLift Behavior Tree", "tree": to_dict(self.root)}
+
     def act(self, observation):
         self._ticks += 1
         outcome = self._tick(self.root, "0", observation)
