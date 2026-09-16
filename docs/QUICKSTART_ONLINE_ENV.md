@@ -201,6 +201,26 @@ free/furniture_welded 必须显式选择；固定基准使用 furniture_welded�
 固定成功不代表随机扰动鲁棒性；任意新场景需重新绑定和校准自己的策略，
 不会自动将本专家迁移到所有桌子。
 
+第一视角 PickLift 输入使用 `experiments/picklift_first_person.json`。该配置只启用
+`head_camera` 与 `left_wrist_camera`，头部俯视茶几，并使用 90° 视场确保 reset
+时红色目标在两个机载视角中都可见。可用以下命令提取 RGB、米制深度、label、
+相机位姿和内参；两个 `--require-target-visible-in` 是硬门槛，目标不在画面时命令失败：
+
+```bash
+LIBGL_ALWAYS_SOFTWARE=1 "$PYTHON" -B scripts/extract_picklift_verigraph_inputs.py \
+  --experiment experiments/picklift_first_person.json \
+  --repository-root "$REPO_ROOT" --scene-root "$SCENE_ROOT" \
+  --cache-root "$RUN_ROOT/first-person-cache" \
+  --output-dir "$RUN_ROOT/first-person-input" --seed 500 \
+  --required-camera head_camera --required-camera left_wrist_camera \
+  --require-target-visible-in head_camera \
+  --require-target-visible-in left_wrist_camera
+```
+
+无 GPU 的开发机需要 Mesa EGL（Ubuntu 包 `libegl1 libegl-mesa0 libgl1-mesa-dri`）。
+相机周期设为 200 秒，只采集任务规划所需的 reset 帧；它不用于伪造物理成功，
+执行结果仍由接触、抬升和稳定保持 evaluator 判定。
+
 ## 7. 可选 IIWA 基线
 
 原离线 IK → RRT → TOPPRA → 仿真只保留一个编排入口，与在线CLI分开：
