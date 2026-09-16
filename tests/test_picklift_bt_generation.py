@@ -171,6 +171,11 @@ class PickLiftBtGenerationTest(unittest.TestCase):
         output = write_result(result, self.root / "output")
         self.assertTrue(output.is_file())
         self.assertTrue((output.parent / "generated_bt.mmd").is_file())
+        viewer = (output.parent / "generated_bt.html").read_text()
+        self.assertIn('id="graph"', viewer)
+        self.assertIn('"request_id":"contract-test"', viewer)
+        self.assertIn("已生成 · 未执行", viewer)
+        self.assertIn("generated_bt.json", viewer)
 
     def test_rejects_image_not_bound_to_environment(self):
         request = json.loads(self.request_path.read_text())

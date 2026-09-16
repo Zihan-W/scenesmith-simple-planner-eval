@@ -225,7 +225,8 @@ LIBGL_ALWAYS_SOFTWARE=1 "$PYTHON" -B scripts/extract_picklift_verigraph_inputs.p
 `scenesmith-generate-picklift-bt`。输入必须是
 `scenesmith.picklift_bt_generation.request.v1`，其中环境、任务计划、头部 RGB 和
 左腕 RGB 都由 SHA-256 绑定；输出是
-`scenesmith.picklift_bt_generation.result.v1`，同时写出可执行 JSON、MDSL 和 Mermaid。
+`scenesmith.picklift_bt_generation.result.v1`，同时写出可执行 JSON、MDSL、Mermaid
+和可离线打开的 `generated_bt.html` 交互树图。它展示生成结构与节点参数，执行状态仍需运行 BT 才能获得。
 服务地址和密钥只通过运行参数/环境变量提供，不写入请求或结果：
 
 ```bash

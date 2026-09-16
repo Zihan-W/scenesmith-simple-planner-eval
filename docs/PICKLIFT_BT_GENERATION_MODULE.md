@@ -3,8 +3,8 @@
 `scenesmith-generate-picklift-bt` is the fixed boundary between perception/task
 preparation and BT execution. It accepts one
 `scenesmith.picklift_bt_generation.request.v1` JSON file and writes one executable
-`scenesmith.picklift_bt_generation.result.v1` file plus JSON, MDSL, and Mermaid
-projections of the same tree.
+`scenesmith.picklift_bt_generation.result.v1` file plus JSON, MDSL, Mermaid,
+and a self-contained `generated_bt.html` visualization of the same tree.
 
 The v1 input binds an authoritative VeriGraph environment, validated task plan,
 task description, robot head image, robot left-wrist image, and model selection by
@@ -30,6 +30,13 @@ scenesmith-generate-picklift-bt \
   --request /path/to/request.json \
   --output-dir /path/to/fresh-output
 ```
+
+Open `/path/to/fresh-output/generated_bt.html` directly in a browser after the
+command completes. The page offers a left-to-right tree, search, zoom, pan,
+collapse/expand, and node details without a web server or online dependency. It
+labels the tree as generated but not yet executed; runtime status requires a
+separate execution trace. The JSON printed by the CLI includes a `visualization`
+path. The legacy PickLift and navigation BT generation scripts use the same viewer.
 
 The normative JSON Schemas are
 `docs/contracts/picklift_bt_generation_request.schema.json` and

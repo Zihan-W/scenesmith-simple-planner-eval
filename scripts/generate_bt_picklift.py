@@ -8,6 +8,7 @@ from pathlib import Path
 
 from examples.online_manipulation.generated_bt_picklift import (
     canonical_tree, compile_response, load_inputs, to_dict, to_mdsl, to_mermaid)
+from examples.online_manipulation.bt_visualization import write_viewer
 
 
 def main():
@@ -32,6 +33,7 @@ def main():
     (args.output_dir / "generated_bt.mdsl").write_text(mdsl)
     (args.output_dir / "generated_bt.json").write_text(json.dumps(to_dict(root), indent=2) + "\n")
     (args.output_dir / "generated_bt.mmd").write_text(to_mermaid(root))
+    write_viewer(to_dict(root), args.output_dir, plan=artifact)
     print(args.output_dir.resolve())
 
 

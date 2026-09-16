@@ -14,6 +14,7 @@ from examples.online_manipulation.generated_bt_navigation import (
     to_mdsl,
     to_mermaid,
 )
+from examples.online_manipulation.bt_visualization import write_viewer
 
 
 def main():
@@ -57,6 +58,7 @@ def main():
         json.dumps(to_dict(root), indent=2) + "\n", encoding="utf-8"
     )
     (args.output_dir / "generated_bt.mmd").write_text(to_mermaid(root), encoding="utf-8")
+    write_viewer(to_dict(root), args.output_dir, plan=artifact if args.model_response else None)
     print(args.output_dir.resolve())
 
 

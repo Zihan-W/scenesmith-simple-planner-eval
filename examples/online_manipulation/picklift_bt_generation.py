@@ -26,6 +26,7 @@ from examples.online_manipulation.generated_bt_picklift import (
     to_mermaid,
     validate_inputs,
 )
+from examples.online_manipulation.bt_visualization import render_viewer
 
 
 REQUEST_SCHEMA = "scenesmith.picklift_bt_generation.request.v1"
@@ -394,7 +395,7 @@ def generate(loaded: LoadedRequest, client: ChatClient) -> dict:
 
 
 def write_result(result: dict, output_dir) -> Path:
-    """Write the executable result and its two human-readable projections."""
+    """Write the executable result and automatically create an offline BT viewer."""
 
     expected = {
         "schema", "request_id", "request_sha256", "raw_response", "parsed_response",
@@ -410,9 +411,11 @@ def write_result(result: dict, output_dir) -> Path:
         destination / "generated_bt.json",
         destination / "generated_bt.mdsl",
         destination / "generated_bt.mmd",
+        destination / "generated_bt.html",
     )
     if any(target.exists() for target in targets):
         raise FileExistsError("BT generation output already exists")
+    viewer = render_viewer(result["tree"], plan=result)
     targets[0].write_text(
         json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
@@ -424,6 +427,7 @@ def write_result(result: dict, output_dir) -> Path:
     # the compiler so there is one canonical parser and node representation.
     _, root = compile_response({}, _task_from_result(result), result["raw_response"])
     targets[3].write_text(to_mermaid(root), encoding="utf-8")
+    targets[4].write_text(viewer, encoding="utf-8")
     return targets[0]
 
 
@@ -547,7 +551,11 @@ def main(argv=None):
     )
     output = write_result(generate(loaded, client), args.output_dir)
     artifact_sha = _sha256(output.read_bytes())
-    print(json.dumps({"output": str(output.resolve()), "sha256": artifact_sha}))
+    print(json.dumps({
+        "output": str(output.resolve()),
+        "sha256": artifact_sha,
+        "visualization": str((output.parent / "generated_bt.html").resolve()),
+    }))
 
 
 if __name__ == "__main__":
