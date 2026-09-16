@@ -1,0 +1,754 @@
+{
+  "schema": "scenesmith.verigraph_pick.environment.v1",
+  "runtime_snapshot": {
+    "schema": "scenesmith.picklift.runtime_snapshot.v1",
+    "extraction": {
+      "method": "scenesmith_runtime_reset",
+      "generated_at_utc": "2026-09-16T04:17:13.584331+00:00",
+      "seed": 500,
+      "experiment": "/root/workspace/scenesmith-simple-planner-eval/experiments/picklift_first_person.json",
+      "experiment_sha256": "4f3ee5a747b5211a231ae90c0746cd0aef23af88dbf214d678b0e25e810699a5",
+      "scene_dmd": "/tmp/picklift-first-person-formal-sWQAx1/cache/packages/scene/combined_house/house_furniture_welded.dmd.yaml",
+      "scene_dmd_sha256": "e7b736a9e6ddbf280ab7f660fbf98ca7e8549fb8842465608cf67d8110189a25",
+      "robot_model": "/root/workspace/scenesmith-simple-planner-eval/models/zerith_drake",
+      "robot_urdf_sha256": "6823d04e61b96f17c7b5c8dfb7c29cc51763d8e696574d05783d3bf454fcc9bc",
+      "reset_info": {
+        "policy_dt": 0.1,
+        "episode_randomization": {},
+        "base_mode": "fixed",
+        "seed": 500,
+        "task_reset": {
+          "task_name": "pick_lift",
+          "target": "pick_target",
+          "initial_height_m": 0.5107367132195106
+        }
+      }
+    },
+    "robot": {
+      "name": "zerith_left_arm",
+      "controlled_joints": [
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_yaw_joint",
+        "left_wrist_pitch_joint",
+        "left_jaw_left_finger_joint",
+        "left_jaw_right_finger_joint"
+      ],
+      "q": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "gripper_width_m": 0.07628,
+      "end_effector_pose": {
+        "translation_m": [
+          2.0432000009999993,
+          2.7700010500000007,
+          0.7003047899999999
+        ],
+        "quaternion_wxyz": [
+          6.123233995736766e-17,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "robot_camera_observations": {
+      "head_camera": {
+        "frame": "head_camera",
+        "timestamp_s": 0.0,
+        "pose": {
+          "translation_m": [
+            2.4563323473329413,
+            2.91749999770704,
+            1.161026128207967
+          ],
+          "quaternion_wxyz": [
+            0.2952081096107215,
+            -0.6425357359867744,
+            -0.6425357359867728,
+            0.2952081096107195
+          ]
+        },
+        "intrinsics": {
+          "width": 640,
+          "height": 480,
+          "focal_x_px": 240.00000000000003,
+          "focal_y_px": 240.00000000000003,
+          "center_x_px": 319.5,
+          "center_y_px": 239.5,
+          "fov_y_rad": 1.5707963267948966,
+          "near_m": 0.05,
+          "far_m": 10.0
+        },
+        "image_metadata": {
+          "rgb": {
+            "shape": [
+              480,
+              640,
+              3
+            ],
+            "dtype": "uint8"
+          },
+          "depth": {
+            "shape": [
+              480,
+              640
+            ],
+            "dtype": "float32"
+          },
+          "label": {
+            "shape": [
+              480,
+              640
+            ],
+            "dtype": "int16"
+          }
+        },
+        "label_names": {
+          "1": "room_geometry_living_room::room_geometry_body_link",
+          "2": "living_room_rug_0::base_link",
+          "3": "living_room_sofa_0::base_link",
+          "4": "living_room_coffee_table_0::base_link",
+          "5": "living_room_lounge_chair_0::base_link",
+          "6": "living_room_lounge_chair_1::base_link",
+          "7": "living_room_dining_chair_0::base_link",
+          "8": "living_room_dining_chair_1::base_link",
+          "9": "living_room_dining_chair_2::base_link",
+          "10": "living_room_dining_chair_3::base_link",
+          "11": "living_room_sideboard_0::E_door_1_1",
+          "12": "living_room_sideboard_0::E_body_5",
+          "13": "living_room_sideboard_0::E_door_3_2",
+          "14": "living_room_sideboard_0::E_door_2_3",
+          "15": "living_room_sideboard_0::E_door_4_4",
+          "16": "living_room_dining_table_0::base_link",
+          "17": "living_room_potted_plant_0::base_link",
+          "18": "living_room_artwork_0::base_link",
+          "19": "living_room_mirror_0::base_link",
+          "20": "living_room_shelf_0::base_link",
+          "21": "living_room_flush_mount_0::base_link",
+          "22": "living_room_pendant_light_0::base_link",
+          "23": "living_room_box_0::base_link",
+          "24": "living_room_hardcover_book_0::base_link",
+          "25": "living_room_vase_0::base_link",
+          "26": "living_room_decorative_bowl_0::base_link",
+          "27": "living_room_table_lamp_0::base_link",
+          "28": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::dipan_link",
+          "29": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::daogui_link",
+          "30": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_pitch_link",
+          "31": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+          "32": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_pitch_link",
+          "33": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_roll_link",
+          "34": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_yaw_link",
+          "35": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_elbow_link",
+          "36": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_roll_link",
+          "37": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_yaw_link",
+          "38": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_pitch_link",
+          "39": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+          "40": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link",
+          "41": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_camera_link",
+          "42": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_end_effector_link",
+          "43": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_shoulder_pitch_link",
+          "44": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_shoulder_roll_link",
+          "45": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_shoulder_yaw_link",
+          "46": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_elbow_link",
+          "47": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_roll_link",
+          "48": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_yaw_link",
+          "49": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_pitch_link",
+          "50": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_left_finger_link",
+          "51": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_right_finger_link",
+          "52": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_camera_link",
+          "53": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_end_effector_link",
+          "54": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::neck_yaw_link",
+          "55": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::neck_pitch_link",
+          "56": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::neck_camera_link",
+          "57": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_front_wheel_link",
+          "58": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_middle_wheel_link",
+          "59": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_rear_wheel_link",
+          "60": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_front_wheel_link",
+          "61": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_middle_wheel_link",
+          "62": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_rear_wheel_link"
+        },
+        "files": {
+          "rgb": {
+            "path": "cameras/head_camera_rgb.png",
+            "sha256": "60410cc51c3fe6237d8b84d91959b076413f9b6d1df4750a2912e83840aaf57f"
+          },
+          "depth": {
+            "path": "cameras/head_camera_depth_m.npy",
+            "sha256": "c121cbaad5797175462b78c7ce84945a2c491cce49d4c40c83b87c2d29df5fd8",
+            "unit": "m",
+            "valid_pixel_fraction": 0.9999934895833333,
+            "valid_range_m": [
+              0.05000060051679611,
+              2.580707550048828
+            ]
+          },
+          "label": {
+            "path": "cameras/head_camera_label.npy",
+            "sha256": "e18584bee1387d15fd457e6f32816b282e7a4c72262ba190beaec8bac75ec3ff",
+            "visible_labels": [
+              {
+                "label": 1,
+                "name": "room_geometry_living_room::room_geometry_body_link",
+                "pixel_count": 98914
+              },
+              {
+                "label": 2,
+                "name": "living_room_rug_0::base_link",
+                "pixel_count": 35810
+              },
+              {
+                "label": 3,
+                "name": "living_room_sofa_0::base_link",
+                "pixel_count": 37066
+              },
+              {
+                "label": 4,
+                "name": "living_room_coffee_table_0::base_link",
+                "pixel_count": 25782
+              },
+              {
+                "label": 5,
+                "name": "living_room_lounge_chair_0::base_link",
+                "pixel_count": 11435
+              },
+              {
+                "label": 6,
+                "name": "living_room_lounge_chair_1::base_link",
+                "pixel_count": 9899
+              },
+              {
+                "label": 17,
+                "name": "living_room_potted_plant_0::base_link",
+                "pixel_count": 12459
+              },
+              {
+                "label": 18,
+                "name": "living_room_artwork_0::base_link",
+                "pixel_count": 6597
+              },
+              {
+                "label": 23,
+                "name": "living_room_box_0::base_link",
+                "pixel_count": 134
+              },
+              {
+                "label": 24,
+                "name": "living_room_hardcover_book_0::base_link",
+                "pixel_count": 575
+              },
+              {
+                "label": 25,
+                "name": "living_room_vase_0::base_link",
+                "pixel_count": 232
+              },
+              {
+                "label": 31,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+                "pixel_count": 59250
+              },
+              {
+                "label": 33,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_roll_link",
+                "pixel_count": 22
+              },
+              {
+                "label": 36,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_roll_link",
+                "pixel_count": 1567
+              },
+              {
+                "label": 37,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_yaw_link",
+                "pixel_count": 615
+              },
+              {
+                "label": 38,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_pitch_link",
+                "pixel_count": 1821
+              },
+              {
+                "label": 39,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+                "pixel_count": 150
+              },
+              {
+                "label": 40,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link",
+                "pixel_count": 200
+              },
+              {
+                "label": 41,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_camera_link",
+                "pixel_count": 122
+              },
+              {
+                "label": 42,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_end_effector_link",
+                "pixel_count": 64
+              },
+              {
+                "label": 47,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_roll_link",
+                "pixel_count": 1400
+              },
+              {
+                "label": 48,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_yaw_link",
+                "pixel_count": 707
+              },
+              {
+                "label": 49,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_pitch_link",
+                "pixel_count": 1837
+              },
+              {
+                "label": 50,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_left_finger_link",
+                "pixel_count": 216
+              },
+              {
+                "label": 51,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_right_finger_link",
+                "pixel_count": 121
+              },
+              {
+                "label": 52,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_camera_link",
+                "pixel_count": 141
+              },
+              {
+                "label": 53,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_end_effector_link",
+                "pixel_count": 64
+              }
+            ]
+          }
+        }
+      },
+      "left_wrist_camera": {
+        "frame": "left_wrist_camera",
+        "timestamp_s": 0.0,
+        "pose": {
+          "translation_m": [
+            2.0998700009999993,
+            2.761001050000001,
+            0.7626777899999999
+          ],
+          "quaternion_wxyz": [
+            0.37993743426956555,
+            -0.5963634652149739,
+            -0.5963612746536731,
+            0.3799360386840061
+          ]
+        },
+        "intrinsics": {
+          "width": 640,
+          "height": 480,
+          "focal_x_px": 240.00000000000003,
+          "focal_y_px": 240.00000000000003,
+          "center_x_px": 319.5,
+          "center_y_px": 239.5,
+          "fov_y_rad": 1.5707963267948966,
+          "near_m": 0.05,
+          "far_m": 10.0
+        },
+        "image_metadata": {
+          "rgb": {
+            "shape": [
+              480,
+              640,
+              3
+            ],
+            "dtype": "uint8"
+          },
+          "depth": {
+            "shape": [
+              480,
+              640
+            ],
+            "dtype": "float32"
+          },
+          "label": {
+            "shape": [
+              480,
+              640
+            ],
+            "dtype": "int16"
+          }
+        },
+        "label_names": {
+          "1": "room_geometry_living_room::room_geometry_body_link",
+          "2": "living_room_rug_0::base_link",
+          "3": "living_room_sofa_0::base_link",
+          "4": "living_room_coffee_table_0::base_link",
+          "5": "living_room_lounge_chair_0::base_link",
+          "6": "living_room_lounge_chair_1::base_link",
+          "7": "living_room_dining_chair_0::base_link",
+          "8": "living_room_dining_chair_1::base_link",
+          "9": "living_room_dining_chair_2::base_link",
+          "10": "living_room_dining_chair_3::base_link",
+          "11": "living_room_sideboard_0::E_door_1_1",
+          "12": "living_room_sideboard_0::E_body_5",
+          "13": "living_room_sideboard_0::E_door_3_2",
+          "14": "living_room_sideboard_0::E_door_2_3",
+          "15": "living_room_sideboard_0::E_door_4_4",
+          "16": "living_room_dining_table_0::base_link",
+          "17": "living_room_potted_plant_0::base_link",
+          "18": "living_room_artwork_0::base_link",
+          "19": "living_room_mirror_0::base_link",
+          "20": "living_room_shelf_0::base_link",
+          "21": "living_room_flush_mount_0::base_link",
+          "22": "living_room_pendant_light_0::base_link",
+          "23": "living_room_box_0::base_link",
+          "24": "living_room_hardcover_book_0::base_link",
+          "25": "living_room_vase_0::base_link",
+          "26": "living_room_decorative_bowl_0::base_link",
+          "27": "living_room_table_lamp_0::base_link",
+          "28": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::dipan_link",
+          "29": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::daogui_link",
+          "30": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_pitch_link",
+          "31": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+          "32": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_pitch_link",
+          "33": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_roll_link",
+          "34": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_yaw_link",
+          "35": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_elbow_link",
+          "36": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_roll_link",
+          "37": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_yaw_link",
+          "38": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_wrist_pitch_link",
+          "39": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+          "40": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link",
+          "41": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_camera_link",
+          "42": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_end_effector_link",
+          "43": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_shoulder_pitch_link",
+          "44": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_shoulder_roll_link",
+          "45": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_shoulder_yaw_link",
+          "46": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_elbow_link",
+          "47": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_roll_link",
+          "48": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_yaw_link",
+          "49": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_wrist_pitch_link",
+          "50": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_left_finger_link",
+          "51": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_right_finger_link",
+          "52": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_jaw_camera_link",
+          "53": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_end_effector_link",
+          "54": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::neck_yaw_link",
+          "55": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::neck_pitch_link",
+          "56": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::neck_camera_link",
+          "57": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_front_wheel_link",
+          "58": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_middle_wheel_link",
+          "59": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_rear_wheel_link",
+          "60": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_front_wheel_link",
+          "61": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_middle_wheel_link",
+          "62": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_rear_wheel_link"
+        },
+        "files": {
+          "rgb": {
+            "path": "cameras/left_wrist_camera_rgb.png",
+            "sha256": "925a81b2ff4c0d8a48ade40fb1d3479cea61fd3384dca1b77e388a9a6fb8d20e"
+          },
+          "depth": {
+            "path": "cameras/left_wrist_camera_depth_m.npy",
+            "sha256": "666015806f18da20dfc0475bdaa7e5bfe9ec19543c205cfb7a1c1016ef5b8769",
+            "unit": "m",
+            "valid_pixel_fraction": 1.0,
+            "valid_range_m": [
+              0.05000060051679611,
+              2.1771769523620605
+            ]
+          },
+          "label": {
+            "path": "cameras/left_wrist_camera_label.npy",
+            "sha256": "6e9282c98e40fd279b01bcd92b687d893160d7443a199b283a93771b5a2303c4",
+            "visible_labels": [
+              {
+                "label": 1,
+                "name": "room_geometry_living_room::room_geometry_body_link",
+                "pixel_count": 101774
+              },
+              {
+                "label": 2,
+                "name": "living_room_rug_0::base_link",
+                "pixel_count": 24719
+              },
+              {
+                "label": 3,
+                "name": "living_room_sofa_0::base_link",
+                "pixel_count": 48452
+              },
+              {
+                "label": 4,
+                "name": "living_room_coffee_table_0::base_link",
+                "pixel_count": 77519
+              },
+              {
+                "label": 6,
+                "name": "living_room_lounge_chair_1::base_link",
+                "pixel_count": 416
+              },
+              {
+                "label": 17,
+                "name": "living_room_potted_plant_0::base_link",
+                "pixel_count": 4778
+              },
+              {
+                "label": 18,
+                "name": "living_room_artwork_0::base_link",
+                "pixel_count": 14797
+              },
+              {
+                "label": 23,
+                "name": "living_room_box_0::base_link",
+                "pixel_count": 3948
+              },
+              {
+                "label": 24,
+                "name": "living_room_hardcover_book_0::base_link",
+                "pixel_count": 1221
+              },
+              {
+                "label": 39,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+                "pixel_count": 12710
+              },
+              {
+                "label": 40,
+                "name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link",
+                "pixel_count": 16866
+              }
+            ]
+          }
+        }
+      }
+    },
+    "target_camera_visibility": {
+      "head_camera": {
+        "target_contact_body": "living_room_box_0::base_link",
+        "visible": true,
+        "pixel_count": 134
+      },
+      "left_wrist_camera": {
+        "target_contact_body": "living_room_box_0::base_link",
+        "visible": true,
+        "pixel_count": 3948
+      }
+    },
+    "objects": {
+      "pick_target": {
+        "pose": {
+          "translation_m": [
+            1.9831094335979957,
+            2.7700010524037877,
+            0.5107367132195106
+          ],
+          "quaternion_wxyz": [
+            0.9999975663829577,
+            -0.00043297710983740954,
+            -3.822637562409327e-05,
+            0.0021629372918940616
+          ]
+        },
+        "spatial_velocity": {
+          "rotational_rad_s": [
+            0.06673956922457669,
+            0.21053153917413547,
+            -0.00018294244363301185
+          ],
+          "translational_m_s": [
+            6.07975464520538e-11,
+            2.4037868392932703e-06,
+            -0.007181609638055231
+          ]
+        }
+      }
+    },
+    "task": {
+      "target_observation_name": "pick_target",
+      "gripper_contact_bodies": [
+        "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+        "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link"
+      ],
+      "target_contact_body": "living_room_box_0::base_link",
+      "support_contact_bodies": [
+        "living_room_coffee_table_0::base_link"
+      ],
+      "required_lift_m": 0.08,
+      "required_hold_s": 3.0,
+      "maximum_target_translational_speed_m_s": 0.02,
+      "maximum_target_rotational_speed_rad_s": 0.5,
+      "maximum_allowed_contact_penetration_m": 0.0001,
+      "carrier_arm_name": "left",
+      "carrier_gripper_name": "left",
+      "reset_observation": {
+        "task_name": "pick_lift",
+        "target": "pick_target",
+        "lift_m": 0.0,
+        "required_lift_m": 0.08,
+        "held_above_threshold_s": 0.0,
+        "required_hold_s": 3.0,
+        "finger_contacts": [
+          false,
+          false
+        ],
+        "bilateral_gripper_contact": false,
+        "support_contact": true,
+        "unexpected_target_contacts": [],
+        "target_translational_speed_m_s": 0.007181610040346034,
+        "target_rotational_speed_rad_s": 0.2208568145999808,
+        "success": false,
+        "evaluation": {
+          "success": false,
+          "reason": "running",
+          "metrics": {}
+        }
+      },
+      "initial_relation_from_task_binding": "pick_target, on, living_room_coffee_table_0"
+    },
+    "available_bt_skills": [
+      "Wait",
+      "ExecutePickLift",
+      "PickLiftSucceeded"
+    ]
+  },
+  "verigraph": {
+    "parser": "verigraph.core.parse.parse_llm_response_to_graph",
+    "checker": "verigraph.core.simple_plan_checker.SimplePlanChecker",
+    "upstream_commit": "5c07fb8f228049e228b53637e3867650f6854fa5",
+    "catalog": {
+      "semantic_map_locations": {
+        "pick_station": "SceneSmith living-room PickLift work area"
+      },
+      "location_asset_relations": {
+        "pick_station": [
+          "living_room_coffee_table_0"
+        ]
+      },
+      "check_location": "pick_station",
+      "entities": {
+        "pick_target": {
+          "kind": "object",
+          "movable": true,
+          "can_contain": false,
+          "can_support": false,
+          "description": "small red rectangular PickLift target"
+        },
+        "living_room_coffee_table_0": {
+          "kind": "asset",
+          "movable": false,
+          "can_contain": false,
+          "can_support": true,
+          "description": "living-room coffee table supporting the red target"
+        }
+      }
+    },
+    "scene_graph": {
+      "nodes": [
+        "living_room_coffee_table_0",
+        "pick_target"
+      ],
+      "relations": [
+        "pick_target, on, living_room_coffee_table_0"
+      ]
+    },
+    "metadata": {
+      "environment": {
+        "semantic_map_locations": {
+          "pick_station": "SceneSmith living-room PickLift work area"
+        },
+        "objects_metadata": {
+          "pick_target": {
+            "kind": "object",
+            "movable": true,
+            "can_contain": false,
+            "can_support": false,
+            "description": "small red rectangular PickLift target"
+          }
+        },
+        "assets_metadata": {
+          "living_room_coffee_table_0": {
+            "kind": "asset",
+            "movable": false,
+            "can_contain": false,
+            "can_support": true,
+            "description": "living-room coffee table supporting the red target"
+          }
+        },
+        "asset_object_relations": {
+          "living_room_coffee_table_0": [
+            "(on_something)pick_target"
+          ],
+          "pick_target": []
+        },
+        "location_asset_relations": {
+          "pick_station": [
+            "living_room_coffee_table_0"
+          ]
+        },
+        "scene_graph": {
+          "nodes": [
+            "living_room_coffee_table_0",
+            "pick_target"
+          ],
+          "relations": [
+            "pick_target, on, living_room_coffee_table_0"
+          ]
+        }
+      }
+    },
+    "perception_manifest": {
+      "model_api_calls_completed": 1,
+      "provider_response_id": "chatcmpl-EObNXE8kWS5ctupXqdFY1QZHUtT88",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 1957,
+        "completion_tokens": 276,
+        "total_tokens": 2233,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0,
+          "image_tokens": 600
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "latency_checkpoint": {
+          "service_ttft_ms": 373,
+          "user_visible_ttft_ms": 158,
+          "pre_inference_ms": 215,
+          "service_tbt_ms": 8,
+          "service_ttlt_ms": 2468,
+          "engine_ttft_ms": 102,
+          "engine_ttlt_ms": 2202,
+          "engine_tbt_ms": 8
+        }
+      },
+      "scene_graph_validated": true,
+      "task_binding_match": true
+    },
+    "input_sha256": {
+      "catalog": "1fa1216171fc907b99028d318414289a44ec4dcc946aa3a7e1c9cccfd0a496a3",
+      "scene_graph": "92b5a52a73f57e2fc70f210bfbbe434fa3431a7be8b0e7a99968fd07050abf44",
+      "metadata": "e535450726b4ed7d1a11695381e1ddb6b45832fc6d53e4bc9586a266bd98f414",
+      "perception_manifest": "8150b862f11c9c3ebd97be06e7b00f5d9b9f978dbf3ce349f0fadd3b60077f49"
+    }
+  },
+  "available_skills": [
+    "Wait",
+    "ExecutePickLift",
+    "PickLiftSucceeded"
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "schema": "scenesmith.microsoft_picklift.generated.v1",
+  "raw_response": "{\n  \"MAIN_SEQUENCE\": \"sequence { action [Wait, \\\"1.0\\\"] action [ExecutePickLift] }\",\n  \"ULTIMATE_GOAL\": \"The robot has picked up the red pick_target from the living_room_coffee_table_0, lifting it by at least 0.08 meters and holding it stably for at least 3.0 seconds.\"\n}",
+  "parsed_response": {
+    "MAIN_SEQUENCE": "sequence { action [Wait, \"1.0\"] action [ExecutePickLift] }",
+    "ULTIMATE_GOAL": "The robot has picked up the red pick_target from the living_room_coffee_table_0, lifting it by at least 0.08 meters and holding it stably for at least 3.0 seconds."
+  },
+  "generation": {
+    "architecture": "Microsoft scene-aware robot BT planner prompt adaptation",
+    "microsoft_upstream_commit": "efebc2b0883249a63c7b2a47e504727e4f327a21",
+    "microsoft_prompt_sha256": {
+      "system.txt": "bfc00de1a4790959d164987f4ecdd2e1620dfa0f7f63c83ed54f9560851ef70c",
+      "role_prompt.txt": "4e5ebe8c8e7410d9a9993bc55837d5c883a1f42719d8cd87a250a75788fd76db",
+      "environment_prompt.txt": "e982a139c7942d4b13a0eb1221eb834081f1cebcc4c053246514bc1d5cedb33d",
+      "output_prompt.txt": "4ee04bc7caf594021e16b268d3e2c136f757ed03459c168dab5b2f3dfb6309f2",
+      "action_prompt.txt": "904ea1969c46a3c8aa055395881da1c33f87e56dca8580df43d05ad8aceec604",
+      "query.txt": "f48a847e6f0e42851213b9c23769124cccdcbfb8a9609d88a14d7d5b4c2cfc0b"
+    },
+    "microsoft_prompt_files_used": [
+      "system.txt",
+      "role_prompt.txt",
+      "environment_prompt.txt",
+      "output_prompt.txt",
+      "action_prompt.txt",
+      "query.txt"
+    ],
+    "microsoft_example_prompt_used": false,
+    "model_requested": "gpt-4.1-mini-2025-04-14",
+    "independent_generation_trial": 1,
+    "multimodal": true,
+    "robot_first_person_only": true,
+    "views": [
+      {
+        "camera": "head_camera",
+        "path": "cameras/head_camera_rgb.png",
+        "sha256": "60410cc51c3fe6237d8b84d91959b076413f9b6d1df4750a2912e83840aaf57f",
+        "target_pixel_count": 134
+      },
+      {
+        "camera": "left_wrist_camera",
+        "path": "cameras/left_wrist_camera_rgb.png",
+        "sha256": "925a81b2ff4c0d8a48ade40fb1d3479cea61fd3384dca1b77e388a9a6fb8d20e",
+        "target_pixel_count": 3948
+      }
+    ],
+    "environment_sha256": "3eed6bb58665d6d55728b5bc8adbbdf819337986460a18d4d74602e1c397c2f7",
+    "reference_answer_used": false,
+    "generation_contract_contains_complete_bt": false,
+    "model_returned": "gpt-4.1-mini-2025-04-14",
+    "finish_reason": "stop",
+    "provider_response_id": "chatcmpl-EObParq5Iv3sJnpl9lhLs2ApdPp1r",
+    "api_calls_completed": 2,
+    "accepted_attempt": 2,
+    "attempts": [
+      {
+        "attempt": 1,
+        "provider_response_id": "chatcmpl-EObOPZDisuim33IV4iMDxKVxZAZUT",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "usage": {
+          "completion_tokens": 111,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "latency_checkpoint": {
+            "engine_tbt_ms": 11,
+            "engine_ttft_ms": 114,
+            "engine_ttlt_ms": 1397,
+            "pre_inference_ms": 262,
+            "service_tbt_ms": 12,
+            "service_ttft_ms": 500,
+            "service_ttlt_ms": 1777,
+            "user_visible_ttft_ms": 237
+          },
+          "prompt_tokens": 3423,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 2944,
+            "image_tokens": 600
+          },
+          "total_tokens": 3534
+        },
+        "finish_reason": "stop",
+        "validation_error": "Response must contain exactly MAIN_SEQUENCE and ULTIMATE_GOAL"
+      },
+      {
+        "attempt": 2,
+        "provider_response_id": "chatcmpl-EObParq5Iv3sJnpl9lhLs2ApdPp1r",
+        "model": "gpt-4.1-mini-2025-04-14",
+        "usage": {
+          "completion_tokens": 78,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "latency_checkpoint": {
+            "engine_tbt_ms": 10,
+            "engine_ttft_ms": 106,
+            "engine_ttlt_ms": 918,
+            "pre_inference_ms": 241,
+            "service_tbt_ms": 10,
+            "service_ttft_ms": 464,
+            "service_ttlt_ms": 1271,
+            "user_visible_ttft_ms": 223
+          },
+          "prompt_tokens": 3638,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 3072,
+            "image_tokens": 600
+          },
+          "total_tokens": 3716
+        },
+        "finish_reason": "stop",
+        "validation_error": null
+      }
+    ],
+    "planning_messages_sha256": "dadf7fd588b0e2466ad40d526c0bbbbf37bb8758526e3e75c158ae186e31bacf"
+  },
+  "mdsl": "root {\n    selector {\n        condition [PickLiftSucceeded]\n        sequence {\n            action [Wait, \"1.0\"]\n            action [ExecutePickLift]\n        }\n    }\n}\n",
+  "mdsl_sha256": "4ab878eb8ec17ce0fc2f4f4c2a1f4f13a7df7de1346a59cb26bc100a4f45b62f",
+  "tree": {
+    "kind": "root",
+    "name": "",
+    "args": [],
+    "children": [
+      {
+        "kind": "selector",
+        "name": "",
+        "args": [],
+        "children": [
+          {
+            "kind": "condition",
+            "name": "PickLiftSucceeded",
+            "args": [],
+            "children": []
+          },
+          {
+            "kind": "sequence",
+            "name": "",
+            "args": [],
+            "children": [
+              {
+                "kind": "action",
+                "name": "Wait",
+                "args": [
+                  "1.0"
+                ],
+                "children": []
+              },
+              {
+                "kind": "action",
+                "name": "ExecutePickLift",
+                "args": [],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

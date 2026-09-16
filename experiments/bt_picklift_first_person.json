@@ -1,0 +1,40 @@
+{
+  "robot": "zerith_left",
+  "robot_options": {
+    "camera_options": {
+      "enabled_names": ["head_camera", "left_wrist_camera"],
+      "width": 640,
+      "height": 480,
+      "fov_y_rad": 1.5707963267948966,
+      "update_period_s": 200.0
+    },
+    "locked_joint_positions": {
+      "neck_yaw_joint": 0.0,
+      "neck_pitch_joint": 0.5
+    }
+  },
+  "control": "picklift",
+  "initial_state": "picklift",
+  "scene": "scenesmith",
+  "scene_options": {
+    "variant": "furniture_welded",
+    "overrides": "experiments/inputs/pick_lift/scene_overrides.yaml",
+    "additional_package_xmls": ["models/zerith_pick_eval/package.xml"]
+  },
+  "policy": "examples.online_manipulation.generated_bt_picklift:make_policy",
+  "policy_options": {
+    "environment_input": "experiments/inputs/bt_picklift_first_person/environment.json",
+    "task_plan_input": "experiments/inputs/bt_picklift_first_person/task_plan.json",
+    "generated_plan_input": "experiments/inputs/bt_picklift_first_person/generated_plan.json",
+    "expert_inputs": "experiments/inputs/pick_lift",
+    "expert_calibration": "experiments/inputs/pick_lift/pick_lift_calibration.json"
+  },
+  "task": "picklift",
+  "evaluator": "task_result",
+  "requires": {
+    "arms": ["left"],
+    "grippers": ["left"],
+    "sensors": ["head_camera", "left_wrist_camera"]
+  },
+  "run": {"seeds": [500], "max_steps": 1200}
+}

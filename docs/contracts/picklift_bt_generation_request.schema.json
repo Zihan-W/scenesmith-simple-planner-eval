@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scenesmith.picklift_bt_generation.request.v1",
+  "title": "SceneSmith PickLift BT generation request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "request_id", "environment", "task", "observations", "model"],
+  "properties": {
+    "schema": {"const": "scenesmith.picklift_bt_generation.request.v1"},
+    "request_id": {"type": "string", "minLength": 1},
+    "environment": {"$ref": "#/$defs/fileReference"},
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "plan_path", "plan_sha256"],
+      "properties": {
+        "description": {"type": "string", "minLength": 1},
+        "plan_path": {"type": "string", "minLength": 1},
+        "plan_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "observations": {
+      "type": "array",
+      "prefixItems": [
+        {"$ref": "#/$defs/headObservation"},
+        {"$ref": "#/$defs/wristObservation"}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "max_attempts"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "max_attempts": {"type": "integer", "minimum": 1, "maximum": 5}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "fileReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "headObservation": {"$ref": "#/$defs/observation", "properties": {"camera": {"const": "head_camera"}}},
+    "wristObservation": {"$ref": "#/$defs/observation", "properties": {"camera": {"const": "left_wrist_camera"}}},
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["camera", "path", "sha256", "media_type"],
+      "properties": {
+        "camera": {"type": "string"},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "media_type": {"const": "image/png"}
+      }
+    }
+  }
+}

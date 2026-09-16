@@ -1,0 +1,9 @@
+{
+  "schema": "scenesmith.bt.picklift_task_plan.v1",
+  "task": "pick_and_lift_red_target",
+  "success_condition": "PickLiftSucceeded",
+  "steps": [
+    {"skill": "Wait", "duration_s": 1.0},
+    {"skill": "ExecutePickLift"}
+  ]
+}

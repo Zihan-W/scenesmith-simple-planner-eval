@@ -139,9 +139,8 @@ def canonical_tree(task_plan):
     )),))
 
 
-def load_inputs(environment_path, task_plan_path):
-    environment = json.loads(Path(environment_path).read_text())
-    task_plan = json.loads(Path(task_plan_path).read_text())
+def validate_inputs(environment, task_plan):
+    """Validate already-loaded PickLift planning inputs."""
     if environment.get("schema") != "scenesmith.verigraph_pick.environment.v1":
         raise ValueError("PickLift environment must be VeriGraph-derived")
     verigraph = environment.get("verigraph", {})
@@ -152,6 +151,12 @@ def load_inputs(environment_path, task_plan_path):
     if set(SIGNATURES) - set(environment.get("available_skills", ())):
         raise ValueError("PickLift environment is missing executable BT skills")
     return environment, task_plan
+
+
+def load_inputs(environment_path, task_plan_path):
+    environment = json.loads(Path(environment_path).read_text())
+    task_plan = json.loads(Path(task_plan_path).read_text())
+    return validate_inputs(environment, task_plan)
 
 
 def compile_response(environment, task_plan, raw_response):

@@ -1,0 +1,31 @@
+{
+  "schema": "scenesmith.picklift_bt_generation.request.v1",
+  "request_id": "scenesmith-picklift-first-person-example-v1",
+  "environment": {
+    "path": "environment.json",
+    "sha256": "3eed6bb58665d6d55728b5bc8adbbdf819337986460a18d4d74602e1c397c2f7"
+  },
+  "task": {
+    "description": "Wait 1.0 seconds, then pick up the red pick_target from living_room_coffee_table_0, lift it by at least 0.08 m, and hold it stably for at least 3.0 seconds.",
+    "plan_path": "task_plan.json",
+    "plan_sha256": "89bffed7b0a1c7c49ef921d81f86846dda8f832958041c77fe8105ef8755922b"
+  },
+  "observations": [
+    {
+      "camera": "head_camera",
+      "path": "cameras/head_camera_rgb.png",
+      "sha256": "60410cc51c3fe6237d8b84d91959b076413f9b6d1df4750a2912e83840aaf57f",
+      "media_type": "image/png"
+    },
+    {
+      "camera": "left_wrist_camera",
+      "path": "cameras/left_wrist_camera_rgb.png",
+      "sha256": "925a81b2ff4c0d8a48ade40fb1d3479cea61fd3384dca1b77e388a9a6fb8d20e",
+      "media_type": "image/png"
+    }
+  ],
+  "model": {
+    "id": "gpt-4.1-mini-2025-04-14",
+    "max_attempts": 3
+  }
+}

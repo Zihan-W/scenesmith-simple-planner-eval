@@ -20,6 +20,7 @@ dev = ["trimesh==4.11.0", "scipy==1.15.3", "matplotlib>=3.9"]
 [project.scripts]
 scene-eval = "src.online_manipulation.experiment:main"
 iiwa-baseline = "tools.iiwa.__main__:main"
+scenesmith-generate-picklift-bt = "examples.online_manipulation.picklift_bt_generation:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

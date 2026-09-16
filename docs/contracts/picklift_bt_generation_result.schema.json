@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scenesmith.picklift_bt_generation.result.v1",
+  "title": "SceneSmith PickLift BT generation result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "request_id", "request_sha256", "raw_response", "parsed_response",
+    "generation", "mdsl", "mdsl_sha256", "tree"
+  ],
+  "properties": {
+    "schema": {"const": "scenesmith.picklift_bt_generation.result.v1"},
+    "request_id": {"type": "string", "minLength": 1},
+    "request_sha256": {"$ref": "#/$defs/sha256"},
+    "raw_response": {"type": "string", "minLength": 1},
+    "parsed_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["MAIN_SEQUENCE", "ULTIMATE_GOAL"],
+      "properties": {
+        "MAIN_SEQUENCE": {"type": "string", "minLength": 1},
+        "ULTIMATE_GOAL": {"type": "string", "minLength": 1}
+      }
+    },
+    "generation": {"type": "object"},
+    "mdsl": {"type": "string", "minLength": 1},
+    "mdsl_sha256": {"$ref": "#/$defs/sha256"},
+    "tree": {"type": "object"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
