@@ -30,12 +30,14 @@ scripts/simulate_zerith_safe_pregrasp.py
 *.pdf
 
 # Local documentation, experiment artifacts, and exported patches.
-/docs/
+/docs/*
+!/docs/CURRENT_ARCHITECTURE.md
 # Ignore historical runs; keep the latest unseeded run's evidence visible.
 /runs/*
 !/runs/object-plusx100mm-online-unseeded-20260921/
 /runs/object-plusx100mm-online-unseeded-20260921/*
 !/runs/object-plusx100mm-online-unseeded-20260921/run_001/
+!/runs/object-plusx100mm-online-unseeded-20260921/validate_vlm_ccsp_unseeded.py
 /runs/object-plusx100mm-online-unseeded-20260921/run_001/scene_cache/
 /patches/
 

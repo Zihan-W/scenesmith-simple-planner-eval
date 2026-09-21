@@ -287,4 +287,4 @@ cd "$REPO_ROOT"
 
 不支持任意URDF免适配、任意策略免输入输出适配、SLAM、移动携物、
 双手协同抓物、PLACE、导轨动力学或新策略模型。
-当前代码与实验结果见唯一[维护记录](EVAL_STRUCTURE_PROGRESS.md)。
+本次实验结果见[运行结果](../runs/object-plusx100mm-online-unseeded-20260921/run_001/live_result.json)；历史维护记录可用 `git show 708edf0:docs/EVAL_STRUCTURE_PROGRESS.md` 查看。

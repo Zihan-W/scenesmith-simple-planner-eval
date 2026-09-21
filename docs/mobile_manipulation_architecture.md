@@ -3,7 +3,7 @@
 实现边界：SceneSmith产物 → 只读适配/派生cache → 实验profile组装 → 单一Runtime。
 机器人定义、控制参数、初态、Task、Policy、evaluator分别管理；不引入第二套Runtime。
 用户最新确认优先于历史任务书；行为详细契约见[GENERIC](GENERIC_ONLINE_EXAMPLE.md)，
-运行命令见[Quickstart](QUICKSTART_ONLINE_ENV.md)，实际证据见[维护记录](EVAL_STRUCTURE_PROGRESS.md)。
+运行命令见[Quickstart](QUICKSTART_ONLINE_ENV.md)，历史证据可用 `git show 708edf0:docs/EVAL_STRUCTURE_PROGRESS.md` 查看。
 
 ## 实际实现映射
 
