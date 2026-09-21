@@ -1,0 +1,5 @@
+Name: tamp_legacy_program
+Version: 1
+Schema: scenesmith.tamp.program.v1
+Legacy VLM-domain ablation only, not the hierarchical PRoC3S-inspired path.
+Produce a declarative parameter program as JSON only. Schema: scenesmith.tamp.program.v1; keys: schema, variables, steps. Every variable must have a discrete, uniform or normal sampling domain. Each step must exactly match the required skill sequence and arguments; parameters use {"var":name}, {"const":value}, {"state":name}, {"add":[expr,expr]} or {"sub":[expr,expr]}. Do not output Python. Change sampling domains using physical failure feedback. Never claim a candidate is feasible; another solver checks it.

@@ -20,6 +20,7 @@ from src.online_manipulation.contact import (
     PairContactPolicy,
     SupportContactPolicy,
     penetration_limit,
+    permits_contact,
 )
 
 
@@ -114,6 +115,20 @@ class NavigationTest(unittest.TestCase):
         self.assertEqual(penetration_limit(combined, "wheel", "floor"), 0.002)
         self.assertEqual(penetration_limit(combined, "finger", "target"), 0.0001)
         self.assertEqual(penetration_limit(combined, "wheel", "obstacle"), 0)
+
+    def test_nested_support_bounds_preserve_each_pair_limit(self):
+        task = PairContactPolicy.from_pairs(
+            "grasp", [("finger", "target")], maximum_allowed_penetration_m=0.0005
+        )
+        table = SupportContactPolicy(task, {("table", "target"): 0.0035})
+        wheel = SupportContactPolicy(table, {("floor", "wheel"): 0.01})
+        self.assertTrue(permits_contact(wheel, "table", "target"))
+        self.assertTrue(permits_contact(wheel, "floor", "wheel"))
+        self.assertFalse(permits_contact(wheel, "target", "obstacle"))
+        self.assertEqual(penetration_limit(wheel, "finger", "target"), 0.0005)
+        self.assertEqual(penetration_limit(wheel, "table", "target"), 0.0035)
+        self.assertEqual(penetration_limit(wheel, "floor", "wheel"), 0.01)
+        self.assertEqual(penetration_limit(wheel, "target", "obstacle"), 0.0)
 
 
 if __name__ == "__main__":

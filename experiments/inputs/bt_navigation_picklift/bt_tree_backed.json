@@ -1,0 +1,13 @@
+{
+  "kind": "root", "name": "", "args": [], "children": [
+    {"kind": "selector", "name": "", "args": [], "children": [
+      {"kind": "condition", "name": "PickLiftSucceeded", "args": [], "children": []},
+      {"kind": "sequence", "name": "", "args": [], "children": [
+        {"kind": "action", "name": "Wait", "args": ["1.0"], "children": []},
+        {"kind": "action", "name": "NavigateTo", "args": ["2.7056", "2.95", "3.141592653589793", "world"], "children": []},
+        {"kind": "condition", "name": "BaseParkedAtPickPose", "args": [], "children": []},
+        {"kind": "action", "name": "ExecutePickLift", "args": [], "children": []}
+      ]}
+    ]}
+  ]
+}

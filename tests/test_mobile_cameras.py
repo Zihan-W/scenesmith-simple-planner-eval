@@ -20,6 +20,36 @@ from src.online_manipulation.adapters.description import drake_pose
 class MobileCameraTest(unittest.TestCase):
     """Both real base implementations must move the very same camera frames."""
 
+    def test_fresh_capture_does_not_step_or_replace_periodic_latch(self):
+        config = make_config("planar_kinematic")
+        adapter = config.robot_adapter
+        cameras = make_zerith_camera_specs(
+            enabled_names=("head_camera", "left_wrist_camera"),
+            width=64, height=48, update_period_s=200.0,
+        )
+        adapter = type(adapter)(dataclasses.replace(adapter.spec, cameras=cameras),
+                                adapter.base_config)
+        env = make_env(dataclasses.replace(config, robot_adapter=adapter))
+        initial, _ = env.reset(3)
+        obs, *_ = env.step(BaseVelocityAction(0.08, 0.15))
+        self.assertGreater(obs.time_s, 0.0)
+        fresh = env.backend.capture_cameras()
+        self.assertEqual(env.observation.time_s, obs.time_s)
+        self.assertEqual(env.backend.simulator.get_context().get_time(), obs.time_s)
+        held = env.backend.cameras.observe(env.backend.simulator.get_context())
+        for spec in cameras:
+            if not spec.enabled:
+                continue
+            frame = fresh[spec.name]
+            self.assertEqual(frame.timestamp_s, obs.time_s)
+            expected = drake_pose(obs.robot.frame_poses_world[spec.parent_frame]) @ drake_pose(
+                spec.X_parent_camera_optical)
+            np.testing.assert_allclose(drake_pose(frame.pose).GetAsMatrix4(),
+                                       expected.GetAsMatrix4(), atol=1e-10)
+            self.assertEqual(held[spec.name].timestamp_s, 0.0)
+            self.assertEqual(held[spec.name].pose, initial.sensors[spec.name].pose)
+            np.testing.assert_array_equal(held[spec.name].rgb, initial.sensors[spec.name].rgb)
+
     def test_pose_images_and_time_latch_on_both_modes(self):
         for mode in ("planar_kinematic", "wheel_dynamic"):
             with self.subTest(mode=mode):

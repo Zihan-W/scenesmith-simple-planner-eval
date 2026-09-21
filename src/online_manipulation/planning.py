@@ -13,6 +13,7 @@ from pydrake.all import (
     ProcessModelDirectives,
     Quaternion,
     RigidTransform,
+    Role,
     RotationMatrix,
     Solve,
 )
@@ -239,14 +240,32 @@ class PlanningQuery:
 
     def _contact_policy(self, policy):
         """Keep robot support limits separate from task-specific contacts."""
-        if (self.support_limits_m or self.support_geometry_limits_m) and not isinstance(policy, SupportContactPolicy):
-            return SupportContactPolicy(policy, self.support_limits_m, self.support_geometry_limits_m)
-        return policy
+        if not (self.support_limits_m or self.support_geometry_limits_m):
+            return policy
+        if (isinstance(policy, SupportContactPolicy)
+                and policy.support_limits_m == self.support_limits_m
+                and policy.geometry_limits_m == self.support_geometry_limits_m):
+            return policy
+        # A task may already wrap its finger contacts with object/table support.
+        # That wrapper does not contain the robot's wheel/floor geometry rules.
+        return SupportContactPolicy(
+            policy, self.support_limits_m, self.support_geometry_limits_m)
 
     def configuration(self) -> tuple[float, ...]:
         """Return controlled joint positions in RobotSpec order."""
         positions = self.plant.GetPositions(self._plant_context)
         return tuple(float(positions[index]) for index in self._controlled_indices)
+
+    def set_observed_joint_positions(self, positions: Mapping[str, float]) -> None:
+        """Copy named measured joints into the independent query context.
+
+        Measurements are not RobotSpec home commands: retain numerical contact
+        solver excursions exactly and let existing state/edge checks judge them.
+        """
+        names = self.robot_adapter.spec.controlled_joint_names
+        if set(positions) != set(names):
+            raise ValueError("Observed joints must match the controlled joint names")
+        self._set_configuration([positions[name] for name in names])
 
     def joint_limits(self) -> dict[str, tuple[float, float]]:
         """Return configured position limits keyed by joint name."""
@@ -640,7 +659,11 @@ class PlanningQuery:
         minimum_safety_clearance_m: float = 0.005,
         influence_distance_m: float = 0.05,
     ) -> IkResult:
-        """Solve pose IK, then independently validate its endpoint."""
+        """Solve IK, constrain violating endpoint pairs, and independently validate.
+
+        Up to four constraint additions retain the original contact/clearance
+        limits. Dense motion-edge validation remains the caller's responsibility.
+        """
         if position_tolerance_m <= 0.0:
             raise ValueError("position_tolerance_m must be positive")
         if orientation_tolerance_rad <= 0.0:
@@ -718,14 +741,62 @@ class PlanningQuery:
         initial = self._base_positions.copy()
         initial[self._controlled_indices] = q_seed
         program.SetInitialGuess(q, initial)
-        result = Solve(program)
-        solution = result.GetSolution(q)[self._controlled_indices]
-        check = self.check_configuration(
-            solution,
-            contact_policy=contact_policy,
-            minimum_safety_clearance_m=minimum_safety_clearance_m,
-            influence_distance_m=influence_distance_m,
-        )
+        contact_policy = self._contact_policy(contact_policy)
+        constrained_pairs = set()
+        collision_refinement = False
+        # A constraint generation loop avoids putting thousands of distant
+        # scene pairs in every pose solve. Each solution is still checked against
+        # ALL relevant geometry; exhaustion never accepts an unsafe endpoint.
+        for iteration in range(5):
+            result = Solve(program)
+            full_solution = result.GetSolution(q)
+            solution = full_solution[self._controlled_indices]
+            check, pairs = self._check_configuration(
+                solution, contact_policy=contact_policy,
+                minimum_safety_clearance_m=minimum_safety_clearance_m,
+                influence_distance_m=influence_distance_m,
+            )
+            if check.valid or not result.is_success() or iteration == 4:
+                break
+            # Attached objects have pose-dependent transforms outside this IK's
+            # decision variables. Keep their independent rejection unchanged.
+            if contact_policy.carried_bodies or not check.within_joint_limits:
+                break
+            violations = {}
+            for pair in pairs:
+                lower = pair.distance_m - self._nonpenetration_margin(pair, contact_policy)
+                if not self._safety_pair_exempt(pair, contact_policy):
+                    lower = max(lower, minimum_safety_clearance_m)
+                identity = self._collision_pair_identity(pair)
+                if pair.distance_m < lower and identity not in constrained_pairs:
+                    violations[identity] = lower
+            if not violations:
+                break
+            if not collision_refinement:
+                # Do not fix a left-arm collision by moving a second arm that
+                # the caller will never execute. Only target-frame ancestors
+                # may depart from the original seed during refinement.
+                active = self._safety_joint_influences[int(frame.body().index())]
+                inactive = np.asarray([i for i, joint in enumerate(self._controlled_joints)
+                                       if joint.name() not in active], dtype=int)
+                if len(inactive):
+                    program.AddBoundingBoxConstraint(q_seed[inactive], q_seed[inactive],
+                                                     q[self._controlled_indices[inactive]])
+            geometry_query = self.plant.get_geometry_query_input_port().Eval(self._plant_context)
+            inspector = geometry_query.inspector()
+            # The violating pairs already came from a collision query. Resolve
+            # only their geometry IDs; enumerating the scene's full O(n^2)
+            # candidate set here dominates planning in furnished rooms.
+            for identity, lower in violations.items():
+                geometry_ids = tuple(inspector.GetGeometryIdByName(
+                    self.plant.GetBodyFrameIdOrThrow(
+                        self._body_from_qualified_name(body_name).index()),
+                    Role.kProximity, geometry_name,
+                ) for body_name, geometry_name in identity)
+                ik.AddDistanceConstraint(geometry_ids, lower + 1e-6, math.inf)
+                constrained_pairs.add(identity)
+            collision_refinement = True
+            program.SetInitialGuess(q, full_solution)
         actual = self.frame_pose(
             self.robot_adapter.spec.model_instance_name,
             frame.name(),
@@ -744,7 +815,7 @@ class PlanningQuery:
         success = bool(result.is_success() and check.valid)
         reason = "success"
         if not result.is_success():
-            reason = "solver_failed"
+            reason = "endpoint_collision_or_clearance" if collision_refinement else "solver_failed"
         elif not check.valid:
             reason = "endpoint_collision_or_clearance"
         return IkResult(

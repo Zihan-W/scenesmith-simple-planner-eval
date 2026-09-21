@@ -1,5 +1,9 @@
 # PickLift BT generation module
 
+This page documents the legacy PickLift v1 contract. New integrations use the
+[shared BT generation pipeline](BT_GENERATION_PIPELINE.md) and
+`scenesmith-generate-bt`; the older command remains a compatibility alias.
+
 `scenesmith-generate-picklift-bt` is the fixed boundary between perception/task
 preparation and BT execution. It accepts one
 `scenesmith.picklift_bt_generation.request.v1` JSON file and writes one executable

@@ -133,6 +133,9 @@ def permits_contact(policy, body_a, body_b, geometry_a="", geometry_b=""):
         pair = tuple(sorted(((body_a, geometry_a), (body_b, geometry_b))))
         if pair in policy.geometry_limits_m:
             return True
+        if _canonical_pair(body_a, body_b) in policy.support_limits_m:
+            return True
+        return permits_contact(policy.task_policy, body_a, body_b, geometry_a, geometry_b)
     return policy.permits(body_a, body_b)
 
 
@@ -145,4 +148,5 @@ def penetration_limit(policy, body_a, body_b, geometry_a="", geometry_b=""):
         pair = _canonical_pair(body_a, body_b)
         if pair in policy.support_limits_m:
             return policy.support_limits_m[pair]
+        return penetration_limit(policy.task_policy, body_a, body_b, geometry_a, geometry_b)
     return policy.maximum_allowed_penetration_m if policy.permits(body_a, body_b) else 0.0

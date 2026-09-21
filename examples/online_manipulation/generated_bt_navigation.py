@@ -6,17 +6,18 @@ robot actions and Navigator; no TAMP query or task-level planner is used.
 
 from __future__ import annotations
 
-import dataclasses
-import enum
 import hashlib
 import json
 import math
-import re
 from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
 
+from examples.online_manipulation.bt_core import (
+    MdslParser as BaseMdslParser, Node, Status, TickOutcome,
+    condition_names, skill_registry, skill_signatures, tick_tree, to_dict, to_mdsl, to_mermaid,
+)
 from src.online_manipulation import (
     BaseVelocityAction,
     GripperAction,
@@ -31,126 +32,14 @@ from src.online_manipulation import (
 )
 
 
-class Status(enum.Enum):
-    """Behavior Tree status values."""
+_SIGNATURES = skill_signatures("navigation")
 
-    RUNNING = "RUNNING"
-    SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE"
-
-
-@dataclasses.dataclass(frozen=True)
-class Node:
-    """One validated Behavior Tree node."""
-
-    kind: str
-    name: str = ""
-    args: tuple[str, ...] = ()
-    children: tuple["Node", ...] = ()
-
-
-@dataclasses.dataclass(frozen=True)
-class TickOutcome:
-    """Result of one tree tick and its optional public robot action."""
-
-    status: Status
-    action: object | None = None
-    path: str = ""
-    reason: str = ""
-
-
-_SIGNATURES = {
-    "Wait": ("duration_s",),
-    "NavigateTo": ("x_m", "y_m", "yaw_rad", "frame_id"),
-    "SetDualJointTargets": (
-        "arm_target_rad",
-        "left_gripper_width_m",
-        "right_gripper_width_m",
-        "hold_s",
-    ),
-    "ParkedDualTargetsReached": (),
-}
-
-_TOKEN = re.compile(
-    r'\s*(?:(?P<word>[A-Za-z_][A-Za-z_0-9]*)|'
-    r'(?P<string>"(?:[^"\\]|\\.)*")|(?P<punct>[{}\[\],]))'
-)
-
-
-class MdslParser:
-    """Strict parser for the model-generated SceneSmith MDSL subset."""
+class MdslParser(BaseMdslParser):
+    """Navigation skill validation using the common MDSL parser."""
 
     def __init__(self, text):
-        if not isinstance(text, str) or not text.strip() or len(text) > 20_000:
-            raise ValueError("MAIN_SEQUENCE must be nonempty MDSL")
-        self.tokens = []
-        position = 0
-        while position < len(text):
-            if not text[position:].strip():
-                break
-            match = _TOKEN.match(text, position)
-            if not match:
-                raise ValueError(f"Invalid MDSL near {text[position:position + 30]!r}")
-            self.tokens.append((match.lastgroup, match.group(match.lastgroup)))
-            position = match.end()
-        self.index = 0
-        self.count = 0
-
-    def _pop(self, expected=None):
-        if self.index >= len(self.tokens):
-            raise ValueError("Unexpected end of MDSL")
-        token = self.tokens[self.index]
-        self.index += 1
-        if expected is not None and token[1] != expected:
-            raise ValueError(f"Expected {expected!r}, got {token[1]!r}")
-        return token
-
-    def _peek(self):
-        return self.tokens[self.index][1] if self.index < len(self.tokens) else ""
-
-    def _node(self, depth=0):
-        self.count += 1
-        if depth > 16 or self.count > 64:
-            raise ValueError("Generated BT exceeds depth/node limit")
-        kind = self._pop()[1]
-        if kind in ("sequence", "selector"):
-            self._pop("{")
-            children = []
-            while self._peek() != "}":
-                children.append(self._node(depth + 1))
-            self._pop("}")
-            if not children:
-                raise ValueError("Composite node must contain children")
-            return Node(kind, children=tuple(children))
-        if kind not in ("action", "condition"):
-            raise ValueError(f"Unsupported BT node kind: {kind!r}")
-        self._pop("[")
-        token_kind, name = self._pop()
-        if token_kind != "word" or name not in _SIGNATURES:
-            raise ValueError(f"Unknown BT skill: {name!r}")
-        if kind == "condition" and name != "ParkedDualTargetsReached":
-            raise ValueError(f"Skill is not a condition: {name}")
-        if kind == "action" and name == "ParkedDualTargetsReached":
-            raise ValueError(f"Skill is not an action: {name}")
-        args = []
-        while self._peek() == ",":
-            self._pop(",")
-            arg_kind, raw = self._pop()
-            if arg_kind != "string":
-                raise ValueError("MDSL arguments must be JSON strings")
-            args.append(json.loads(raw))
-        self._pop("]")
-        if len(args) != len(_SIGNATURES[name]):
-            raise ValueError(
-                f"{name} expects {len(_SIGNATURES[name])} arguments, got {len(args)}"
-            )
-        return Node(kind, name, tuple(args))
-
-    def parse(self):
-        result = self._node()
-        if self.index != len(self.tokens):
-            raise ValueError("MAIN_SEQUENCE must contain exactly one subtree")
-        return result
+        super().__init__(text, signatures=_SIGNATURES,
+                         conditions=condition_names("navigation"), max_depth=16)
 
 
 def planning_prompt(environment: Mapping, task_plan: Mapping) -> str:
@@ -188,14 +77,14 @@ def planning_prompt(environment: Mapping, task_plan: Mapping) -> str:
         }
     compact_environment = json.dumps(planning_environment, separators=(",", ":"))
     compact_plan = json.dumps(task_plan, separators=(",", ":"))
+    actions = {name: spec for name, spec in skill_registry("navigation").items()
+               if spec["class"] == "action"}
     return (
         "Generate a SceneSmith behavior tree from these authoritative inputs. "
         f"ENV={compact_environment} TASK={compact_plan} "
         "Return only strict JSON with keys MAIN_SEQUENCE and ULTIMATE_GOAL. "
         "MAIN_SEQUENCE must be exactly one MDSL sequence with these task steps in order. "
-        'Syntax: action [Wait, "duration_s"]; action [NavigateTo, "x_m", "y_m", '
-        '"yaw_rad", "frame_id"]; action [SetDualJointTargets, "arm_target_rad", '
-        '"left_gripper_width_m", "right_gripper_width_m", "hold_s"]. '
+        f"Action signatures: {json.dumps(actions, separators=(',', ':'))}. "
         "All args are quoted strings. Do not emit root, TAMP, code fences, comments, "
         "retries or extra nodes."
     )
@@ -337,64 +226,6 @@ def generate_tree(environment: Mapping, task_plan: Mapping) -> Node:
     )
 
 
-def to_mdsl(root: Node) -> str:
-    """Serialize the generated tree using the project's strict MDSL subset."""
-    def emit(node, depth):
-        prefix = "    " * depth
-        if node.kind in ("action", "condition"):
-            args = "".join(", " + json.dumps(arg) for arg in node.args)
-            return [f"{prefix}{node.kind} [{node.name}{args}]"]
-        if node.kind not in ("root", "selector", "sequence"):
-            raise ValueError(f"Unsupported composite: {node.kind}")
-        lines = [f"{prefix}{node.kind} {{"]
-        for child in node.children:
-            lines.extend(emit(child, depth + 1))
-        return lines + [prefix + "}"]
-
-    return "\n".join(emit(root, 0)) + "\n"
-
-
-def to_dict(node: Node):
-    """Return a JSON-compatible tree representation."""
-    return {
-        "kind": node.kind,
-        "name": node.name,
-        "args": list(node.args),
-        "children": [to_dict(child) for child in node.children],
-    }
-
-
-def to_mermaid(root: Node) -> str:
-    """Render a compact visualization source for the generated tree."""
-    lines = [
-        "flowchart TD",
-        "    classDef root fill:#e2e8f0,stroke:#334155",
-        "    classDef selector fill:#f3e8ff,stroke:#7e22ce",
-        "    classDef sequence fill:#dbeafe,stroke:#2563eb",
-        "    classDef condition fill:#ccfbf1,stroke:#0f766e",
-        "    classDef action fill:#e0f2fe,stroke:#0369a1",
-    ]
-    serial = 0
-
-    def emit(node, parent=None, order=1):
-        nonlocal serial
-        serial += 1
-        current = f"n{serial}"
-        label = node.name or node.kind
-        if node.args:
-            label += "(" + ", ".join(node.args) + ")"
-        label = label.replace('"', "&quot;")
-        shape = f'{{"{label}"}}' if node.kind == "condition" else f'["{label}"]'
-        lines.append(f"    {current}{shape}:::{node.kind}")
-        if parent:
-            lines.append(f"    {parent} -->|{order}| {current}")
-        for child_index, child in enumerate(node.children, 1):
-            emit(child, current, child_index)
-
-    emit(root)
-    return "\n".join(lines) + "\n"
-
-
 class GeneratedBehaviorTreePolicy:
     """Tick a generated BT while emitting at most one action per policy step."""
 
@@ -454,36 +285,14 @@ class GeneratedBehaviorTreePolicy:
         return {"title": "Navigation Behavior Tree", "tree": to_dict(self.root)}
 
     def _tick(self, node, path, observation):
-        if node.kind == "root":
-            return self._tick(node.children[0], f"{path}.0", observation)
-        if node.kind == "selector":
-            for index, child in enumerate(node.children):
-                result = self._tick(child, f"{path}.{index}", observation)
-                if result.status is not Status.FAILURE:
-                    return result
-            return TickOutcome(Status.FAILURE, path=path, reason="all_branches_failed")
-        if node.kind == "sequence":
-            index = self._sequence_indexes.get(path, 0)
-            while index < len(node.children):
-                result = self._tick(node.children[index], f"{path}.{index}", observation)
-                if result.status is Status.FAILURE:
-                    self._sequence_indexes[path] = 0
-                    return result
-                if result.status is Status.RUNNING:
-                    self._sequence_indexes[path] = index
-                    return result
-                index += 1
-                self._sequence_indexes[path] = index
-                if result.action is not None:
-                    status = Status.SUCCESS if index == len(node.children) else Status.RUNNING
-                    return dataclasses.replace(result, status=status)
-            return TickOutcome(Status.SUCCESS, path=path)
-        if node.kind == "condition":
-            if node.name == "ParkedDualTargetsReached":
-                success = bool(observation.task.get("success", False))
-                return TickOutcome(Status.SUCCESS if success else Status.FAILURE, path=path)
-            return TickOutcome(Status.FAILURE, path=path, reason=f"unknown_condition:{node.name}")
-        return self._tick_action(node, path, observation)
+        return tick_tree(node, path, observation, self._sequence_indexes,
+                         self._tick_condition, self._tick_action)
+
+    def _tick_condition(self, node, path, observation):
+        if node.name == "ParkedDualTargetsReached":
+            success = bool(observation.task.get("success", False))
+            return TickOutcome(Status.SUCCESS if success else Status.FAILURE, path=path)
+        return TickOutcome(Status.FAILURE, path=path, reason=f"unknown_condition:{node.name}")
 
     def _tick_action(self, node, path, observation):
         state = self._leaf_state.setdefault(path, {})
@@ -583,8 +392,9 @@ def make_policy(context):
         generated_plan_path, environment, task_plan
     )
     environment_sha256 = hashlib.sha256(environment_path.read_bytes()).hexdigest()
-    recorded_environment_sha256 = generated_artifact.get("generation", {}).get(
-        "full_extracted_environment_sha256"
+    generation = generated_artifact.get("generation", {})
+    recorded_environment_sha256 = generation.get(
+        "environment_sha256", generation.get("full_extracted_environment_sha256")
     )
     if recorded_environment_sha256 != environment_sha256:
         raise ValueError("Generated BT does not match the extracted environment hash")

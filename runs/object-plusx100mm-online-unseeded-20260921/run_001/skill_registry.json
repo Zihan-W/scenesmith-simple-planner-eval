@@ -1,0 +1,85 @@
+[
+  {
+    "name": "NavigateToPick",
+    "symbolic_parameters": [
+      "object"
+    ],
+    "geometric_parameters": [
+      "base_pose"
+    ],
+    "preconditions": [
+      {
+        "predicate": "observed",
+        "arguments": [
+          "$object"
+        ]
+      }
+    ],
+    "add_effects": [
+      {
+        "predicate": "at_pick_pose",
+        "arguments": [
+          "$object"
+        ]
+      }
+    ],
+    "delete_effects": [],
+    "constraints": [
+      "corridor",
+      "base_collision",
+      "reachability"
+    ],
+    "supports_geometric_conditioning": true,
+    "runtime_action": "NavigateTo"
+  },
+  {
+    "name": "PickLift",
+    "symbolic_parameters": [
+      "object"
+    ],
+    "geometric_parameters": [
+      "grasp_pose",
+      "approach_pose"
+    ],
+    "preconditions": [
+      {
+        "predicate": "observed",
+        "arguments": [
+          "$object"
+        ]
+      },
+      {
+        "predicate": "at_pick_pose",
+        "arguments": [
+          "$object"
+        ]
+      },
+      {
+        "predicate": "gripper_empty",
+        "arguments": []
+      }
+    ],
+    "add_effects": [
+      {
+        "predicate": "holding",
+        "arguments": [
+          "$object"
+        ]
+      }
+    ],
+    "delete_effects": [
+      {
+        "predicate": "gripper_empty",
+        "arguments": []
+      }
+    ],
+    "constraints": [
+      "ik",
+      "joint_limits",
+      "joint_edge",
+      "contact"
+    ],
+    "supports_geometric_conditioning": true,
+    "runtime_action": "ExecutePickLift"
+  }
+]

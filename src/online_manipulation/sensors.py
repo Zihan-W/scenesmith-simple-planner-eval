@@ -73,14 +73,21 @@ class CameraSystems:
                 if self.labels.setdefault(label, name) != name:
                     raise RuntimeError(f"Render label {label} has multiple body names")
 
-    def observe(self, root_context):
-        """Read held frames without inferring timestamps from current time."""
+    def observe(self, root_context, *, fresh=False):
+        """Read held frames, or render current state without advancing time.
+
+        Fresh reads evaluate the underlying continuous sensor, leaving the
+        discrete sensor's image/pose/time latch unchanged.
+        """
         observations = {}
         for name, (spec, sensor) in self.systems.items():
+            if fresh:
+                sensor = sensor.sensor()
             context = sensor.GetMyContextFromRoot(root_context)
             observations[name] = CameraObservation(
                 frame=name,
-                timestamp_s=sampled_image_time(sensor, context, root_context),
+                timestamp_s=(float(root_context.get_time()) if fresh else
+                             sampled_image_time(sensor, context, root_context)),
                 pose=public_pose(sensor.body_pose_in_world_output_port().Eval(context)),
                 intrinsics=spec.intrinsics,
                 rgb=(

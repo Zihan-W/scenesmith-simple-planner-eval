@@ -111,6 +111,17 @@ class _FailingPolicy(_Policy):
         return HoldAction()
 
 
+class _ActionResultPolicy(_Policy):
+    """Record post-step observations and final Runtime decisions."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.results = []
+
+    def record_action_result(self, observation, info):
+        self.results.append((observation.time_s, dict(info["action_decision"])))
+
+
 class _TerminalDiagnosticPolicy(_Policy):
     """Expose a terminal policy reason after one environment step."""
 
@@ -299,6 +310,20 @@ class EpisodeRunnerTest(unittest.TestCase):
                 {"stage": "hold"},
             )
             self.assertEqual(result.summary["policy"], {"stage": "hold"})
+
+    def test_run_episode_reports_post_step_action_result_to_policy(self):
+        policy = _ActionResultPolicy()
+        run_episode(
+            env=_Environment(),
+            policy=policy,
+            seed=4,
+            max_steps=4,
+        )
+        self.assertEqual([item[0] for item in policy.results], [0.1, 0.2])
+        self.assertEqual(
+            policy.results[0][1],
+            {"status": "accepted", "reasons": ()},
+        )
 
     def test_bt_recording_contains_synchronized_timeline(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -1,0 +1,20 @@
+{
+  "kind": "root",
+  "name": "",
+  "args": [],
+  "children": [
+    {
+      "kind": "sequence",
+      "name": "",
+      "args": [],
+      "children": [
+        {
+          "kind": "action",
+          "name": "ExecutePickLift",
+          "args": [],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

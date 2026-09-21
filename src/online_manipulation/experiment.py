@@ -179,6 +179,10 @@ def load_experiment(config_path, *, repository_root, cache_root, scene_root=None
             gripper_contact_bodies=tuple(f"{spec.model_instance_name}::{n}" for n in grip.contact_body_names),
             support_contact_bodies=tuple(b["support_contact_bodies"]),
             required_lift_m=task_data["required_lift_m"], required_hold_s=task_data["required_hold_s"],
+            maximum_allowed_contact_penetration_m=task_data.get(
+                "maximum_allowed_contact_penetration_m", 0.0001),
+            maximum_allowed_support_penetration_m=task_data.get(
+                "maximum_allowed_support_penetration_m"),
             carrier_arm_name=arm, carrier_gripper_name=arm))
         scenario = dataclasses.replace(scenario, observed_bodies=(ObservedBodySpec(
             task_data["target_observation_name"], b["target_model_name"], b["target_body_name"], write_back=True),))

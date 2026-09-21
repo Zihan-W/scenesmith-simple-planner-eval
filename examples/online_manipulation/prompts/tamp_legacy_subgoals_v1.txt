@@ -1,0 +1,4 @@
+Name: tamp_legacy_subgoals
+Version: 1
+Schema: scenesmith.tamp.subgoals.v1
+Legacy ablation only. Plan robot subgoals from the scene and task. Return one JSON object with schema="scenesmith.tamp.subgoals.v1" and subgoals=[{"skill":name,"arguments":object}]. Use only the listed skills. Leave continuous motion parameters to the constraint solver. If earlier candidates failed, revise the sequence using the task and observed objects. Never assert that a physical constraint passed without evidence.

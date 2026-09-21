@@ -221,25 +221,25 @@ LIBGL_ALWAYS_SOFTWARE=1 "$PYTHON" -B scripts/extract_picklift_verigraph_inputs.p
 相机周期设为 200 秒，只采集任务规划所需的 reset 帧；它不用于伪造物理成功，
 执行结果仍由接触、抬升和稳定保持 evaluator 判定。
 
-场景信息和任务描述到 BT 的固定模块入口是
-`scenesmith-generate-picklift-bt`。输入必须是
-`scenesmith.picklift_bt_generation.request.v1`，其中环境、任务计划、头部 RGB 和
-左腕 RGB 都由 SHA-256 绑定；输出是
-`scenesmith.picklift_bt_generation.result.v1`，同时写出可执行 JSON、MDSL、Mermaid
+场景信息和任务描述到 BT 的统一入口是
+`scenesmith-generate-bt`。推荐输入为
+`scenesmith.bt_generation.request.v1`，环境、任务计划及所需的相机图像
+均由 SHA-256 绑定；输出为
+`scenesmith.bt_generation.result.v1`，同时写出可执行 JSON、MDSL、Mermaid
 和可离线打开的 `generated_bt.html` 交互树图。它展示生成结构与节点参数，执行状态仍需运行 BT 才能获得。
+已有 PickLift v1 请求仍可直接使用，输出保持原 v1 schema 以兼容旧实验。
 服务地址和密钥只通过运行参数/环境变量提供，不写入请求或结果：
 
 ```bash
 export OPENAI_BASE_URL='https://provider.example/v1'
 export OPENAI_API_KEY='...'
-scenesmith-generate-picklift-bt \
+scenesmith-generate-bt \
   --request "$RUN_ROOT/generation_request.json" \
   --output-dir "$RUN_ROOT/generated-bt"
 ```
 
-完整字段、语义检查和限制见
-[PickLift BT 生成模块](PICKLIFT_BT_GENERATION_MODULE.md)。这是当前已验证的
-PickLift 有限技能接口，不自动扩展为任意任务规划器。
+完整字段见[通用 BT 生成 Pipeline](BT_GENERATION_PIPELINE.md)；PickLift 的图像与
+语义约束见[PickLift BT 生成模块](PICKLIFT_BT_GENERATION_MODULE.md)。
 
 ## 7. 可选 IIWA 基线
 

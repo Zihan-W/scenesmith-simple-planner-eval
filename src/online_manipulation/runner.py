@@ -284,6 +284,11 @@ def run_episode(
             observation, reward, terminated, truncated, last_info = env.step(
                 action
             )
+            action_result = getattr(policy, "record_action_result", None)
+            if action_result is not None:
+                if not callable(action_result):
+                    raise TypeError("policy.record_action_result must be callable")
+                action_result(observation, last_info)
         except Exception as error:
             _write_exception_artifacts(
                 env=env,

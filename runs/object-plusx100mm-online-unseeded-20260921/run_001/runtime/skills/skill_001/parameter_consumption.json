@@ -1,0 +1,10 @@
+{
+  "supports_geometric_conditioning": {
+    "base_pose": true
+  },
+  "geometry_guarantee": true,
+  "parameter_bindings": {
+    "base_pose": "b0"
+  },
+  "scope": "runtime_parameter_consumption_not_physical_success"
+}

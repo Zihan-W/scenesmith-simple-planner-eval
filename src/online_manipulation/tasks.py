@@ -21,6 +21,7 @@ from src.online_manipulation.contact import (
     CarriedBody,
     FREE_MOTION_CONTACT_POLICY,
     PairContactPolicy,
+    SupportContactPolicy,
 )
 from src.online_manipulation.protocols import ContactPolicy, TaskEvaluation
 
@@ -71,6 +72,7 @@ class PickLiftTaskConfig:
     maximum_target_translational_speed_m_s: float = 0.02
     maximum_target_rotational_speed_rad_s: float = 0.5
     maximum_allowed_contact_penetration_m: float = 0.0001
+    maximum_allowed_support_penetration_m: float | None = None
     carrier_arm_name: str | None = None
     carrier_gripper_name: str | None = None
 
@@ -112,6 +114,11 @@ class PickLiftTaskConfig:
             or self.maximum_allowed_contact_penetration_m <= 0.0
         ):
             raise ValueError("PickLiftTask contact penetration limit must be positive")
+        if self.maximum_allowed_support_penetration_m is not None and (
+            not math.isfinite(self.maximum_allowed_support_penetration_m)
+            or self.maximum_allowed_support_penetration_m <= 0.0
+        ):
+            raise ValueError("PickLiftTask support penetration limit must be positive")
         object.__setattr__(self, "gripper_contact_bodies", contacts)
         object.__setattr__(self, "support_contact_bodies", supports)
 
@@ -294,20 +301,36 @@ class PickLiftTask:
                     ),
                 ),
             )
-        return PairContactPolicy.from_pairs(
+        grasp_policy = PairContactPolicy.from_pairs(
             "pick_lift_target_contact",
             tuple(
                 (body, self.config.target_contact_body)
                 for body in self.config.gripper_contact_bodies
-            )
-            + tuple(
+            ) + (tuple(
                 (body, self.config.target_contact_body)
                 for body in self.config.support_contact_bodies
-            ),
+            ) if self.config.maximum_allowed_support_penetration_m is None else ()),
             carried_bodies=carried_bodies,
             maximum_allowed_penetration_m=(
                 self.config.maximum_allowed_contact_penetration_m
             ),
+        )
+        if (not self.config.support_contact_bodies
+                or self.config.maximum_allowed_support_penetration_m is None):
+            # Preserve the original default policy and its public log name.
+            # A wrapper is needed only for an explicitly distinct support bound.
+            return grasp_policy
+        support_limit = (
+            self.config.maximum_allowed_support_penetration_m
+            if self.config.maximum_allowed_support_penetration_m is not None
+            else self.config.maximum_allowed_contact_penetration_m
+        )
+        return SupportContactPolicy(
+            grasp_policy,
+            {
+                tuple(sorted((body, self.config.target_contact_body))): support_limit
+                for body in self.config.support_contact_bodies
+            },
         )
 
     def finalize(self, env: Any) -> Mapping[str, Any]:

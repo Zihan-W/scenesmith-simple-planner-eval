@@ -1,0 +1,25 @@
+{
+  "kind": "root",
+  "name": "",
+  "args": [],
+  "children": [
+    {
+      "kind": "sequence",
+      "name": "",
+      "args": [],
+      "children": [
+        {
+          "kind": "action",
+          "name": "NavigateTo",
+          "args": [
+            "2.7915632276305797",
+            "2.911423094890688",
+            "-3.141592649145102",
+            "world"
+          ],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

@@ -36,6 +36,14 @@ export RUN_ROOT="$(mktemp -d /tmp/scene-eval-XXXXXX)"
 通用接口不代表任意URDF/策略零适配。未验证双臂协同抓物、移动携物、
 完整TAMP、SLAM、PLACE或导轨动力学；固定PickLift不证明随机鲁棒性。
 
+## BT 与分层 TAMP 对照
+
+BT baseline 仍由 `bt_generation.py` 生成、由 `bt_runtime.py` 的 `JsonBtPolicy` 执行。通用入口 `examples/online_manipulation/tamp_cli.py` 的 `--planner bt` 走原 BT 生成器；`--planner tamp --tamp-mode legacy-vlm-domain` 保留模型给数值采样域的消融路线；`--planner tamp --tamp-mode hierarchical --geometry-backend sampling` 走新分层路线。两条执行路线调用同一 `JsonBtPolicy` 导航和抓取叶节点，分层 TAMP 每次只执行一个技能并重新观测。
+
+论文映射：`tamp_semantic.py` 提供 VLM-TAMP 风格的语义子目标；`tamp_skill_planning.py` 的 `StripsProgramGenerator` 调用 `tamp_hierarchy.py` 的确定性 BFS，是本仓库自研 STRIPS baseline，不是 PRoC3S。`tamp_geometry.py` 的候选生成、IK/碰撞过滤与排序是自研 SamplingSolver，不是 cuTAMP。外部结果校验器已明确命名为 `ExternalGeometrySolverAdapter`，其本身不包含 GPU 优化。当前技能域只有 `NavigateToPick` 和 `PickLift`。新增 `--skill-planner proc3s --geometry-backend proc3s` 接入真实 LLM 开放程序与完整赋值拒绝采样，但尚未完成端到端验收。官方 cuTAMP 独立 demo 已运行，Zerith 适配器仍未实现。官方源码逐项差距见 [论文对齐报告](docs/PAPER_ALIGNMENT.md)，当前证据与未完成项见 [进展报告](docs/PAPER_ALIGNMENT_PROGRESS.md)。
+
+已验证真实在线仿真 `runs/tamp-hierarchical-20260919/live_010/result.json`：seed 500，自动导航/抓取参数，实际抬高 8.013 cm 并稳定保持 3.1 s，最终 `task_goal_verified`。这是单场景验证，不是多场景成功率；完整文件职责、A–E 测试、边界与后续工作见 [A–G 实现报告](docs/TAMP_IMPLEMENTATION_REPORT.md) 和 [0–32 需求审计](docs/TAMP_REQUIREMENT_AUDIT.md)。
+
 ## 目录
 
 | 目录 | 职责 |

@@ -1,0 +1,771 @@
+{
+  "user_config": {
+    "robot": "zerith_dual",
+    "robot_options": {
+      "camera_options": {
+        "enabled_names": [
+          "head_camera",
+          "left_wrist_camera"
+        ],
+        "width": 640,
+        "height": 480,
+        "fov_y_rad": 1.5707963267948966,
+        "update_period_s": 200.0
+      },
+      "locked_joint_positions": {
+        "neck_yaw_joint": 0.0,
+        "neck_pitch_joint": 0.0
+      }
+    },
+    "base": {
+      "mode": "wheel_dynamic",
+      "base_height_m": 0.1815
+    },
+    "control": "picklift",
+    "control_options": {
+      "episode_duration": 180.1
+    },
+    "initial_state": "picklift",
+    "initial_state_options": {
+      "robot_xyz": [
+        3.25,
+        2.95,
+        0.1815
+      ]
+    },
+    "scene": "scenesmith",
+    "scene_options": {
+      "variant": "furniture_welded",
+      "overrides": "experiments/inputs/tamp/scene_overrides_reachable.yaml",
+      "additional_package_xmls": [
+        "models/zerith_pick_eval/package.xml"
+      ]
+    },
+    "policy": "examples.online_manipulation.bt_runtime:make_policy",
+    "policy_options": {
+      "navigation_position_tolerance_m": 0.005,
+      "bt_json_input": "experiments/inputs/bt_navigation_picklift/bt_tree_backed.json",
+      "calibrated_base_xyz_m": [
+        2.65,
+        2.95,
+        0.1815
+      ],
+      "calibrated_base_yaw_deg": 180.0,
+      "expert_inputs": "experiments/inputs/pick_lift",
+      "expert_calibration": "experiments/inputs/pick_lift/pick_lift_calibration.json"
+    },
+    "task": "picklift",
+    "evaluator": "task_result",
+    "requires": {
+      "arms": [
+        "left"
+      ],
+      "grippers": [
+        "left"
+      ],
+      "sensors": [
+        "head_camera",
+        "left_wrist_camera"
+      ]
+    },
+    "run": {
+      "seeds": [
+        500
+      ],
+      "max_steps": 1600
+    },
+    "task_options": {
+      "maximum_allowed_contact_penetration_m": 1.0,
+      "maximum_allowed_support_penetration_m": 0.0001
+    }
+  },
+  "selected_profiles": {
+    "robot": {
+      "kind": "zerith_dual",
+      "model_dir": "models/zerith_drake",
+      "camera_options": {
+        "enabled_names": [
+          "head_camera",
+          "left_wrist_camera"
+        ],
+        "width": 640,
+        "height": 480,
+        "fov_y_rad": 1.5707963267948966,
+        "update_period_s": 200.0
+      },
+      "locked_joint_positions": {
+        "neck_yaw_joint": 0.0,
+        "neck_pitch_joint": 0.0
+      }
+    },
+    "control": {
+      "timing": {
+        "physics_dt": 0.001,
+        "controller_dt": 0.005,
+        "policy_dt": 0.1
+      },
+      "episode_duration": 180.1,
+      "max_joint_delta": 0.1,
+      "maximum_cartesian_joint_delta": 0.02
+    },
+    "initial_state": {
+      "robot_xyz": [
+        3.25,
+        2.95,
+        0.1815
+      ],
+      "robot_yaw_deg": 180.0,
+      "rail_position": 0.4,
+      "q_home_left": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "scene": {
+      "kind": "scenesmith",
+      "root_env": "SCENE_ROOT",
+      "variant": "furniture_welded",
+      "overrides": "experiments/inputs/tamp/scene_overrides_reachable.yaml",
+      "additional_package_xmls": [
+        "models/zerith_pick_eval/package.xml"
+      ]
+    },
+    "policy": {
+      "factory": "examples.online_manipulation.bt_runtime:make_policy",
+      "navigation_position_tolerance_m": 0.005,
+      "bt_json_input": "experiments/inputs/bt_navigation_picklift/bt_tree_backed.json",
+      "calibrated_base_xyz_m": [
+        2.65,
+        2.95,
+        0.1815
+      ],
+      "calibrated_base_yaw_deg": 180.0,
+      "expert_inputs": "experiments/inputs/pick_lift",
+      "expert_calibration": "experiments/inputs/pick_lift/pick_lift_calibration.json"
+    },
+    "task": {
+      "kind": "picklift",
+      "target_observation_name": "pick_target",
+      "required_lift_m": 0.08,
+      "required_hold_s": 3.0,
+      "bindings": {
+        "target_model_name": "living_room_box_0",
+        "target_body_name": "base_link",
+        "support_contact_bodies": [
+          "living_room_coffee_table_0::base_link"
+        ]
+      },
+      "maximum_allowed_contact_penetration_m": 1.0,
+      "maximum_allowed_support_penetration_m": 0.0001
+    },
+    "evaluator": {
+      "kind": "task_result"
+    }
+  },
+  "robot_spec": {
+    "name": "zerith_dual_arm",
+    "model_instance_name": "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02",
+    "package_name": "zerith_drake",
+    "model_path": "/root/workspace/scenesmith-simple-planner-eval/models/zerith_drake/urdf/zerith_drake.urdf",
+    "base_link_name": "dipan_link",
+    "base_pose": {
+      "translation_m": [
+        3.25,
+        2.95,
+        0.1815
+      ],
+      "quaternion_wxyz": [
+        6.123233995736766e-17,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "controlled_joints": [
+      {
+        "name": "left_shoulder_pitch_joint",
+        "joint_type": "revolute",
+        "position_lower": -2.7925,
+        "position_upper": 1.5708,
+        "velocity_limit": 8.164,
+        "effort_limit": 36.0,
+        "kp": 320.0,
+        "kd": 36.0
+      },
+      {
+        "name": "left_shoulder_roll_joint",
+        "joint_type": "revolute",
+        "position_lower": -0.5236,
+        "position_upper": 2.0944,
+        "velocity_limit": 8.164,
+        "effort_limit": 36.0,
+        "kp": 320.0,
+        "kd": 36.0
+      },
+      {
+        "name": "left_shoulder_yaw_joint",
+        "joint_type": "revolute",
+        "position_lower": -2.9671,
+        "position_upper": 2.9671,
+        "velocity_limit": 7.3267,
+        "effort_limit": 27.0,
+        "kp": 160.0,
+        "kd": 26.0
+      },
+      {
+        "name": "left_elbow_joint",
+        "joint_type": "revolute",
+        "position_lower": -1.5184,
+        "position_upper": 1.5708,
+        "velocity_limit": 7.3267,
+        "effort_limit": 27.0,
+        "kp": 240.0,
+        "kd": 32.0
+      },
+      {
+        "name": "left_wrist_roll_joint",
+        "joint_type": "revolute",
+        "position_lower": -2.9671,
+        "position_upper": 2.9671,
+        "velocity_limit": 16.747,
+        "effort_limit": 9.0,
+        "kp": 1000.0,
+        "kd": 64.0
+      },
+      {
+        "name": "left_wrist_yaw_joint",
+        "joint_type": "revolute",
+        "position_lower": -1.0472,
+        "position_upper": 1.0472,
+        "velocity_limit": 16.747,
+        "effort_limit": 9.0,
+        "kp": 1000.0,
+        "kd": 64.0
+      },
+      {
+        "name": "left_wrist_pitch_joint",
+        "joint_type": "revolute",
+        "position_lower": -1.0472,
+        "position_upper": 1.0472,
+        "velocity_limit": 16.747,
+        "effort_limit": 9.0,
+        "kp": 1000.0,
+        "kd": 64.0
+      },
+      {
+        "name": "left_jaw_left_finger_joint",
+        "joint_type": "prismatic",
+        "position_lower": -0.03814,
+        "position_upper": 0.0,
+        "velocity_limit": 0.25,
+        "effort_limit": 25.0,
+        "kp": 2500.0,
+        "kd": 100.0
+      },
+      {
+        "name": "left_jaw_right_finger_joint",
+        "joint_type": "prismatic",
+        "position_lower": 0.0,
+        "position_upper": 0.03814,
+        "velocity_limit": 0.25,
+        "effort_limit": 25.0,
+        "kp": 2500.0,
+        "kd": 100.0
+      },
+      {
+        "name": "right_shoulder_pitch_joint",
+        "joint_type": "revolute",
+        "position_lower": -2.7925,
+        "position_upper": 1.5708,
+        "velocity_limit": 8.164,
+        "effort_limit": 36.0,
+        "kp": 320.0,
+        "kd": 36.0
+      },
+      {
+        "name": "right_shoulder_roll_joint",
+        "joint_type": "revolute",
+        "position_lower": -2.0944,
+        "position_upper": 0.5236,
+        "velocity_limit": 8.164,
+        "effort_limit": 36.0,
+        "kp": 320.0,
+        "kd": 36.0
+      },
+      {
+        "name": "right_shoulder_yaw_joint",
+        "joint_type": "revolute",
+        "position_lower": -2.9671,
+        "position_upper": 2.9671,
+        "velocity_limit": 7.3267,
+        "effort_limit": 27.0,
+        "kp": 160.0,
+        "kd": 26.0
+      },
+      {
+        "name": "right_elbow_joint",
+        "joint_type": "revolute",
+        "position_lower": -1.5184,
+        "position_upper": 1.5708,
+        "velocity_limit": 7.3267,
+        "effort_limit": 27.0,
+        "kp": 240.0,
+        "kd": 32.0
+      },
+      {
+        "name": "right_wrist_roll_joint",
+        "joint_type": "revolute",
+        "position_lower": -2.9671,
+        "position_upper": 2.9671,
+        "velocity_limit": 16.747,
+        "effort_limit": 9.0,
+        "kp": 1000.0,
+        "kd": 64.0
+      },
+      {
+        "name": "right_wrist_yaw_joint",
+        "joint_type": "revolute",
+        "position_lower": -1.0472,
+        "position_upper": 1.0472,
+        "velocity_limit": 16.747,
+        "effort_limit": 9.0,
+        "kp": 1000.0,
+        "kd": 64.0
+      },
+      {
+        "name": "right_wrist_pitch_joint",
+        "joint_type": "revolute",
+        "position_lower": -1.0472,
+        "position_upper": 1.0472,
+        "velocity_limit": 16.747,
+        "effort_limit": 9.0,
+        "kp": 1000.0,
+        "kd": 64.0
+      },
+      {
+        "name": "right_jaw_left_finger_joint",
+        "joint_type": "prismatic",
+        "position_lower": -0.03814,
+        "position_upper": 0.0,
+        "velocity_limit": 0.25,
+        "effort_limit": 25.0,
+        "kp": 2500.0,
+        "kd": 100.0
+      },
+      {
+        "name": "right_jaw_right_finger_joint",
+        "joint_type": "prismatic",
+        "position_lower": 0.0,
+        "position_upper": 0.03814,
+        "velocity_limit": 0.25,
+        "effort_limit": 25.0,
+        "kp": 2500.0,
+        "kd": 100.0
+      }
+    ],
+    "locked_joint_positions": {
+      "daogui_joint": 0.4,
+      "body_pitch_joint": 0.0,
+      "body_yaw_joint": 0.0,
+      "neck_yaw_joint": 0.0,
+      "neck_pitch_joint": 0.0,
+      "left_middle_wheel_joint": 0.0,
+      "right_middle_wheel_joint": 0.0
+    },
+    "end_effector_frame_name": "left_grasp_frame",
+    "home_positions": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "gripper": {
+      "joint_names": [
+        "left_jaw_left_finger_joint",
+        "left_jaw_right_finger_joint"
+      ],
+      "minimum_width_m": 0.0,
+      "maximum_width_m": 0.07628,
+      "contact_body_names": [
+        "left_jaw_left_finger_link",
+        "left_jaw_right_finger_link"
+      ]
+    },
+    "safety_exempt_body_pairs": [
+      [
+        "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+        "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_shoulder_roll_link"
+      ],
+      [
+        "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::body_yaw_link",
+        "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::right_shoulder_roll_link"
+      ]
+    ],
+    "cameras": [
+      {
+        "name": "left_wrist_camera",
+        "parent_frame": "left_wrist_pitch_link",
+        "X_parent_camera_mount": {
+          "translation_m": [
+            0.11933,
+            0.009,
+            0.060373
+          ],
+          "quaternion_wxyz": [
+            0.37993603868400616,
+            -0.5963612746536732,
+            0.5963634652149739,
+            -0.3799374342695656
+          ]
+        },
+        "X_mount_camera_optical": {
+          "translation_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "quaternion_wxyz": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "width": 640,
+        "height": 480,
+        "fov_y_rad": 1.5707963267948966,
+        "near_m": 0.05,
+        "far_m": 10.0,
+        "update_period_s": 200.0,
+        "modalities": [
+          "rgb",
+          "depth",
+          "label"
+        ],
+        "enabled": true
+      },
+      {
+        "name": "right_wrist_camera",
+        "parent_frame": "right_wrist_pitch_link",
+        "X_parent_camera_mount": {
+          "translation_m": [
+            0.11933,
+            0.0090006,
+            0.060373
+          ],
+          "quaternion_wxyz": [
+            0.37993603868400616,
+            -0.5963612746536732,
+            0.5963634652149739,
+            -0.3799374342695656
+          ]
+        },
+        "X_mount_camera_optical": {
+          "translation_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "quaternion_wxyz": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "width": 640,
+        "height": 480,
+        "fov_y_rad": 1.5707963267948966,
+        "near_m": 0.05,
+        "far_m": 10.0,
+        "update_period_s": 200.0,
+        "modalities": [
+          "rgb",
+          "depth",
+          "label"
+        ],
+        "enabled": false
+      },
+      {
+        "name": "head_camera",
+        "parent_frame": "neck_pitch_link",
+        "X_parent_camera_mount": {
+          "translation_m": [
+            0.0675568573382885,
+            0.0324999999999979,
+            -0.0363332072227294
+          ],
+          "quaternion_wxyz": [
+            0.4449966894371905,
+            -0.5495252008688398,
+            0.5495252008688417,
+            -0.44499668943719206
+          ]
+        },
+        "X_mount_camera_optical": {
+          "translation_m": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "quaternion_wxyz": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "width": 640,
+        "height": 480,
+        "fov_y_rad": 1.5707963267948966,
+        "near_m": 0.05,
+        "far_m": 10.0,
+        "update_period_s": 200.0,
+        "modalities": [
+          "rgb",
+          "depth",
+          "label"
+        ],
+        "enabled": true
+      }
+    ],
+    "arm_groups": {
+      "left": [
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_yaw_joint",
+        "left_wrist_pitch_joint"
+      ],
+      "right": [
+        "right_shoulder_pitch_joint",
+        "right_shoulder_roll_joint",
+        "right_shoulder_yaw_joint",
+        "right_elbow_joint",
+        "right_wrist_roll_joint",
+        "right_wrist_yaw_joint",
+        "right_wrist_pitch_joint"
+      ]
+    },
+    "end_effector_frames": {
+      "left": "left_grasp_frame",
+      "right": "right_grasp_frame"
+    },
+    "grippers": {
+      "left": {
+        "joint_names": [
+          "left_jaw_left_finger_joint",
+          "left_jaw_right_finger_joint"
+        ],
+        "minimum_width_m": 0.0,
+        "maximum_width_m": 0.07628,
+        "contact_body_names": [
+          "left_jaw_left_finger_link",
+          "left_jaw_right_finger_link"
+        ]
+      },
+      "right": {
+        "joint_names": [
+          "right_jaw_left_finger_joint",
+          "right_jaw_right_finger_joint"
+        ],
+        "minimum_width_m": 0.0,
+        "maximum_width_m": 0.07628,
+        "contact_body_names": [
+          "right_jaw_left_finger_link",
+          "right_jaw_right_finger_link"
+        ]
+      }
+    }
+  },
+  "scenario": {
+    "dmd_path": "/root/workspace/scenesmith-simple-planner-eval/runs/object-plusx100mm-online-unseeded-20260921/run_001/scene_cache/packages/scene/combined_house/house_furniture_welded.dmd.yaml",
+    "package_xmls": [
+      "/root/workspace/scenesmith-simple-planner-eval/runs/object-plusx100mm-online-unseeded-20260921/run_001/scene_cache/packages/scene/package.xml",
+      "/root/workspace/scenesmith-simple-planner-eval/runs/object-plusx100mm-online-unseeded-20260921/run_001/scene_cache/packages/zerith_pick_eval/package.xml"
+    ],
+    "initial_object_poses": {},
+    "observed_bodies": [
+      {
+        "observation_name": "pick_target",
+        "model_instance_name": "living_room_box_0",
+        "body_name": "base_link",
+        "write_back": true
+      }
+    ],
+    "pose_randomizations": [],
+    "contact_parameters": {},
+    "visualization": {
+      "enabled": true,
+      "port": null,
+      "record_html_path": null,
+      "realtime_rate": 0.0
+    },
+    "renderer": {
+      "name": "online_environment_renderer",
+      "engine": "vtk"
+    },
+    "output_directory": null,
+    "ground_body_names": [],
+    "ground_geometries": [
+      [
+        "room_geometry_living_room::room_geometry_body_link",
+        "floor_collision"
+      ]
+    ]
+  },
+  "control": {
+    "timing": {
+      "physics_dt": 0.001,
+      "controller_dt": 0.005,
+      "policy_dt": 0.1
+    },
+    "episode_duration": 180.1,
+    "max_joint_delta": 0.1,
+    "maximum_cartesian_joint_delta": 0.02
+  },
+  "base": {
+    "mode": "wheel_dynamic",
+    "maximum_velocity_m_s": 0.15,
+    "maximum_yaw_rate_rad_s": 0.6,
+    "acceleration_m_s2": 0.25,
+    "yaw_acceleration_rad_s2": 0.8,
+    "maximum_wheel_speed_rad_s": 2.3,
+    "maximum_wheel_torque_nm": 60.0,
+    "wheel_velocity_gain": 30.0,
+    "ground_height_m": 0.0,
+    "base_height_m": 0.1815,
+    "support_contact_allowance_m": 0.002
+  },
+  "task": {
+    "target_observation_name": "pick_target",
+    "gripper_contact_bodies": [
+      "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_left_finger_link",
+      "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02::left_jaw_right_finger_link"
+    ],
+    "target_contact_body": "living_room_box_0::base_link",
+    "support_contact_bodies": [
+      "living_room_coffee_table_0::base_link"
+    ],
+    "required_lift_m": 0.08,
+    "required_hold_s": 3.0,
+    "maximum_target_translational_speed_m_s": 0.02,
+    "maximum_target_rotational_speed_rad_s": 0.5,
+    "maximum_allowed_contact_penetration_m": 1.0,
+    "maximum_allowed_support_penetration_m": 0.0001,
+    "carrier_arm_name": "left",
+    "carrier_gripper_name": "left"
+  },
+  "policy": {
+    "kind": "json_behavior_tree",
+    "bt_json_sha256": "f5a6fefebb8a902644238f4872daa9f21eccd85f8fba7c00a5a953f801ea94b2",
+    "mdsl_sha256": "63dc4b71deb35661026342ff7484d510ca29fb20b004065f39d1ad252e914e61",
+    "mdsl": "root {\n    selector {\n        condition [PickLiftSucceeded]\n        sequence {\n            action [Wait, \"1.0\"]\n            action [NavigateTo, \"2.7056\", \"2.95\", \"3.141592653589793\", \"world\"]\n            condition [BaseParkedAtPickPose]\n            action [ExecutePickLift]\n        }\n    }\n}\n",
+    "tree": {
+      "kind": "root",
+      "name": "",
+      "args": [],
+      "children": [
+        {
+          "kind": "selector",
+          "name": "",
+          "args": [],
+          "children": [
+            {
+              "kind": "condition",
+              "name": "PickLiftSucceeded",
+              "args": [],
+              "children": []
+            },
+            {
+              "kind": "sequence",
+              "name": "",
+              "args": [],
+              "children": [
+                {
+                  "kind": "action",
+                  "name": "Wait",
+                  "args": [
+                    "1.0"
+                  ],
+                  "children": []
+                },
+                {
+                  "kind": "action",
+                  "name": "NavigateTo",
+                  "args": [
+                    "2.7056",
+                    "2.95",
+                    "3.141592653589793",
+                    "world"
+                  ],
+                  "children": []
+                },
+                {
+                  "kind": "condition",
+                  "name": "BaseParkedAtPickPose",
+                  "args": [],
+                  "children": []
+                },
+                {
+                  "kind": "action",
+                  "name": "ExecutePickLift",
+                  "args": [],
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "generation": {
+      "mode": "reviewed_design",
+      "model_called": false
+    }
+  },
+  "evaluator": {
+    "kind": "task_result"
+  },
+  "run": {
+    "seeds": [
+      500
+    ],
+    "max_steps": 1600,
+    "record_html": false,
+    "write_final_dmd": false
+  },
+  "provenance": {
+    "experiment": "/root/workspace/scenesmith-simple-planner-eval/experiments/navigation_picklift_tamp.json",
+    "experiment_sha256": "1b412dcfe60eeb4b1152117e1f1431c73cabbfedb8e65d400830e39222209e3b",
+    "profiles": "/root/workspace/scenesmith-simple-planner-eval/experiments/profiles.json",
+    "profiles_sha256": "de8b8043faf7b38d927baa7bdef4be0ca95d316c47b1746dd2efe79fde4cde7c",
+    "robot_hardware_limits": "/root/workspace/scenesmith-simple-planner-eval/models/zerith_drake/urdf/zerith_drake.urdf",
+    "input_sha256": {
+      "/root/workspace/scenesmith-simple-planner-eval/models/zerith_drake/urdf/zerith_drake.urdf": "6823d04e61b96f17c7b5c8dfb7c29cc51763d8e696574d05783d3bf454fcc9bc"
+    },
+    "servo_defaults": "src/zerith_servo_config.py (validated simulation, not hardware specification)",
+    "scene_manifest": "/root/workspace/scenesmith-simple-planner-eval/runs/object-plusx100mm-online-unseeded-20260921/run_001/scene_cache/manifest.json"
+  }
+}

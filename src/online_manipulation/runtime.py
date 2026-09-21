@@ -504,6 +504,12 @@ class DrakeRuntime:
                 geometry[indices] = np.asarray(start)[indices]
         return self.planning.check_edge(start, geometry, contact_policy=contact_policy)
 
+    def capture_cameras(self):
+        """Render synchronized current cameras without stepping the robot."""
+        if self.simulator is None:
+            raise RuntimeError("Call reset before capturing cameras")
+        return self.cameras.observe(self.simulator.get_context(), fresh=True)
+
     def _observation(self):
         context = self.plant_context
         robot = self.adapter.make_robot_observation(

@@ -270,6 +270,24 @@ class PlanningQueryTest(unittest.TestCase):
         self.assertEqual(query.joint_limits()["joint"], (-3.14, 3.14))
         self.assertEqual(query.body_pose("obstacle", "body").translation_m[0], 0.75)
 
+    def test_pose_ik_repairs_collision_without_relaxing_pose_or_clearance(self):
+        query = _planning_query()
+        seed = [0.1]
+        self.assertFalse(query.check_configuration(seed).valid)
+        target = Pose((0, 0, 0), (math.cos(0.2), 0, 0, math.sin(0.2)))
+        result = query.solve_ik(target, seed=seed, orientation_tolerance_rad=0.35)
+        self.assertTrue(result.success, result)
+        self.assertTrue(query.check_configuration(result.configuration).valid)
+        self.assertLessEqual(result.orientation_error_rad, 0.35 + 1e-6)
+        self.assertGreaterEqual(result.clearance.minimum_safety_clearance_m, 0.005)
+
+    def test_pose_ik_rejects_unavoidable_collision(self):
+        query = _planning_query()
+        result = query.solve_ik(Pose((0, 0, 0), (math.cos(0.05), 0, 0, math.sin(0.05))),
+                                seed=[0.1], orientation_tolerance_rad=0.001)
+        self.assertFalse(result.success)
+        self.assertEqual(result.reason, "endpoint_collision_or_clearance")
+
     def test_observed_free_body_pose_can_follow_runtime_state(self) -> None:
         query = _planning_query()
         updated = Pose((2.0, 1.0, 0.5), (1.0, 0.0, 0.0, 0.0))

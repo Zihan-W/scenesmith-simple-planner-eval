@@ -1,0 +1,12 @@
+{
+  "supports_geometric_conditioning": {
+    "grasp_pose": true,
+    "approach_pose": true
+  },
+  "geometry_guarantee": true,
+  "parameter_bindings": {
+    "grasp_pose": "g0",
+    "approach_pose": "a0"
+  },
+  "scope": "runtime_parameter_consumption_not_physical_success"
+}

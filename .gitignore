@@ -28,3 +28,37 @@ models/zerith_drake/meshes/*.obj
 scripts/simulate_zerith_safe_pregrasp.py
 *.log
 *.pdf
+
+# Local documentation, experiment artifacts, and exported patches.
+/docs/
+# Ignore historical runs; keep the latest unseeded run's evidence visible.
+/runs/*
+!/runs/object-plusx100mm-online-unseeded-20260921/
+/runs/object-plusx100mm-online-unseeded-20260921/*
+!/runs/object-plusx100mm-online-unseeded-20260921/run_001/
+/runs/object-plusx100mm-online-unseeded-20260921/run_001/scene_cache/
+/patches/
+
+# Python test, lint, and type-check caches.
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local experiment configurations and generated inputs.
+# Keep the current runtime configuration and its required inputs visible.
+# Previously tracked example configurations remain tracked.
+/experiments/*
+!/experiments/navigation_picklift_tamp.json
+!/experiments/tamp_hierarchical_config.json
+!/experiments/inputs/
+/experiments/inputs/*
+!/experiments/inputs/pick_lift/
+!/experiments/inputs/tamp/
+/experiments/inputs/tamp/*
+!/experiments/inputs/tamp/scene_overrides_reachable.yaml
+!/experiments/inputs/bt_navigation_picklift/
+/experiments/inputs/bt_navigation_picklift/*
+!/experiments/inputs/bt_navigation_picklift/bt_tree_backed.json
+
+# Keep the large simulation replay on disk, outside Git.
+/runs/object-plusx100mm-online-unseeded-20260921/run_001/simulation_01_success.html

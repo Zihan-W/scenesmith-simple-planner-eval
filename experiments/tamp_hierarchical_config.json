@@ -1,0 +1,26 @@
+{
+  "subgoal_model": {
+    "model": "gpt-4.1-mini",
+    "temperature": 0.2,
+    "max_attempts": 3,
+    "response_format": "json_schema"
+  },
+  "skill_model": {
+    "model": "gpt-4.1-mini",
+    "temperature": 0.2,
+    "max_attempts": 3,
+    "response_format": "json_object"
+  },
+  "sampling": {
+    "max_candidates": 128,
+    "batch_size": 8
+  },
+  "recovery": {
+    "semantic_replans": 2,
+    "skill_replans": 2,
+    "geometry_retries": 3,
+    "skill_retries": 1,
+    "max_skill_executions": 20
+  },
+  "max_skill_steps": 600
+}

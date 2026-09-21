@@ -1,0 +1,17 @@
+[
+  {
+    "object": "pick_target",
+    "body": "living_room_box_0::base_link",
+    "category": "manipuland",
+    "movable": true,
+    "articulated": false,
+    "surface": null,
+    "bbox_xyxy": [
+      277,
+      352,
+      288,
+      368
+    ],
+    "source": "simulator_label_mask"
+  }
+]

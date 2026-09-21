@@ -2,120 +2,31 @@
 
 from __future__ import annotations
 
-import dataclasses
-import enum
 import hashlib
 import json
 import math
-import re
 from pathlib import Path
 
+from examples.online_manipulation.bt_core import (
+    MdslParser, Node, Status, TickOutcome, condition_names, skill_signatures,
+    tick_tree, to_dict, to_mdsl, to_mermaid,
+)
 from src.online_manipulation import HoldAction
 from src.online_manipulation.recipes.pick_policy import build_policy
 
 
-class Status(enum.Enum):
-    RUNNING = "RUNNING"
-    SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE"
+Outcome = TickOutcome
 
 
-@dataclasses.dataclass(frozen=True)
-class Node:
-    kind: str
-    name: str = ""
-    args: tuple[str, ...] = ()
-    children: tuple["Node", ...] = ()
+SIGNATURES = skill_signatures("picklift")
+CONDITIONS = condition_names("picklift")
 
 
-@dataclasses.dataclass(frozen=True)
-class Outcome:
-    status: Status
-    action: object | None = None
-    path: str = ""
-    reason: str = ""
-
-
-SIGNATURES = {
-    "Wait": ("duration_s",),
-    "ExecutePickLift": (),
-    "PickLiftSucceeded": (),
-}
-CONDITIONS = {"PickLiftSucceeded"}
-TOKEN = re.compile(
-    r'\s*(?:(?P<word>[A-Za-z_][A-Za-z_0-9]*)|'
-    r'(?P<string>"(?:[^"\\]|\\.)*")|(?P<punct>[{}\[\],]))'
-)
-
-
-class Parser:
-    """Strict MDSL parser for the finite PickLift skill registry."""
+class Parser(MdslParser):
+    """PickLift skill validation using the common MDSL parser."""
 
     def __init__(self, text):
-        if not isinstance(text, str) or not text.strip() or len(text) > 20_000:
-            raise ValueError("MAIN_SEQUENCE must be nonempty MDSL")
-        self.tokens = []
-        position = 0
-        while position < len(text):
-            if not text[position:].strip():
-                break
-            match = TOKEN.match(text, position)
-            if not match:
-                raise ValueError(f"Invalid MDSL near {text[position:position + 30]!r}")
-            self.tokens.append((match.lastgroup, match.group(match.lastgroup)))
-            position = match.end()
-        self.index = 0
-
-    def pop(self, expected=None):
-        if self.index >= len(self.tokens):
-            raise ValueError("Unexpected end of MDSL")
-        token = self.tokens[self.index]
-        self.index += 1
-        if expected is not None and token[1] != expected:
-            raise ValueError(f"Expected {expected!r}, got {token[1]!r}")
-        return token
-
-    def peek(self):
-        return self.tokens[self.index][1] if self.index < len(self.tokens) else ""
-
-    def node(self, depth=0):
-        if depth > 12:
-            raise ValueError("Generated BT exceeds depth limit")
-        kind = self.pop()[1]
-        if kind in ("sequence", "selector"):
-            self.pop("{")
-            children = []
-            while self.peek() != "}":
-                children.append(self.node(depth + 1))
-            self.pop("}")
-            if not children:
-                raise ValueError("Composite node must have children")
-            return Node(kind, children=tuple(children))
-        if kind not in ("action", "condition"):
-            raise ValueError(f"Unsupported BT node kind: {kind}")
-        self.pop("[")
-        token_kind, name = self.pop()
-        if token_kind != "word" or name not in SIGNATURES:
-            raise ValueError(f"Unknown PickLift skill: {name}")
-        if (kind == "condition") != (name in CONDITIONS):
-            raise ValueError(f"Wrong BT node class for skill: {name}")
-        args = []
-        while self.peek() == ",":
-            self.pop(",")
-            token_kind, raw = self.pop()
-            if token_kind != "string":
-                raise ValueError("MDSL arguments must be JSON strings")
-            args.append(json.loads(raw))
-        self.pop("]")
-        if len(args) != len(SIGNATURES[name]):
-            raise ValueError(f"{name} has the wrong argument count")
-        return Node(kind, name, tuple(args))
-
-    def parse(self):
-        result = self.node()
-        if self.index != len(self.tokens):
-            raise ValueError("MAIN_SEQUENCE must contain one subtree")
-        return result
+        super().__init__(text, signatures=SIGNATURES, conditions=CONDITIONS)
 
 
 def canonical_tree(task_plan):
@@ -175,47 +86,6 @@ def compile_response(environment, task_plan, raw_response):
     return response, canonical_tree(task_plan)
 
 
-def to_dict(node):
-    return {"kind": node.kind, "name": node.name, "args": list(node.args),
-            "children": [to_dict(child) for child in node.children]}
-
-
-def to_mdsl(root):
-    def emit(node, depth):
-        prefix = "    " * depth
-        if node.kind in ("action", "condition"):
-            args = "".join(", " + json.dumps(value) for value in node.args)
-            return [f"{prefix}{node.kind} [{node.name}{args}]"]
-        lines = [f"{prefix}{node.kind} {{"]
-        for child in node.children:
-            lines.extend(emit(child, depth + 1))
-        return lines + [prefix + "}"]
-    return "\n".join(emit(root, 0)) + "\n"
-
-
-def to_mermaid(root):
-    lines = ["flowchart TD", "    classDef root fill:#e2e8f0,stroke:#334155",
-             "    classDef selector fill:#f3e8ff,stroke:#7e22ce",
-             "    classDef sequence fill:#dbeafe,stroke:#2563eb",
-             "    classDef condition fill:#ccfbf1,stroke:#0f766e",
-             "    classDef action fill:#e0f2fe,stroke:#0369a1"]
-    serial = 0
-    def visit(node, parent=None, order=1):
-        nonlocal serial
-        serial += 1
-        current = f"n{serial}"
-        label = node.name or node.kind
-        if node.args:
-            label += "(" + ", ".join(node.args) + ")"
-        lines.append(f'    {current}["{label}"]:::{node.kind}')
-        if parent:
-            lines.append(f"    {parent} -->|{order}| {current}")
-        for index, child in enumerate(node.children, 1):
-            visit(child, current, index)
-    visit(root)
-    return "\n".join(lines) + "\n"
-
-
 class PickLiftBehaviorTreePolicy:
     required_capabilities = {"arms": ("left",), "grippers": ("left",)}
 
@@ -264,34 +134,12 @@ class PickLiftBehaviorTreePolicy:
         return outcome.action if outcome.action is not None else HoldAction()
 
     def _tick(self, node, path, observation):
-        if node.kind == "root":
-            return self._tick(node.children[0], path + ".0", observation)
-        if node.kind == "selector":
-            for index, child in enumerate(node.children):
-                result = self._tick(child, f"{path}.{index}", observation)
-                if result.status is not Status.FAILURE:
-                    return result
-            return Outcome(Status.FAILURE, path=path, reason="all_branches_failed")
-        if node.kind == "sequence":
-            index = self._sequence_indexes.get(path, 0)
-            while index < len(node.children):
-                result = self._tick(node.children[index], f"{path}.{index}", observation)
-                if result.status is Status.FAILURE:
-                    self._sequence_indexes[path] = 0
-                    return result
-                if result.status is Status.RUNNING:
-                    self._sequence_indexes[path] = index
-                    return result
-                index += 1
-                self._sequence_indexes[path] = index
-                if result.action is not None:
-                    return dataclasses.replace(result, status=(
-                        Status.SUCCESS if index == len(node.children) else Status.RUNNING))
-            return Outcome(Status.SUCCESS, path=path)
-        if node.kind == "condition":
-            success = bool(observation.task.get("success", False))
-            return Outcome(Status.SUCCESS if success else Status.FAILURE, path=path)
-        return self._tick_action(node, path, observation)
+        return tick_tree(node, path, observation, self._sequence_indexes,
+                         self._tick_condition, self._tick_action)
+
+    def _tick_condition(self, node, path, observation):
+        success = bool(observation.task.get("success", False))
+        return Outcome(Status.SUCCESS if success else Status.FAILURE, path=path)
 
     def _tick_action(self, node, path, observation):
         if node.name == "Wait":

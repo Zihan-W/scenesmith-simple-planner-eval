@@ -1,0 +1,50 @@
+[
+  {
+    "camera": "head_camera",
+    "path": "/root/workspace/scenesmith-simple-planner-eval/runs/object-plusx100mm-online-unseeded-20260921/run_001/runtime/observations/observation_001/head_camera_annotated.png",
+    "sha256": "31abaa6a3f563b487542919cac09f0ae624091bcdeb824b91e3f909019eecae5",
+    "timestamp_s": 0.0,
+    "observation_time_s": 0.0,
+    "annotations": [
+      {
+        "object": "pick_target",
+        "body": "living_room_box_0::base_link",
+        "category": "manipuland",
+        "movable": true,
+        "articulated": false,
+        "surface": null,
+        "bbox_xyxy": [
+          277,
+          352,
+          288,
+          368
+        ],
+        "source": "simulator_label_mask"
+      }
+    ]
+  },
+  {
+    "camera": "left_wrist_camera",
+    "path": "/root/workspace/scenesmith-simple-planner-eval/runs/object-plusx100mm-online-unseeded-20260921/run_001/runtime/observations/observation_001/left_wrist_camera_annotated.png",
+    "sha256": "e08853d1d4ed7951ca4ab467d5bdba2bfdff82007c8b63afe70ea6259500fbd5",
+    "timestamp_s": 0.0,
+    "observation_time_s": 0.0,
+    "annotations": [
+      {
+        "object": "pick_target",
+        "body": "living_room_box_0::base_link",
+        "category": "manipuland",
+        "movable": true,
+        "articulated": false,
+        "surface": null,
+        "bbox_xyxy": [
+          315,
+          233,
+          331,
+          254
+        ],
+        "source": "simulator_label_mask"
+      }
+    ]
+  }
+]

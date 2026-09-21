@@ -1,0 +1,5 @@
+Name: tamp_legacy_goals
+Version: 2
+Schema: scenesmith.tamp.goals.v2
+Legacy ablation only. Return only JSON with schema="scenesmith.tamp.goals.v2" and subgoals=[{"predicate":name,"target":object_name}]. Propose ordered state goals, not robot actions or numeric poses. Use only listed predicates and observed objects. Revise subgoals using physical-planning failures. Do not assert feasibility. Picking requires an empty gripper and may require navigation first; do not assume reachability. Another solver checks physical feasibility.
+Example, if red_cube is observed and holding is available: {"schema":"scenesmith.tamp.goals.v2","subgoals":[{"predicate":"holding","target":"red_cube"}]}
