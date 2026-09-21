@@ -10,6 +10,11 @@
 安装与模型准备见[中文 Quickstart](docs/QUICKSTART_ONLINE_ENV.md)。
 以下命令针对当前开发机，均在独立仿真中工作，不连接真实机器人。
 
+按当前仓库管理约定，`runs/`、`tests/`、`AGENTS.md` 和 `pyproject.toml`
+仅保留在开发机，不随 Git 分发。以下命令使用已有 `.venv` 和 Python 模块入口。
+新克隆缺少打包元数据，不能直接执行旧 Quickstart 中的 `pip install -e .`；
+恢复本地 `pyproject.toml` 后才能使用该安装方式。
+
 ```bash
 source ~/.bashrc
 cd /root/workspace/scenesmith-simple-planner-eval
@@ -32,13 +37,14 @@ test -d "$SCENE_ROOT"
 ### 直接开始生成任务树
 
 ```bash
-"$REPO_ROOT/.venv/bin/python" -m examples.online_manipulation.tamp_cli \
-  --planner bt \
+"$REPO_ROOT/.venv/bin/python" -m planner.src.bt \
   --request "$REPO_ROOT/experiments/inputs/bt_picklift_first_person/generation_request.json" \
-  --output-root "$RUN_ROOT/bt"
+  --output-dir "$RUN_ROOT/bt"
 ```
 
 这条命令调用真实模型，生成并严格校验 BT，**不启动物理执行**。
+BT 生成已封装为独立模块；输入字段、Python API、输出文件与执行接口见
+[Planner 模块说明](planner/README.md)。
 它使用仓库保留的固定 PickLift 示例请求：环境快照、任务计划、头部/左腕图片，
 以及模型 `gpt-4.1-mini-2025-04-14`。图片和环境是请求中绑定的既有快照，
 不是本次 `+100 mm` 移动物体后新采集的观测；不能用它证明当前移动场景已完成规划或抓取。
@@ -46,7 +52,7 @@ test -d "$SCENE_ROOT"
 直接生成器的等价接口是：
 
 ```bash
-"$REPO_ROOT/.venv/bin/python" -m examples.online_manipulation.bt_generation \
+"$REPO_ROOT/.venv/bin/python" -m planner.src.bt.generation \
   --request "$REPO_ROOT/experiments/inputs/bt_picklift_first_person/generation_request.json" \
   --output-dir "$RUN_ROOT/bt-direct"
 ```
@@ -78,7 +84,7 @@ test -d "$SCENE_ROOT"
 
 ```bash
 "$REPO_ROOT/.venv/bin/python" \
-  "$REPO_ROOT/runs/object-plusx100mm-online-unseeded-20260921/validate_vlm_ccsp_unseeded.py" \
+  "$REPO_ROOT/scripts/run_current_tamp.py" \
   --repository-root "$REPO_ROOT" \
   --scene-root "$SCENE_ROOT" \
   --experiment "$REPO_ROOT/experiments/navigation_picklift_tamp.json" \
@@ -103,7 +109,7 @@ test -d "$SCENE_ROOT"
 
 ### 通用任务接口：正式 CLI
 
-如果要传入任务文本、选择规划器或使用其他实验配置，使用 `tamp_cli`。
+如果要传入任务文本、选择规划器或使用其他实验配置，使用 `planner.src.tamp.cli`。
 先生成本轮独立的 16 次 CCSP 配置，避免触发求解器默认的 250 次预算：
 
 ```bash
@@ -123,7 +129,7 @@ PY
 
 # 每次生成新的算法随机种子，不使用固定 500–503 编号；场景是否随机由实验配置决定。
 TAMP_SEED="$("$REPO_ROOT/.venv/bin/python" -c 'import secrets; print(secrets.randbits(32))')"
-"$REPO_ROOT/.venv/bin/python" -m examples.online_manipulation.tamp_cli \
+"$REPO_ROOT/.venv/bin/python" -m planner.src.tamp.cli \
   --planner tamp \
   --tamp-mode hierarchical \
   --skill-planner proc3s \
@@ -162,22 +168,52 @@ TAMP_SEED="$("$REPO_ROOT/.venv/bin/python" -c 'import secrets; print(secrets.ran
 详细调用链、检查边界及已知差异见[当前项目架构报告](docs/CURRENT_ARCHITECTURE.md)。
 
 保留的本次成功结果为
-[`run_001/live_result.json`](runs/object-plusx100mm-online-unseeded-20260921/run_001/live_result.json)：
+开发机本地 `runs/object-plusx100mm-online-unseeded-20260921/run_001/live_result.json`：
 `task_goal_verified`，实际抬升约 **86.01 mm**、保持 **3.1 s**、双侧接触、脱离支撑，
 满足原速度与接触判据。1 次语义模型调用、2 次技能模型调用，整轮墙钟约 412.69 s。
 这是当前场景的一次成功，不是新运行必然成功或多场景可靠性的证明。
-HTML 回放保留在开发机，未纳入 Git。
+运行结果、观测、日志和 HTML 回放均保留在开发机；整个 `runs/` 不纳入 Git。
+
+## 分层目录与迁移后的入口
+
+```text
+planner/                     # 原 examples 中的上层规划实现
+  src/bt/                    # BT 生成、编译、可视化与执行
+  src/tamp/                  # 语义规划、技能程序、CCSP 和闭环调度
+  src/skills/                # BT/TAMP 共用的 PickLift 轨迹技能
+  resources/                 # 提示词与 HTML 模板
+  examples/                  # BT tick 演示
+simulation/                  # 原 src 中的仿真实现
+  src/core/                  # 公共数据、动作、观测与协议
+  src/runtime/               # 组装、环境、状态、执行与 Runner
+  src/control/               # 控制、导航、专家策略
+  src/geometry/              # IK、碰撞、接触与几何查询
+  src/scene/                 # 场景资产输入和输出
+  src/sensors/               # 相机和同步
+  src/robots/                # 机器人适配器与配置
+  src/tasks/                 # 任务与成功判据
+  src/io/                    # 实验配置 CLI、记录工具
+  src/recipes/               # 装配配方
+  examples/                  # 公共 API、相机、导航、抓取演示
+```
+
+模块入口为 `python -m planner.src.bt`、`python -m planner.src.tamp.cli` 和
+`python -m simulation.src`。旧 `examples.*` / `src.online_manipulation.*`
+导入路径已迁移，不再保留同名重复实现。外部调用方需要同步新路径。
+配置文件中的 `module:function` 入口和本地安装的 console scripts 均随本次迁移更新。
+运行时和模型/物理配置不变。子目录说明见 [Planner](planner/README.md) 与
+[Simulation](simulation/README.md)。
 
 ## 目录与维护
 
 | 目录 | 职责 |
 |---|---|
-| `src/online_manipulation/` | 环境组装、Runtime、动作/观测、控制、规划查询、任务判定 |
-| `examples/online_manipulation/` | BT 生成与共享执行、分层 TAMP、模型适配和求解器 |
+| `simulation/` | 按 core/runtime/control/geometry 等职责分组的仿真实现和客户端 |
+| `planner/` | BT、TAMP、共享技能实现及提示词/页面资源 |
 | `experiments/` | 实验配置与运行所需的小型专家输入 |
 | `scripts/` | 场景/模型工具、输入提取、诊断与验证入口 |
 | `models/` | 机器人模型、目标资产及上游子模块 |
-| `runs/` | 本次运行结果；新增运行默认忽略，历史实验已清理 |
+| `runs/` | 所有运行产物，仅本地保留；整个目录忽略且不跟踪 |
 | `docs/` | 当前使用、接口、架构与模型说明；旧实验报告已清理 |
 
 公共接口见[API 与配置契约](docs/GENERIC_ONLINE_EXAMPLE.md)。

@@ -15,14 +15,14 @@ from pathlib import Path
 
 from pydrake.geometry import Box, Capsule, Convex, Cylinder, Ellipsoid, HalfSpace, Mesh, Sphere
 
-from examples.online_manipulation.tamp_scenesmith import target_relative_base_candidates
+from planner.src.tamp.scenesmith import target_relative_base_candidates
 
-from src.online_manipulation.experiment import load_experiment
-from src.online_manipulation.evaluation import EvaluatedTask
-from src.online_manipulation.contact import PairContactPolicy, penetration_limit, permits_contact
-from src.online_manipulation.planning import build_planning_query
-from src.online_manipulation.scene_geometry import resolve_ground_geometries
-from src.online_manipulation.tasks import PickLiftTask
+from simulation.src.io.experiment import load_experiment
+from simulation.src.tasks.evaluation import EvaluatedTask
+from simulation.src.geometry.contact import PairContactPolicy, penetration_limit, permits_contact
+from simulation.src.geometry.planning import build_planning_query
+from simulation.src.geometry.scene_geometry import resolve_ground_geometries
+from simulation.src.tasks.tasks import PickLiftTask
 
 
 def stationary_target_world_check(query, task):

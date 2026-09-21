@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from src.online_manipulation import load_experiment, make_env
+from simulation.src import load_experiment, make_env
 
 
 def _sha256(path: Path) -> str:

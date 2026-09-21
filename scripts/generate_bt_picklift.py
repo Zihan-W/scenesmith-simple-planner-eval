@@ -6,9 +6,9 @@ import hashlib
 import json
 from pathlib import Path
 
-from examples.online_manipulation.generated_bt_picklift import (
+from planner.src.bt.picklift import (
     canonical_tree, compile_response, load_inputs, to_dict, to_mdsl, to_mermaid)
-from examples.online_manipulation.bt_visualization import write_viewer
+from planner.src.bt.visualization import write_viewer
 
 
 def main():

@@ -13,17 +13,17 @@ from pathlib import Path
 import random
 import time
 
-from examples.online_manipulation.bt_generation import OpenAICompatibleChatClient
-from examples.online_manipulation.tamp_ccsp import Proc3sCCSPSolver
-from examples.online_manipulation.tamp_failures import ProgramFailure
-from examples.online_manipulation.tamp_hierarchy import PredicateGoal, picklift_registry, program_identity
-from examples.online_manipulation.tamp_online import IncrementalTampRunner, JsonlTrace, RecoveryLimits
-from examples.online_manipulation.tamp_proc3s import PRoC3SProgramGenerator, PRoC3SGenerationFailure
-from examples.online_manipulation.tamp_scenesmith import SceneSmithPickDomain
-from examples.online_manipulation.tamp_scenesmith_online import SceneSmithSkillExecutor, SceneSmithWorldObserver
-from examples.online_manipulation.tamp_semantic import SemanticSubgoalPlanner, SemanticModelError, ModelSettings
-from src.online_manipulation import make_env
-from src.online_manipulation.experiment import load_experiment
+from planner.src.bt.generation import OpenAICompatibleChatClient
+from planner.src.tamp.ccsp import Proc3sCCSPSolver
+from planner.src.tamp.failures import ProgramFailure
+from planner.src.tamp.hierarchy import PredicateGoal, picklift_registry, program_identity
+from planner.src.tamp.online import IncrementalTampRunner, JsonlTrace, RecoveryLimits
+from planner.src.tamp.proc3s import PRoC3SProgramGenerator, PRoC3SGenerationFailure
+from planner.src.tamp.scenesmith import SceneSmithPickDomain
+from planner.src.tamp.scenesmith_online import SceneSmithSkillExecutor, SceneSmithWorldObserver
+from planner.src.tamp.semantic import SemanticSubgoalPlanner, SemanticModelError, ModelSettings
+from simulation.src import make_env
+from simulation.src.io.experiment import load_experiment
 
 
 def save(path, value):
@@ -33,7 +33,7 @@ def save(path, value):
 def source_hashes(repo):
     """Protect all existing implementations, prompts, configs and robot models."""
     result = {}
-    for folder in ("src", "examples", "experiments", "models"):
+    for folder in ("simulation", "planner", "experiments", "models"):
         for path in sorted((repo / folder).rglob("*")):
             if path.is_file() and "__pycache__" not in path.parts:
                 result[str(path.relative_to(repo))] = hashlib.sha256(path.read_bytes()).hexdigest()

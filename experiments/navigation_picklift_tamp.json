@@ -40,7 +40,7 @@
       "models/zerith_pick_eval/package.xml"
     ]
   },
-  "policy": "examples.online_manipulation.bt_runtime:make_policy",
+  "policy": "planner.src.bt.runtime:make_policy",
   "policy_options": {
     "navigation_position_tolerance_m": 0.005,
     "bt_json_input": "experiments/inputs/bt_navigation_picklift/bt_tree_backed.json",

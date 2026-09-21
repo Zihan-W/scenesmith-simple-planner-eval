@@ -17,7 +17,7 @@ import trimesh
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
-from src.zerith_gripper_config import FINGER_CLOSING_TRAVEL_M
+from simulation.src.robots.zerith_gripper_config import FINGER_CLOSING_TRAVEL_M
 
 SOURCE_PACKAGE_RELATIVE_PATH = Path("models/Zerith_Model/ZERITH_H1_PRO_URDF")
 SOURCE_PACKAGE_NAME = "ZR_H1PRO-1.2.00.H.V4.3_URDF_2025.12.02"

@@ -2,13 +2,13 @@
 import argparse,hashlib,json,time
 from pathlib import Path
 import numpy as np
-from examples.online_manipulation.tamp_diagnostics import DiagnosticRecorder, WorkMeter, json_value, state_record
-from examples.online_manipulation.tamp_hierarchy import ParameterizedSkillAction
-from examples.online_manipulation.tamp_online import JsonlTrace
-from examples.online_manipulation.tamp_scenesmith_online import SceneSmithSkillExecutor
-from examples.online_manipulation.tamp_scenesmith import SceneSmithPickDomain
-from src.online_manipulation import make_env, HoldAction
-from src.online_manipulation.experiment import load_experiment
+from planner.src.tamp.diagnostics import DiagnosticRecorder, WorkMeter, json_value, state_record
+from planner.src.tamp.hierarchy import ParameterizedSkillAction
+from planner.src.tamp.online import JsonlTrace
+from planner.src.tamp.scenesmith_online import SceneSmithSkillExecutor
+from planner.src.tamp.scenesmith import SceneSmithPickDomain
+from simulation.src import make_env, HoldAction
+from simulation.src.io.experiment import load_experiment
 
 def saved_actions(path):
     actions=[];checks={}
@@ -67,8 +67,8 @@ def main():
             if args.seed==500 and navresult.success:
                 pick_action=next(a for a in actions if a.skill_name=='PickLift')
                 if args.grasp_offset is not None:
-                    from examples.online_manipulation.tamp_planner import Subgoal
-                    from src.online_manipulation import Pose
+                    from planner.src.tamp.planner import Subgoal
+                    from simulation.src import Pose
                     domain=domain_for(experiment,repo,env.observation)
                     p=env.observation.base['base_link_pose']
                     state={'base_pose':Pose(tuple(p['translation_m']),tuple(p['quaternion_wxyz']))}
@@ -81,7 +81,7 @@ def main():
                         (out/'summary.json').write_text(json.dumps(summary,indent=2));(out/'costs.json').write_text(json.dumps(meter.as_dict(),indent=2));continue
                     geometry={**params,'g0':{'lateral_offset_m':args.grasp_offset,'ik':checks['ik']['grasp_pose_in_target']},'a0':checks['ik']['staging_pose_in_target'],'checks':checks}
                     pick_action=ParameterizedSkillAction('PickLift',pick_action.symbolic_args,geometry,(),True,pick_action.parameter_bindings)
-                from src.online_manipulation import Pose
+                from simulation.src import Pose
                 calibration=json.loads((repo/'experiments/inputs/pick_lift/pick_lift_calibration.json').read_text())
                 for label in ('staging_pose_in_target','grasp_pose_in_target'):
                     p=calibration[label];xyz=list(p['translation_m']);xyz[1]+=pick_action.geometric_parameters['grasp_lateral_offset_m']

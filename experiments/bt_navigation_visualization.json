@@ -7,7 +7,7 @@
   "control": "navigation",
   "initial_state": "navigation_dynamic",
   "scene": "navigation",
-  "policy": "examples.online_manipulation.generated_bt_navigation:make_policy",
+  "policy": "planner.src.bt.navigation:make_policy",
   "policy_options": {
     "environment_input": "experiments/inputs/bt_navigation/environment.json",
     "task_plan_input": "experiments/inputs/bt_navigation/task_plan.json",

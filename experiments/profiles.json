@@ -226,7 +226,7 @@
       "calibration": "experiments/inputs/pick_lift/pick_lift_calibration.json"
     },
     "navigate_exercise": {
-      "factory": "src.online_manipulation.recipes.navigation:make_policy"
+      "factory": "simulation.src.recipes.navigation:make_policy"
     }
   },
   "task": {
@@ -247,7 +247,7 @@
       }
     },
     "parked_dual_exercise": {
-      "factory": "src.online_manipulation.recipes.navigation:make_task",
+      "factory": "simulation.src.recipes.navigation:make_task",
       "goal_xyz_m": [
         2.8,
         0,

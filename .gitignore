@@ -32,13 +32,8 @@ scripts/simulate_zerith_safe_pregrasp.py
 # Local documentation, experiment artifacts, and exported patches.
 /docs/*
 !/docs/CURRENT_ARCHITECTURE.md
-# Ignore historical runs; keep the latest unseeded run's evidence visible.
-/runs/*
-!/runs/object-plusx100mm-online-unseeded-20260921/
-/runs/object-plusx100mm-online-unseeded-20260921/*
-!/runs/object-plusx100mm-online-unseeded-20260921/run_001/
-!/runs/object-plusx100mm-online-unseeded-20260921/validate_vlm_ccsp_unseeded.py
-/runs/object-plusx100mm-online-unseeded-20260921/run_001/scene_cache/
+# All run artifacts stay local.
+/runs/
 /patches/
 
 # Python test, lint, and type-check caches.
@@ -62,5 +57,10 @@ scripts/simulate_zerith_safe_pregrasp.py
 /experiments/inputs/bt_navigation_picklift/*
 !/experiments/inputs/bt_navigation_picklift/bt_tree_backed.json
 
-# Keep the large simulation replay on disk, outside Git.
-/runs/object-plusx100mm-online-unseeded-20260921/run_001/simulation_01_success.html
+
+# Tests remain available locally but are not tracked.
+/tests/
+
+# Local agent instructions and packaging metadata.
+/AGENTS.md
+/pyproject.toml

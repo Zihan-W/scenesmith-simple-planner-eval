@@ -9,7 +9,7 @@
 
 | 职责 | 实际路径/入口 |
 | --- | --- |
-| 通用执行 | `src/online_manipulation/runtime.py::RuntimeConfig/DrakeRuntime`，外层仍为 `make_env → OnlineManipulationEnv` |
+| 通用执行 | `simulation/src/runtime/runtime.py::RuntimeConfig/DrakeRuntime`，外层仍为 `make_env → OnlineManipulationEnv` |
 | 统一模型 | `model.py::populate_model`，仿真与规划同一定义，默认同一Plant、独立Context |
 | 可替换机构 | `adapters/description.py::DescriptionRobotAdapter`，真实两轴无夹爪fixture已运行 |
 | 双臂定义 | `adapters/zerith_dual.py::make_zerith_dual_spec/ZerithDualRobotAdapter` |

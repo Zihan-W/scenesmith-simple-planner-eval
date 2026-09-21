@@ -15,12 +15,12 @@ from pathlib import Path
 import numpy as np
 from pydrake.math import RotationMatrix
 
-from examples.online_manipulation.tamp_scenesmith import SceneSmithPickDomain
-from src.online_manipulation.adapters.description import drake_pose
-from src.online_manipulation.adapters.zerith_mobile import ZerithMobileRobotAdapter
-from src.online_manipulation.experiment import load_experiment
-from src.online_manipulation.observations import Pose
-from src.online_manipulation.planning import build_planning_query
+from planner.src.tamp.scenesmith import SceneSmithPickDomain
+from simulation.src.robots.adapters.description import drake_pose
+from simulation.src.robots.adapters.zerith_mobile import ZerithMobileRobotAdapter
+from simulation.src.io.experiment import load_experiment
+from simulation.src.core.observations import Pose
+from simulation.src.geometry.planning import build_planning_query
 
 
 def main():
@@ -129,7 +129,7 @@ def main():
         "endpoint_valid": bool(check.valid and position_box_valid and rot_error <= math.radians(2.0)),
     }
     if args.diagnose_ik:
-        from src.online_manipulation.adapters.description import public_pose
+        from simulation.src.robots.adapters.description import public_pose
         alternative = query.solve_ik(
             public_pose(desired), frame_name=placed.spec.end_effector_frames["left"],
             seed=configuration, position_tolerance_m=0.001,

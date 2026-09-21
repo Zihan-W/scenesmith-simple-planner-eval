@@ -6,7 +6,7 @@ import csv
 import json
 from pathlib import Path
 
-from src.online_manipulation.recording_overlay import (
+from simulation.src.io.recording_overlay import (
     build_behavior_tree_timeline,
     inject_behavior_tree_overlay,
     write_behavior_tree_timeline,

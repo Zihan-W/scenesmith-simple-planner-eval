@@ -4,7 +4,7 @@
 
 ## 1. 实际调用链
 
-公共入口均为`OnlineManipulationEnv.step()`（`src/online_manipulation/environment.py`），调用`DrakeRuntime.step()`（`runtime.py`），完成动作校验后调用`base_backend.command()`保存本tick速度请求。速度命令不直接成为导航位置目标。
+公共入口均为`OnlineManipulationEnv.step()`（`simulation/src/runtime/environment.py`），调用`DrakeRuntime.step()`（`runtime.py`），完成动作校验后调用`base_backend.command()`保存本tick速度请求。速度命令不直接成为导航位置目标。
 
 ### 平面运动学
 
@@ -17,7 +17,7 @@ BaseVelocityAction → Runtime.step → BaseBackend.command
   → Simulator.AdvanceTo
 ```
 
-- 积分及状态设置：`src/online_manipulation/base.py::integrate_planar`、`PlanarKinematicBase.before_physics`（约164—181行）。没有隐藏这一点：它就是规定运动，不是轮地牵引。
+- 积分及状态设置：`simulation/src/core/base.py::integrate_planar`、`PlanarKinematicBase.before_physics`（约164—181行）。没有隐藏这一点：它就是规定运动，不是轮地牵引。
 - `adapters/zerith_mobile.py::configure_model`仅在本模式添加`PlanarJoint`；`initialize_state`锁定该关节。运行中小步改变其平移/旋转；因此Drake求解器本身的锁定基座twist为0。
 - 公共速度是规定运动速度。本实验额外从连续FK位姿做1ms差分，独立核对它；CSV保留`plant_*`、`public_*`、`pose_fd_*`三套字段，避免把锁定关节速度或请求值冒充动力学测量。
 
@@ -114,10 +114,10 @@ BaseVelocityAction → Runtime.step → BaseBackend.command
 cd /root/workspace/scenesmith-simple-planner-eval
 AUDIT_ROOT="$(mktemp -d "$PWD/output/base_mode_review_XXXXXX")"
 for CASE in planar_kinematic wheel_dynamic wheel_disabled navigation_planar_kinematic navigation_wheel_dynamic; do
-  .venv/bin/python -m examples.online_manipulation.audit_base_modes --case "$CASE" --output "$AUDIT_ROOT" || break
+  .venv/bin/python -m planner.src.audit_base_modes --case "$CASE" --output "$AUDIT_ROOT" || break
 done
-.venv/bin/python -m examples.online_manipulation.audit_base_modes --case analyze --output "$AUDIT_ROOT"
-.venv/bin/python -m examples.online_manipulation.audit_base_modes --case analyze_sampling --output "$AUDIT_ROOT"
+.venv/bin/python -m planner.src.audit_base_modes --case analyze --output "$AUDIT_ROOT"
+.venv/bin/python -m planner.src.audit_base_modes --case analyze_sampling --output "$AUDIT_ROOT"
 ```
 
 脚本仅用已有NumPy、Matplotlib和CSV，不安装新依赖。第一次试跑因未安装pandas而失败，已改用现有依赖；失败日志保留。Drake1.49会对`is_floating()`给弃用提醒，本轮可正常执行，不代表模型错误。

@@ -11,17 +11,17 @@ import json
 import os
 from pathlib import Path
 
-from examples.online_manipulation.bt_generation import OpenAICompatibleChatClient
-from examples.online_manipulation.tamp_ccsp import Proc3sCCSPSolver, PRoC3SProgramUnsat
-from examples.online_manipulation.tamp_hierarchy import (
+from planner.src.bt.generation import OpenAICompatibleChatClient
+from planner.src.tamp.ccsp import Proc3sCCSPSolver, PRoC3SProgramUnsat
+from planner.src.tamp.hierarchy import (
     PredicateGoal, WorldState, picklift_registry, program_identity,
 )
-from examples.online_manipulation.tamp_online import JsonlTrace
-from examples.online_manipulation.tamp_proc3s import PRoC3SProgramGenerator
-from examples.online_manipulation.tamp_scenesmith import SceneSmithPickDomain
-from examples.online_manipulation.tamp_semantic import ModelSettings
-from src.online_manipulation import Pose, make_env
-from src.online_manipulation.experiment import load_experiment
+from planner.src.tamp.online import JsonlTrace
+from planner.src.tamp.proc3s import PRoC3SProgramGenerator
+from planner.src.tamp.scenesmith import SceneSmithPickDomain
+from planner.src.tamp.semantic import ModelSettings
+from simulation.src import Pose, make_env
+from simulation.src.io.experiment import load_experiment
 
 
 class AllGraspsForbidden:

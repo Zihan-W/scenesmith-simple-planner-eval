@@ -4,12 +4,12 @@ from pathlib import Path
 from types import SimpleNamespace
 import numpy as np
 from pydrake.all import Quaternion,RollPitchYaw,RotationMatrix
-from examples.online_manipulation.tamp_diagnostics import WorkMeter,json_value
-from examples.online_manipulation.tamp_planner import Subgoal
-from examples.online_manipulation.tamp_scenesmith import _yaw_pose
-from src.online_manipulation import Pose
-from src.online_manipulation.adapters.description import drake_pose,public_pose
-from src.online_manipulation.experiment import load_experiment
+from planner.src.tamp.diagnostics import WorkMeter,json_value
+from planner.src.tamp.planner import Subgoal
+from planner.src.tamp.scenesmith import _yaw_pose
+from simulation.src import Pose
+from simulation.src.robots.adapters.description import drake_pose,public_pose
+from simulation.src.io.experiment import load_experiment
 from scripts.diagnose_pick_contact import domain_for,saved_actions
 
 def pose(p):return Pose(tuple(p['translation_m']),tuple(p['quaternion_wxyz']))

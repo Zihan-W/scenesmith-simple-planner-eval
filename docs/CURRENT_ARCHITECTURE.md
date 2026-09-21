@@ -1,8 +1,10 @@
 # 当前仿真项目架构报告
 
 日期：2026-09-21。依据开发机当前源码及本次保留的在线成功记录编写。
-代码基线为 `708edf0`；本轮只清理历史产物、补充运行文档并纳入现有复现脚本，
-没有修改模型提示词、规划器、控制器、机器人几何或成功阈值。
+规划行为基线为 `dce9d32`。当前结构将原 `examples/` 重组为 `planner/`，
+原 `src/` 重组为 `simulation/`；并将代码按职责分组。
+只调整模块导入、动态入口、资源定位和源码清单范围，未修改提示词内容、规划算法、
+控制器、机器人几何或成功阈值。
 可直接执行的 Bash 命令见[README](../README.md)。
 
 ## 1. 架构总览
@@ -40,13 +42,13 @@ flowchart TD
 
 | 环节 | 当前实现 | 实际职责 |
 |---|---|---|
-| 入口 | `tamp_cli.py --planner bt` 或 `bt_generation.py` | 接收 `--request`，创建模型客户端 |
+| 入口 | `planner/src/tamp/cli.py --planner bt` 或 `planner/src/bt/generation.py` | 接收 `--request`，创建模型客户端 |
 | 输入 | `load_request()` | 校验 schema、文件边界、SHA-256、任务计划和图片绑定 |
 | 模型 | `OpenAICompatibleChatClient` | 请求兼容 Chat Completions 的服务 |
-| 编译 | `generated_bt_picklift.py` / `generated_bt_navigation.py` | 校验模型返回的两个字段及 MDSL，要求严格匹配输入计划 |
-| 树基础 | `bt_core.py` | 有限技能注册、节点、解析器与 tick 逻辑 |
+| 编译 | `planner/src/bt/picklift.py` / `planner/src/bt/navigation.py` | 校验模型返回的两个字段及 MDSL，要求严格匹配输入计划 |
+| 树基础 | `planner/src/bt/core.py` | 有限技能注册、节点、解析器与 tick 逻辑 |
 | 输出 | `write_result()` | 计划 JSON、BT JSON/MDSL/Mermaid、HTML 树查看器 |
-| 可选执行 | `tamp_cli.py --execute` → `bt_runtime.make_policy()` | 构造共享策略并运行仿真 |
+| 可选执行 | `planner/src/tamp/cli.py --execute` → `planner.src.bt.runtime.make_policy()` | 构造共享策略并运行仿真 |
 
 请求包括 `schema`、`request_id`、`environment`、`task`、`observations`、`model`。
 当前 PickLift 请求需要头部和左腕两张 PNG；导航 profile 的 `observations` 为空。
@@ -55,7 +57,7 @@ BT 模型在既定任务计划上生成可编译的树，不承担 CCSP 站位�
 
 仓库现成的 `bt_picklift_first_person/generation_request.json` 是固定机器人历史快照示例，
 已在当前源码下重新通过输入校验；它不是本次移动场景的实时感知结果。
-`bt_generation.PROFILES` 当前没有 navigation+PickLift 联合请求 schema。
+`planner.src.bt.generation.PROFILES` 当前没有 navigation+PickLift 联合请求 schema。
 手写联合 BT 能由 Runtime 接收，不等于 VLM 生成器已支持对应输入协议。
 新场景的输入需要重新提取并绑定，不能只替换图片或坐标而沿用旧哈希。
 
@@ -66,13 +68,13 @@ BT 模型在既定任务计划上生成可编译的树，不承担 CCSP 站位�
 
 | 层 | 文件 / 类 | 输入 → 输出 |
 |---|---|---|
-| 观测 | `tamp_scenesmith_online.py: SceneSmithWorldObserver` | 实测机器人/目标/接触、图像 → `WorldState` |
-| 语义 | `tamp_semantic.py: SemanticSubgoalPlanner` | 任务文本、标注图像、对象与事实 → 符号子目标 |
-| 技能程序 | `tamp_proc3s.py: PRoC3SProgramGenerator` | 子目标、前提和技能表 → 开放连续变量的程序 |
-| 连续约束 | `tamp_ccsp.py: Proc3sCCSPSolver` | 程序、参数域、实测状态 → 首个可行的完整赋值 |
-| 几何后端 | `tamp_scenesmith.py: SceneSmithPickDomain` | 候选参数 → IK、配置/边检查和几何见证 |
-| 技能绑定 | `tamp_scenesmith_online.py: SceneSmithSkillExecutor` | 带参数技能 → BT 叶节点与运行配置 |
-| 闭环调度 | `tamp_online.py: IncrementalTampRunner` | 单技能执行、重新观测、效果验证与有界重规划 |
+| 观测 | `planner/src/tamp/scenesmith_online.py: SceneSmithWorldObserver` | 实测机器人/目标/接触、图像 → `WorldState` |
+| 语义 | `planner/src/tamp/semantic.py: SemanticSubgoalPlanner` | 任务文本、标注图像、对象与事实 → 符号子目标 |
+| 技能程序 | `planner/src/tamp/proc3s.py: PRoC3SProgramGenerator` | 子目标、前提和技能表 → 开放连续变量的程序 |
+| 连续约束 | `planner/src/tamp/ccsp.py: Proc3sCCSPSolver` | 程序、参数域、实测状态 → 首个可行的完整赋值 |
+| 几何后端 | `planner/src/tamp/scenesmith.py: SceneSmithPickDomain` | 候选参数 → IK、配置/边检查和几何见证 |
+| 技能绑定 | `planner/src/tamp/scenesmith_online.py: SceneSmithSkillExecutor` | 带参数技能 → BT 叶节点与运行配置 |
+| 闭环调度 | `planner/src/tamp/online.py: IncrementalTampRunner` | 单技能执行、重新观测、效果验证与有界重规划 |
 
 模型输出被解析为受限制的结构化程序，不是直接运行任意模型生成的 Python。
 几何搜索不会自行改写技能程序；超预算失败反馈可交给上层模型修订。
@@ -107,7 +109,7 @@ BT 模型在既定任务计划上生成可编译的树，不承担 CCSP 站位�
 | 实际执行 | Runtime 的当前状态检查、提交回执 | 请求目标不等于实际已到达 |
 | 任务验证 | ContactResults、支撑、抬升、保持和速度 | 不能用单次成功推导普遍可靠 |
 
-CCSP 使用 `planning.py: PlanningQuery.solve_ik()`：Drake `InverseKinematics`
+CCSP 使用 `simulation/src/geometry/planning.py: PlanningQuery.solve_ik()`：Drake `InverseKinematics`
 建立带关节限位、位置/朝向约束和靠近初值代价的非线性优化，再由 `Solve(program)`
 选择适用求解器。当前已有按违规碰撞对增添约束的 refinement，最多四轮增补；
 每次候选仍独立检查相关几何，不能继续沿用早期“完全不含避碰约束”的描述。
@@ -116,7 +118,7 @@ CCSP 使用 `planning.py: PlanningQuery.solve_ik()`：Drake `InverseKinematics`
 ## 5. 共享执行与实际 PickLift
 
 `SceneSmithSkillExecutor._pick_binding()` 把检查结果中的左臂关节解与路径传入
-`tamp_joint_skill_plan`。`bt_runtime.make_policy()` 在有该参数时选择
+`tamp_joint_skill_plan`。`planner.src.bt.runtime.make_policy()` 在有该参数时选择
 `JointWaypointPickLiftSkill`；没有时使用原专家策略 `PickLiftPolicy`。
 因此共同的 BT 叶节点下仍存在“专家轨迹”和“CCSP 关节轨迹”两种执行分支。
 TAMP 绑定按关节名称传递左臂的七个关节，不能将不同模型的 q 数组按下标互拷。
@@ -142,7 +144,7 @@ Runtime 仍处理动作合法性、关节约束及配置适用的其余碰撞/�
 
 ## 6. 当前场景运行与正式 CLI 的差异
 
-| 项目 | 正式 `tamp_cli` | 本次保留的 unseeded 运行脚本 |
+| 项目 | 正式 `planner.src.tamp.cli` | 本次保留的 unseeded 运行脚本 |
 |---|---|---|
 | 场景初始化 | 实验配置的原始初态 | 原始初态的红色目标沿世界 +X 平移 0.100 m |
 | 任务 | `--task` 文本；终态仍固定 holding | 固定英文抓取并保持任务 |
@@ -154,7 +156,7 @@ Runtime 仍处理动作合法性、关节约束及配置适用的其余碰撞/�
 | HTML | `simulation.html` | 按结果命名 success/failure HTML |
 
 物体平移发生在模拟初始化，机器人初始位姿不变；后续执行不瞬移、不附着物体。
-该 runner 当前位于本次实验目录并纳入 Git，便于复现；没有把历史成功坐标写入生产采样器。
+该 runner 位于 `scripts/run_current_tamp.py` 并纳入 Git，便于复现；没有把历史成功坐标写入生产采样器。
 它可重跑相同实验条件，但模型输出、算法随机数与物理过程不保证逐次相同。
 
 ## 7. 已保留证据、测试与清理
@@ -169,13 +171,41 @@ Runtime 仍处理动作合法性、关节约束及配置适用的其余碰撞/�
 
 历史清理删除了 12 个运行目录和 8 份旧报告，清理前统计占用约 22.6 GB。
 保留的当前运行目录为 676 MB，1,847 个文件清理前后 SHA-256 一致。
-HTML 回放只保留在磁盘；Git 记录代码、配置、结果日志和观测证据。
+所有运行产物均只保留在磁盘；整个 `runs/` 从 Git 取消跟踪，Git 仅保留代码、必要配置与文档。
+之前提交中的运行记录仍存在于 Git 历史；本次没有改写历史。
 旧诊断脚本中依赖被删日志的复现实验不再具备全部输入；这不影响上述当前入口。
 
-代码基线曾完整运行 `.venv/bin/python -m unittest discover -s tests`：
-311 项，308 项通过、3 项跳过。本轮文档更新的验证另见提交说明，
-不把输入校验、离线编译或旧物理成功当作新一轮在线执行结果。
+最终目录迁移源码完整运行 `.venv/bin/python -m unittest discover -s tests -v`：
+312 项，309 项通过、3 项跳过，耗时 657.994 s。
+跳过项为两项需独立 Torch/CUDA 环境的 cuTAMP 测试，以及一项需显式设置
+`SCENE_ROOT` 的外部完整场景测试；未将这些计为通过。
+新增 BT 包入口测试使用已记录模型响应，验证仓库外调用及全部输出文件；
+另检查 96 个模块、5 个动态配置工厂、已安装命令、资源哈希和文档入口。
+本次未重跑真实模型在线抓取，不把旧物理成功作为迁移后的新在线结果。
+开发机最终日志为 `/tmp/scenesmith-layout-final-regression-20260921.log`，
+源码/配置哈希清单为 `/tmp/scenesmith-layout-acceptance-20260921.json`。
+测试及打包元数据仅留在开发机，不随 Git 分发。
 
 当前边界：BT 的固定快照例子与移动 TAMP 场景尚不是同输入的两算法公平对照；
 支持的抓取对象、机器人与技能域仍有限；有限 CCSP 搜索失败不证明物理不可解，
 单次成功也不证明停车扰动范围内的鲁棒保证。
+
+## 8. Git 分发范围
+
+按当前约定，`runs/`、`tests/`、`AGENTS.md`、`pyproject.toml` 均取消跟踪，
+只在开发机保留；已有 Git 历史不改写。`planner/` 的上层规划代码与 `simulation/` 的底层
+仿真实现属于同一项目，两者均保留。当前场景入口为 `scripts/run_current_tamp.py`，
+仅导入路径和源码清单目录随重组调整，场景与执行逻辑不变，也不依赖 `runs/` 中已有结果。缺少 `pyproject.toml`
+的新克隆不能直接使用 editable install；README 命令面向已有开发环境。
+
+## 9. 模块化与入口迁移
+
+BT 生成实现集中在 `planner/src/bt/`，包级命令为 `python -m planner.src.bt`。
+输入是带哈希绑定的请求、环境、具体任务计划与图片；输出是严格编译后的计划、
+BT JSON、MDSL、Mermaid 和 HTML。生成/执行边界及 Python API 见
+[Planner 模块说明](../planner/README.md)。
+共享轨迹技能在 `planner/src/skills/picklift.py`，BT 不再从 TAMP 文件名下获取该技能。
+底层公共 API 为 `simulation.src`，实现拆到 core、runtime、control、geometry、scene、
+sensors、robots、tasks、io、recipes；仿真层不反向导入 planner。
+`planner/resources/` 保存原提示词和模板，其内容与迁移前一致。
+外部调用方应使用新模块名，旧命名空间未保留兼容副本。

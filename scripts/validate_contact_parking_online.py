@@ -2,17 +2,17 @@
 import argparse,dataclasses,json,os,random,time
 from pathlib import Path
 from scripts.validate_vlm_ccsp import RecordedClient,save,source_hashes
-from examples.online_manipulation.bt_generation import OpenAICompatibleChatClient
-from examples.online_manipulation.tamp_ccsp import Proc3sCCSPSolver
-from examples.online_manipulation.tamp_diagnostics import WorkMeter
-from examples.online_manipulation.tamp_hierarchy import PredicateGoal,picklift_registry
-from examples.online_manipulation.tamp_online import IncrementalTampRunner,JsonlTrace,RecoveryLimits
-from examples.online_manipulation.tamp_proc3s import PRoC3SProgramGenerator
-from examples.online_manipulation.tamp_semantic import SemanticSubgoalPlanner,ModelSettings
-from examples.online_manipulation.tamp_scenesmith_online import SceneSmithSkillExecutor,SceneSmithWorldObserver
+from planner.src.bt.generation import OpenAICompatibleChatClient
+from planner.src.tamp.ccsp import Proc3sCCSPSolver
+from planner.src.tamp.diagnostics import WorkMeter
+from planner.src.tamp.hierarchy import PredicateGoal,picklift_registry
+from planner.src.tamp.online import IncrementalTampRunner,JsonlTrace,RecoveryLimits
+from planner.src.tamp.proc3s import PRoC3SProgramGenerator
+from planner.src.tamp.semantic import SemanticSubgoalPlanner,ModelSettings
+from planner.src.tamp.scenesmith_online import SceneSmithSkillExecutor,SceneSmithWorldObserver
 from scripts.diagnose_pick_contact import domain_for
-from src.online_manipulation import make_env
-from src.online_manipulation.experiment import load_experiment
+from simulation.src import make_env
+from simulation.src.io.experiment import load_experiment
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--seed',type=int,required=True);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--cache',type=Path,required=True);args=parser.parse_args()

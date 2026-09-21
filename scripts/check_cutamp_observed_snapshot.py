@@ -11,11 +11,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from cutamp_observed_resolve import postcheck_candidates
-from examples.online_manipulation.tamp_cutamp_problem import ContinuousProblemBuilder
-from examples.online_manipulation.tamp_hierarchy import SkillProgram, SkillStep, WorldState
-from examples.online_manipulation.tamp_scenesmith import SceneSmithPickDomain
-from src.online_manipulation import Pose
-from src.online_manipulation.experiment import load_experiment
+from planner.src.tamp.cutamp_problem import ContinuousProblemBuilder
+from planner.src.tamp.hierarchy import SkillProgram, SkillStep, WorldState
+from planner.src.tamp.scenesmith import SceneSmithPickDomain
+from simulation.src import Pose
+from simulation.src.io.experiment import load_experiment
 
 
 def main():

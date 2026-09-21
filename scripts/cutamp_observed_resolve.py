@@ -3,11 +3,11 @@
 import json
 from pathlib import Path
 
-from examples.online_manipulation.tamp_cutamp import (
+from planner.src.tamp.cutamp import (
     CuTAMPSolver, CuTAMPSettings, postcheck_cutamp_candidates,
 )
-from examples.online_manipulation.tamp_geometry import GeometricUnsat
-from examples.online_manipulation.tamp_hierarchy import SkillProgram, SkillStep, picklift_registry
+from planner.src.tamp.geometry import GeometricUnsat
+from planner.src.tamp.hierarchy import SkillProgram, SkillStep, picklift_registry
 
 
 def _pick_program(domain):

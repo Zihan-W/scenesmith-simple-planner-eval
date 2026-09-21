@@ -16,7 +16,7 @@
         make_env → reset → policy.act(obs) → step → 原 Runner 记录
 ```
 
-正式工厂位于 `src/online_manipulation/recipes/`，不能反向依赖 examples/scripts。
+正式工厂位于 `simulation/src/recipes/`，不能反向依赖 planner/scripts。
 `assembly.run` 是公共API和配置CLI共用的装配调用，`runtime.py` 仍是唯一实际积分/控制循环。
 旧 CLI 及其重复配置来源已删除。普通策略不读取专家文件。
 
@@ -24,7 +24,7 @@
 
 | 数据 | 单一来源 / 使用位置 |
 | --- | --- |
-| 机器人模型、关节、执行器/TCP/夹爪/相机安装 | Adapter + 模型包；TCP 位于 src/zerith_tcp.py，不再导入盒子/桌子参数 |
+| 机器人模型、关节、执行器/TCP/夹爪/相机安装 | Adapter + 模型包；TCP 位于 simulation/src/robots/zerith_tcp.py，不再导入盒子/桌子参数 |
 | 运行初态：站位、yaw、导轨、手臂 q | profiles.initial_state |
 | 时钟、动作上限、servo 设置 | profiles.control；controller.configure_joint_servos 仅允许 kp/kd/effort cap，不改位置/速度硬件限位 |
 | 场景资产、显式 free/welded、观察对象 | profiles.scene + scene_options；物体替换/位姿覆盖写入 cache |
@@ -34,7 +34,7 @@
 
 `control_options.joint_servo_settings` 示例：
 `{"left_wrist_pitch_joint":{"kp":800,"kd":60,"effort_limit":8}}`。
-这是可选运行设置，不是新的硬件标定。默认仍用 src/zerith_servo_config.py 的既有
+这是可选运行设置，不是新的硬件标定。默认仍用 simulation/src/robots/zerith_servo_config.py 的既有
 验证值；所有最终 JointSpec 数值进入 resolved_config。未知关节或超出 Adapter 上限明确报错。
 
 ### 最小公共 API
@@ -45,7 +45,7 @@
 import os
 import tempfile
 from pathlib import Path
-from src.online_manipulation import load_experiment, make_env
+from simulation.src import load_experiment, make_env
 
 root = Path(os.environ["REPO_ROOT"])
 with tempfile.TemporaryDirectory() as cache:
@@ -82,7 +82,7 @@ wheel_dynamic/mobile双臂配置中实际reset/step并采样三帧；空场景�
 
 ### 仓库外 Policy / evaluator
 
-把 `examples/online_manipulation/external_evaluator.py` 复制到你自己的工作目录，
+把 `simulation/examples/external_evaluator.py` 复制到你自己的工作目录，
 命名为 `my_components.py`。在自己的短 JSON 里选择：
 
 ```json
@@ -95,7 +95,7 @@ wheel_dynamic/mobile双臂配置中实际reset/step并采样三帧；空场景�
 }
 ```
 
-在该目录用已安装的 Python 执行 `-m src.online_manipulation`，加 `--trust-factories`；
+在该目录用已安装的 Python 执行 `-m simulation.src`，加 `--trust-factories`；
 具体完整命令见 Quickstart。第三方已安装模块也可直接用 scene-eval。
 未显式信任时 module:function 会被拒绝；启用后相当于执行本地 Python，**不是安全沙箱**，
 不能加载来源不明的配置/工厂。不需要修改中央分支或 Runtime。

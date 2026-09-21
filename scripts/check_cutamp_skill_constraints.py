@@ -12,14 +12,14 @@ import json
 from pathlib import Path
 
 from cutamp_observed_resolve import resolve_observed_pick
-from examples.online_manipulation.tamp_planner import Subgoal
-from examples.online_manipulation.tamp_scenesmith import SceneSmithPickDomain
-from examples.online_manipulation.tamp_geometry import _bind_effect, _parameter_value
-from examples.online_manipulation.tamp_hierarchy import ParameterizedSkillAction, picklift_registry
-from examples.online_manipulation.tamp_scenesmith_online import SceneSmithSkillExecutor, SceneSmithWorldObserver
-from src.online_manipulation import Pose, make_env
-from src.online_manipulation.adapters.description import drake_pose
-from src.online_manipulation.experiment import load_experiment
+from planner.src.tamp.planner import Subgoal
+from planner.src.tamp.scenesmith import SceneSmithPickDomain
+from planner.src.tamp.geometry import _bind_effect, _parameter_value
+from planner.src.tamp.hierarchy import ParameterizedSkillAction, picklift_registry
+from planner.src.tamp.scenesmith_online import SceneSmithSkillExecutor, SceneSmithWorldObserver
+from simulation.src import Pose, make_env
+from simulation.src.robots.adapters.description import drake_pose
+from simulation.src.io.experiment import load_experiment
 
 
 def execute_checked_candidate(env, experiment, domain, observation, reset_info,

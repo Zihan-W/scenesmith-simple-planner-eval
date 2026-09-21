@@ -17,7 +17,7 @@ OBJ 仍不纳入 Git，可以通过原转换命令生成，`--check` 校验新�
 
 ## 开口标定与调用影响
 
-`src/zerith_gripper_config.py` 集中定义每指向内行程 38.14 mm。该值来自
+`simulation/src/robots/zerith_gripper_config.py` 集中定义每指向内行程 38.14 mm。该值来自
 CAD 最小间距向下取整，两指闭合后保留小于 10 微米的几何间隙，避免完全重合。
 这属于仿真几何止点，不是硬件行程或机械限位实测值。
 

@@ -13,8 +13,8 @@ import xml.etree.ElementTree as ET
 
 def export_drake(args):
     import numpy as np
-    from src.online_manipulation.experiment import load_experiment
-    from src.online_manipulation.planning import build_planning_query
+    from simulation.src.io.experiment import load_experiment
+    from simulation.src.geometry.planning import build_planning_query
 
     output = args.output_root.resolve()
     output.mkdir(parents=True, exist_ok=False)

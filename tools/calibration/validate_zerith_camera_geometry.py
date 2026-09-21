@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from src.online_manipulation import (
+from simulation.src import (
     NullTask,
     ObservedBodySpec,
     ScenarioSpec,

@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.lib import recfunctions
 
-from src.online_manipulation.recipes.mobile import make_config
-from src.online_manipulation import (
+from simulation.src.recipes.mobile import make_config
+from simulation.src import (
     BaseVelocityAction, NavigationGoal, Navigator, Pose,
     build_navigation_map, make_env,
 )
@@ -391,10 +391,10 @@ def analyze(root):
     summary["source_sha256"] = {
         str(path.relative_to(repo)): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (
-            repo / "examples/online_manipulation/audit_base_modes.py",
-            *(repo / "src/online_manipulation" / name for name in (
-                "runtime.py", "base.py", "controller.py", "navigation.py",
-                "adapters/zerith_mobile.py", "adapters/description.py",
+            Path(__file__).resolve(),
+            *(repo / "simulation/src" / name for name in (
+                "runtime/runtime.py", "core/base.py", "control/controller.py", "control/navigation.py",
+                "robots/adapters/zerith_mobile.py", "robots/adapters/description.py",
             )),
         )
     }

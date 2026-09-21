@@ -10,11 +10,11 @@ import json
 import os
 from pathlib import Path
 
-from examples.online_manipulation.bt_generation import OpenAICompatibleChatClient
-from examples.online_manipulation.tamp_hierarchy import PredicateGoal, WorldState, picklift_registry
-from examples.online_manipulation.tamp_online import JsonlTrace
-from examples.online_manipulation.tamp_proc3s import PRoC3SProgramGenerator
-from examples.online_manipulation.tamp_semantic import ModelSettings
+from planner.src.bt.generation import OpenAICompatibleChatClient
+from planner.src.tamp.hierarchy import PredicateGoal, WorldState, picklift_registry
+from planner.src.tamp.online import JsonlTrace
+from planner.src.tamp.proc3s import PRoC3SProgramGenerator
+from planner.src.tamp.semantic import ModelSettings
 
 
 def main():

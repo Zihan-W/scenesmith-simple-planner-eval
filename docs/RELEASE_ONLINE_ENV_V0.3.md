@@ -111,7 +111,7 @@ export REPO_ROOT="$(pwd)"
 export PYTHON="$REPO_ROOT/.venv/bin/python"
 export PYTHONPATH="$REPO_ROOT"
 cd /tmp
-"$PYTHON" -B "$REPO_ROOT/examples/online_manipulation/public_api_client.py" --repository-root "$REPO_ROOT" --seed 0
+"$PYTHON" -B "$REPO_ROOT/simulation/examples/public_api_client.py" --repository-root "$REPO_ROOT" --seed 0
 ```
 
 应该看到`action_status: accepted`、时间约0.1s；NullTask没有抓取成功目标。

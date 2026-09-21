@@ -62,7 +62,7 @@ class ItemLockingMonitorConfig:
     speed_threshold: float = 0.002
 
 
-from src.geometry_bounds import (
+from simulation.src.geometry.geometry_bounds import (
     BoundingBox, _GetShapeOabb, _GetMeshOabb, _OabbToAabb, _MergeAabbs, _CalcAabb,
 )
 

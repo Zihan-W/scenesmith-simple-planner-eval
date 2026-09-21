@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.online_manipulation import (
+from simulation.src import (
     build_navigation_map,
     build_planning_query,
     load_experiment,

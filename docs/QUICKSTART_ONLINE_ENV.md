@@ -45,7 +45,7 @@ model-tools 同时安装 trimesh 和 scipy：OBJ 顶点法线计算及手指凸�
 需要这些依赖。旧环境更新代码后应重新执行上述 editable 安装命令，
 不能只更新源码而跳过新增依赖。若安装失败，请先解决安装错误，再运行转换器。
 
-可编辑安装保留现有 `src.online_manipulation` 公共命名，不为改包名重写项目。
+可编辑安装保留现有 `simulation.src` 公共命名，不为改包名重写项目。
 Python 包不携带大型场景、OBJ 或 submodule；运行时明确传入 repository-root。
 不再需要设置 PYTHONPATH，不需要激活虚拟环境；下文使用绝对可执行文件路径。
 
@@ -67,7 +67,7 @@ cd /tmp
 "$REPO_ROOT/.venv/bin/scene-eval" "$REPO_ROOT/experiments/minimal.json" --repository-root "$REPO_ROOT" --cache-root "$RUN_ROOT/cache" --output-root "$RUN_ROOT/output"
 ```
 
-这是唯一正式配置 CLI。等价的模块入口是 `"$PYTHON" -m src.online_manipulation`，
+这是唯一正式配置 CLI。等价的模块入口是 `"$PYTHON" -m simulation.src`，
 参数完全相同，不是另一套组装逻辑。
 
 预期：`policy_steps: 10`、约1秒仿真时间、`termination_reason: "max_steps"`。
@@ -83,7 +83,7 @@ cache 是可重建派生资产，不是日志；final.dmd 可能继续引用它�
 ## 3. 公共 Python API 与外部扩展
 
 ```bash
-"$PYTHON" -B "$REPO_ROOT/examples/online_manipulation/public_api_client.py" --repository-root "$REPO_ROOT"
+"$PYTHON" -B "$REPO_ROOT/simulation/examples/public_api_client.py" --repository-root "$REPO_ROOT"
 ```
 
 预期返回 `simulation_time_s: 0.1` 和动作状态。它只导入公共 API，
@@ -93,7 +93,7 @@ cache 是可重建派生资产，不是日志；final.dmd 可能继续引用它�
 import os
 import tempfile
 from pathlib import Path
-from src.online_manipulation import load_experiment, make_env
+from simulation.src import load_experiment, make_env
 
 root = Path(os.environ["REPO_ROOT"])
 with tempfile.TemporaryDirectory() as cache:
@@ -118,7 +118,7 @@ Task/机器人 factory 签名见 [API与配置契约](GENERIC_ONLINE_EXAMPLE.md)
 
 ```bash
 export CLIENT_ROOT="$(mktemp -d /tmp/eval-client-XXXXXX)"
-cp "$REPO_ROOT/examples/online_manipulation/external_evaluator.py" "$CLIENT_ROOT/my_components.py"
+cp "$REPO_ROOT/simulation/examples/external_evaluator.py" "$CLIENT_ROOT/my_components.py"
 cd "$CLIENT_ROOT"
 "$PYTHON" - <<'PY'
 import json
@@ -129,7 +129,7 @@ config.update(policy="my_components:make_policy", evaluator="my_components:make_
 config["run"]["seeds"] = [7, 8]
 Path("experiment.json").write_text(json.dumps(config))
 PY
-"$PYTHON" -B -m src.online_manipulation "$CLIENT_ROOT/experiment.json" --repository-root "$REPO_ROOT" --cache-root "$CLIENT_ROOT/cache" --output-root "$CLIENT_ROOT/output" --trust-factories
+"$PYTHON" -B -m simulation.src "$CLIENT_ROOT/experiment.json" --repository-root "$REPO_ROOT" --cache-root "$CLIENT_ROOT/cache" --output-root "$CLIENT_ROOT/output" --trust-factories
 ```
 
 此处 -m 让 Python 按正常规则导入当前目录的 my_components；
@@ -139,8 +139,8 @@ PY
 ## 4. 相机与组合动作
 
 ```bash
-"$PYTHON" -B "$REPO_ROOT/examples/online_manipulation/camera_public_api_client.py" --repository-root "$REPO_ROOT" --output-dir "$RUN_ROOT/camera"
-"$PYTHON" -B "$REPO_ROOT/examples/online_manipulation/mobile_public_api_client.py" --repo-root "$REPO_ROOT" --mode wheel_dynamic --output "$RUN_ROOT/mobile-client"
+"$PYTHON" -B "$REPO_ROOT/simulation/examples/camera_public_api_client.py" --repository-root "$REPO_ROOT" --output-dir "$RUN_ROOT/camera"
+"$PYTHON" -B "$REPO_ROOT/simulation/examples/mobile_public_api_client.py" --repo-root "$REPO_ROOT" --mode wheel_dynamic --output "$RUN_ROOT/mobile-client"
 ```
 
 相机例子保存 RGB PNG、米制深度 NPY并打印 shape/dtype/时间戳。
@@ -264,7 +264,7 @@ export IIWA_RUN="$(mktemp -d /tmp/iiwa-run-XXXXXX)"
 
 | 旧内容 | 当前去向 |
 |---|---|
-| run_zerith_online_example、examples/run_online、pick_lift_demo组装 | experiments配置 + scene-eval；旧CLI参数不再兼容 |
+| run_zerith_online_example、planner/run_online、pick_lift_demo组装 | experiments配置 + scene-eval；旧CLI参数不再兼容 |
 | models/zerith_pick_eval/environment.json | profiles的initial_state/control/task及独立专家输入 |
 | 旧Zerith字典环境/Facade、safe-home/导轨/阶段搜索链 | 删除；历史可从检查点cb79ba8取回，不另存legacy |
 | 原IIWA脚本和批处理shell | iiwa-baseline；算法仅在tools/iiwa |
