@@ -1,0 +1,254 @@
+{
+  "schema": "validation.evidence_index.v1",
+  "implementation": {
+    "implementation_commit": "c36e394401251b14470730e78011f7662ddae6ba",
+    "base_commit": "895a70c8ccbe4f9a3fabeca2dea1d3dba24ae9c7",
+    "source_tree_sha256": "3a483170deedf9638f9c1c9ca7fe00f00701c3cd77570f868f1a95c05ac7da7a",
+    "all_manifest_files_match_committed_blobs": true,
+    "validation_current": "c36e394401251b14470730e78011f7662ddae6ba",
+    "previous_validation_current": "895a70c8ccbe4f9a3fabeca2dea1d3dba24ae9c7"
+  },
+  "verification": {
+    "source_tree_sha256": "3a483170deedf9638f9c1c9ca7fe00f00701c3cd77570f868f1a95c05ac7da7a",
+    "regression": {
+      "tests": 401,
+      "skipped": 3,
+      "seconds": 683.279
+    },
+    "gpu": [
+      {
+        "log": "gpu_test_cutamp_planar_support.py.log",
+        "tests": 2,
+        "seconds": 0.003
+      },
+      {
+        "log": "gpu_test_cutamp_stationary_all.py.log",
+        "tests": 8,
+        "seconds": 0.004
+      },
+      {
+        "log": "gpu_test_static_bounds.py.log",
+        "tests": 1,
+        "seconds": 0.027
+      }
+    ],
+    "model_corpus_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+    "zero_live_calls_and_no_replay_divergences": true,
+    "quality_full_transcript_reproduced": true,
+    "compensation_success": true,
+    "firstpass_successes": 3,
+    "firstpass_trials": 3,
+    "scope": "conditional outcomes, not population reliability; quality baseline is an expected negative control"
+  },
+  "trials": [
+    {
+      "strategy": "quality_replay",
+      "seed": 500,
+      "success": false,
+      "reason": "recovery_preconditions_failed",
+      "model": {
+        "mode": "strict_replay",
+        "logical_calls": 6,
+        "live_provider_calls": 0,
+        "replay_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+        "transcript_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+        "recorded_calls": 6,
+        "unused_recorded_calls": 0,
+        "replay_scope": "complete_recorded_sequence",
+        "divergence": null,
+        "timing": "recorded_provider_latency_not_replayed"
+      },
+      "wall_time_s": 1064.0872089089826,
+      "postcheck_s": 289.5078872239974
+    },
+    {
+      "strategy": "firstpass_replay",
+      "seed": 1758317394,
+      "success": true,
+      "reason": "task_goal_verified",
+      "model": {
+        "mode": "strict_replay",
+        "logical_calls": 3,
+        "live_provider_calls": 0,
+        "replay_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+        "transcript_sha256": "6b66a9120731995d1e4379cfef66f571b551b8928be45efb877ad88a09a0861c",
+        "recorded_calls": 6,
+        "unused_recorded_calls": 3,
+        "replay_scope": "matched_request_prefix",
+        "divergence": null,
+        "timing": "recorded_provider_latency_not_replayed"
+      },
+      "wall_time_s": 542.7938357099774,
+      "postcheck_s": 26.604711480991682
+    },
+    {
+      "strategy": "firstpass_replay",
+      "seed": 500,
+      "success": true,
+      "reason": "task_goal_verified",
+      "model": {
+        "mode": "strict_replay",
+        "logical_calls": 3,
+        "live_provider_calls": 0,
+        "replay_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+        "transcript_sha256": "6b66a9120731995d1e4379cfef66f571b551b8928be45efb877ad88a09a0861c",
+        "recorded_calls": 6,
+        "unused_recorded_calls": 3,
+        "replay_scope": "matched_request_prefix",
+        "divergence": null,
+        "timing": "recorded_provider_latency_not_replayed"
+      },
+      "wall_time_s": 512.9106152029999,
+      "postcheck_s": 13.45169548704871
+    },
+    {
+      "strategy": "firstpass_replay",
+      "seed": 501,
+      "success": true,
+      "reason": "task_goal_verified",
+      "model": {
+        "mode": "strict_replay",
+        "logical_calls": 3,
+        "live_provider_calls": 0,
+        "replay_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+        "transcript_sha256": "6b66a9120731995d1e4379cfef66f571b551b8928be45efb877ad88a09a0861c",
+        "recorded_calls": 6,
+        "unused_recorded_calls": 3,
+        "replay_scope": "matched_request_prefix",
+        "divergence": null,
+        "timing": "recorded_provider_latency_not_replayed"
+      },
+      "wall_time_s": 541.0204567009932,
+      "postcheck_s": 21.5265481150127
+    },
+    {
+      "strategy": "compensation_replay",
+      "seed": 500,
+      "success": true,
+      "reason": "task_goal_verified",
+      "model": {
+        "mode": "strict_replay",
+        "logical_calls": 3,
+        "live_provider_calls": 0,
+        "replay_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+        "transcript_sha256": "6b66a9120731995d1e4379cfef66f571b551b8928be45efb877ad88a09a0861c",
+        "recorded_calls": 6,
+        "unused_recorded_calls": 3,
+        "replay_scope": "matched_request_prefix",
+        "divergence": null,
+        "timing": "recorded_provider_latency_not_replayed"
+      },
+      "wall_time_s": 805.7012965879985,
+      "postcheck_s": 283.1997028240585
+    }
+  ],
+  "artifacts": {
+    "REPORT.md": {
+      "sha256": "64dcc763c53df1bc8ab3d953e6ae09684acd15abe112065e9f63dc7efd18a2da",
+      "bytes": 11280,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/REPORT.md",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/REPORT.md"
+    },
+    "repair.patch": {
+      "sha256": "1e7c221edb66a27d3868aee89ea0d13a2a8adb5ff7a9b9185f5372b5b981eb83",
+      "bytes": 92748,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/repair.patch",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/repair.patch"
+    },
+    "verification.json": {
+      "sha256": "431bd761ded50177bc4a44cac1ba4a9ba0e9c359cc99a00b1901621467965a83",
+      "bytes": 898,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/verification.json",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/verification.json"
+    },
+    "publication.json": {
+      "sha256": "ce482a17d01deb837c534c8f32f3f92a85ccf5a98a0830b4ed03eb4664c44945",
+      "bytes": 424,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/publication.json",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/publication.json"
+    },
+    "ref_archive_result.json": {
+      "sha256": "08ebd7a612a61270a80fed82bb632b3031d1944d3181ccf7cec388c4ad5205d7",
+      "bytes": 3163,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/ref_archive_result.json",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/ref_archive_result.json"
+    },
+    "model_transcript.jsonl": {
+      "sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+      "bytes": 51296,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/model_transcript.jsonl",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/model_transcript.jsonl"
+    },
+    "analysis.json": {
+      "sha256": "d631de6e5b6a3d96dee37f98cf877368d78cc3dcf7273433a2e8a89a9f1eb96e",
+      "bytes": 58292,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/analysis.json",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/analysis.json"
+    },
+    "pair_comparison.json": {
+      "sha256": "b580d10068a15976532545e139a829b382363be3861c0103a60b04d5b9ce816d",
+      "bytes": 2040,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/pair_comparison.json",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/pair_comparison.json"
+    },
+    "position_feedback_audit.json": {
+      "sha256": "9a1e2fb51e4d85b671e036c420be978ba77ec649c0fae2e0058d2398706eb091",
+      "bytes": 3550,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/position_feedback_audit.json",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/position_feedback_audit.json"
+    },
+    "source_manifest.json": {
+      "sha256": "5995e5dfb9de02f5d954a02dca8cf4bcef9b494511355287ce3c40bcec562d26",
+      "bytes": 42083,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/source_manifest.json",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/provenance/source_manifest.json"
+    },
+    "validated_sources.tar.gz": {
+      "sha256": "f3762998d643453b118902d162158bf3c157a9fd9e369d3a88236285e036c355",
+      "bytes": 686976,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/validated_sources.tar.gz",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/provenance/validated_sources.tar.gz"
+    },
+    "validation.bundle": {
+      "sha256": "b1b966e3de17ae29d4bcdc911a1fbb746387e64cb4205b43c17c96ace8d5faaf",
+      "bytes": 37558869,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/validation.bundle",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/validation-ref-archive-20260923-v4/validation.bundle"
+    },
+    "evidence.tar.gz": {
+      "sha256": "73d687f9c3a0393992a8aa724c490cd6bed24fce3895d4ba212d46cfb1ef3553",
+      "bytes": 1111979409,
+      "local_path": "/home/hchen82/cutamp-reproducible-20260923/evidence.tar.gz",
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4.evidence.tar.gz"
+    }
+  },
+  "copies_verified_sha256": true,
+  "archive_read_through": {
+    "regular_files": 2313,
+    "hardlinks": 7224,
+    "data_bytes": 2569135304
+  },
+  "validation_refs": {
+    "archived_count": 26,
+    "retained": {
+      "refs/validation/current": "c36e394401251b14470730e78011f7662ddae6ba",
+      "refs/validation/cutamp-reproducible-firstpass-20260923-v4": "3717b1c711d8f88b0a9d93dc0dd55ec6b284e61c",
+      "refs/validation/cutamp-reproducible-quality-20260923-v4": "d4d0f24675ecae2290c25ef107538aeb5ddf0737"
+    },
+    "fresh_repository_restore_verified": true,
+    "bundle_sha256": "b1b966e3de17ae29d4bcdc911a1fbb746387e64cb4205b43c17c96ace8d5faaf",
+    "restore": "git fetch /path/to/validation.bundle refs/validation/NAME:refs/validation/NAME"
+  },
+  "storage": {
+    "raw_final_run_directory": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4",
+    "generated_cache_deduplication_manifest": "/root/workspace/scenesmith-simple-planner-eval/runs/repair-cache-deduplication-20260924.json",
+    "free_bytes": 4266287104
+  },
+  "limitations": [
+    "Finite sphere approximation still requires exact postchecks.",
+    "Historical floating-point trigger was not proven; current matched-input declarations agree.",
+    "Single-finger release/regrasp remains disabled by user decision.",
+    "No second CUDA host was available for a fresh cross-host build.",
+    "Three fixed-model seeds do not establish population reliability or variance decomposition."
+  ]
+}
