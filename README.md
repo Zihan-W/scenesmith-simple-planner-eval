@@ -256,4 +256,6 @@ export CUTAMP_ROOT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv
 每轮记录原始结果和同源码多 seed 汇总（含失败分类与 Wilson 区间）；小样本不构成可靠性认证。
 `refs/validation/current` 是本地最新已完成验收的源码指针；具体结果见
 `runs/cutamp-closure-20260923/REPORT.md`，引用本身不表示任务全部成功。
-可选后验策略与软/硬截止边界见 [预算契约](docs/CUTAMP_BUDGET_CONTRACT.md)。正式配置仍关闭。
+可选后验策略与软/硬截止边界见 [预算契约](docs/CUTAMP_BUDGET_CONTRACT.md)。自适应计时策略仍默认关闭；正式后验现在默认首个完整通过即停止。
+
+完整模型记录/严格回放、条件化统计口径、可选有界抓持补偿与验证 ref 归档见 [TAMP 实验契约](docs/TAMP_REPRODUCIBILITY.md)。

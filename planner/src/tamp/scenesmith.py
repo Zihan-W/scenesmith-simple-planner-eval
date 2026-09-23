@@ -577,6 +577,87 @@ class SceneSmithPickDomain:
             return True, "valid", {"ik": checks, "dynamics_pending": True}
         raise ValueError(f"Unsupported skill: {subgoal.skill}")
 
+    def failure_positions(self, step, index, parameters, reason, details):
+        """Expose only checked-control projections, not world poses or joint vectors."""
+        from .failures import constraint_category
+        from .failure_positions import normalized_failure_positions
+        return normalized_failure_positions(self, step, index, parameters,
+                                            constraint_category(reason, details))
+
+    def plan_lift_compensation(self, distance_m):
+        """Certify one upward correction from the measured grasp attachment.
+
+        This is a geometric certificate, never a prediction of no-slip dynamics.
+        The runtime still checks every command and observes task completion.
+        """
+        self._require_time()
+        if not math.isfinite(distance_m) or not 0 < distance_m <= 0.01:
+            raise ValueError('Compensation is limited to 10 mm per measured-state plan')
+        observation = self.observation
+        if (not observation.task.get('bilateral_gripper_contact', False)
+                or observation.task.get('unexpected_target_contacts')):
+            return None, {'reason': 'compensation_contact_precondition'}
+        query = self.snapshot.fork_query()
+        if query is None:
+            raise ValueError('Compensation requires a synchronized online planning query')
+        spec = self.config.robot_adapter.spec
+        frame = spec.end_effector_frames['left']
+        names = spec.controlled_joint_names
+        arm_names = spec.arm_groups['left']
+        indices = [names.index(name) for name in arm_names]
+        measured = dict(zip(observation.robot.joint_names, observation.robot.q, strict=True))
+        commanded = dict(zip(observation.robot.joint_names, observation.robot.q_commanded, strict=True))
+        start = tuple(measured[name] for name in names)
+        tcp = query.frame_pose_at(start, spec.model_instance_name, frame)
+        target = observation.objects[self.target_name].pose
+        carried = CarriedBody(self.task_config.target_contact_body, frame, target, tcp)
+        contacts = self._grasp_contact_policy(carried_bodies=(carried,))
+        desired = Pose((tcp.translation_m[0], tcp.translation_m[1], tcp.translation_m[2] + distance_m),
+                       tcp.quaternion_wxyz)
+        checks = {'observation_time_s': observation.time_s, 'snapshot_token': self.snapshot.token,
+                  'distance_m': distance_m, 'measured_target_pose': target.as_dict(),
+                  'measured_tcp_pose': tcp.as_dict(), 'dynamics_pending': True,
+                  'position_tolerance_m': .0005, 'orientation_tolerance_rad': math.radians(.5)}
+        result = self._timed_check('compensation_ik', query.solve_ik, desired,
+            # A 3 mm nominal-lift tolerance absorbs half a 6 mm correction;
+            # loaded servo offset can absorb the remainder. Certify the small
+            # correction to 0.5 mm / 0.5 degrees before runtime feedback.
+            frame_name=frame, seed=start, position_tolerance_m=checks['position_tolerance_m'],
+            orientation_tolerance_rad=checks['orientation_tolerance_rad'], contact_policy=contacts)
+        checks['ik'] = dataclasses.asdict(result)
+        if not result.success:
+            return None, {**checks, 'reason': 'compensation_ik_rejected'}
+        # Only the arm is commanded; certify that actual command, including
+        # unchanged measured finger joints, rather than a whole-robot IK seed.
+        goal = list(start)
+        for index in indices:
+            goal[index] = result.configuration[index]
+        limits = query.joint_limits()
+        margin = min(min(goal[i] - limits[name][0], limits[name][1] - goal[i])
+                     for name, i in zip(arm_names, indices, strict=True))
+        actual = query.frame_pose_at(goal, spec.model_instance_name, frame)
+        if (max(abs(goal[i] - start[i]) for i in indices) > .4 or margin < .005
+                or actual.translation_m[2] < desired.translation_m[2] - checks['position_tolerance_m'] - 1e-9):
+            return None, {**checks, 'reason': 'compensation_continuity_rejected'}
+        # Uniform clipping starts from q_commanded; check that edge as well as
+        # the measured edge. Every subsequent tick is checked by the runtime.
+        commanded_arm_start = list(start)
+        for name, index in zip(arm_names, indices, strict=True):
+            commanded_arm_start[index] = commanded[name]
+        # As in Runtime.check_command_edge, compliant finger squeeze targets
+        # are not physical geometry. This correction moves only the arm.
+        for label, edge_start in (('measured_edge', start),
+                                  ('commanded_edge', commanded_arm_start)):
+            edge = self._timed_check('compensation_edge', query.check_edge,
+                edge_start, goal, contact_policy=contacts, maximum_joint_step=.01)
+            checks[label] = dataclasses.asdict(edge)
+            if not edge.valid:
+                return None, {**checks, 'reason': 'compensation_edge_rejected'}
+        checks.update(reason='certified', min_joint_margin_rad=margin,
+                      actual_tcp_rise_m=actual.translation_m[2] - tcp.translation_m[2],
+                      certified_tcp_pose=actual.as_dict())
+        return [tuple(goal[i] for i in indices)], checks
+
     def predict(self, subgoal: Subgoal, parameters: Mapping, state: dict):
         if subgoal.skill == "NavigateToPick":
             state["base_pose"] = _yaw_pose(parameters["base_x_m"],

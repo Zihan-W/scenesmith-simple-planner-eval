@@ -9,7 +9,7 @@ def static_oriented_bounds(mesh):
 
     Trimesh's OBB search chooses a frame, but its reported extents combine
     intermediate 2-D and 3-D projections. Recompute all three from the same
-    frame with fsum, avoiding the old independently computed height's last bit.
+    frame with fsum, avoiding last-bit differences in the old mixed projection extents.
     This is still a conservative box approximation, not exact mesh collision.
     """
     to_box, _ = trimesh.bounds.oriented_bounds(mesh)

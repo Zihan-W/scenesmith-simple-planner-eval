@@ -125,13 +125,17 @@ class SceneSmithSkillExecutor:
     def __init__(self, *, env, experiment, repository_root: Path,
                  output_root: Path, observation, reset_info,
                  max_skill_steps: int = 600,
-                 model_called: bool = False, registry=None):
+                 model_called: bool = False, registry=None, grasp_compensation=None):
         if type(max_skill_steps) is not int or max_skill_steps < 1:
             raise ValueError("max_skill_steps must be a positive integer")
         self.env, self.experiment = env, experiment
         self.repo, self.output = Path(repository_root), Path(output_root)
         self.observation, self.last_info = observation, reset_info
         self.max_skill_steps = max_skill_steps
+        if grasp_compensation is not None:
+            from planner.src.skills.picklift import validate_compensation
+            validate_compensation(grasp_compensation)
+        self.grasp_compensation = grasp_compensation
         self.model_called = model_called
         self.registry = picklift_registry() if registry is None else registry
         self.bindings = {}
@@ -187,7 +191,10 @@ class SceneSmithSkillExecutor:
         )
         query = (self.env.get_planning_query()
                  if spec.runtime_action == "NavigateTo" else None)
-        policy = make_skill_policy(context, leaf, navigation_query=query)
+        extra = {}
+        if spec.runtime_action == 'ExecutePickLift' and self.grasp_compensation is not None:
+            extra['pick_compensation'] = self._plan_compensation
+        policy = make_skill_policy(context, leaf, navigation_query=query, **extra)
         policy.reset(self.observation, self.last_info)
         start = time.perf_counter()
         reason = "skill_step_limit"
@@ -302,10 +309,26 @@ class SceneSmithSkillExecutor:
         self.last_navigation_goal = tuple(float(value) for value in goal[:3])
         return SkillInvocation("NavigateTo", tuple(goal))
 
+    def _plan_compensation(self, observation, distance_m):
+        from .geometry import GeometryDeadlineExceeded
+        from .scenesmith import SceneSmithPickDomain
+        domain = SceneSmithPickDomain(
+            environment_config=self.experiment.environment_config, observation=observation,
+            planning_query=self.env.get_planning_query(),
+            calibration_path=self.repo / 'experiments/inputs/pick_lift/pick_lift_calibration.json',
+            pick_home_path=self.repo / 'experiments/inputs/pick_lift/pick_home.json')
+        domain.set_deadline(self.deadline_monotonic_s)
+        try:
+            return domain.plan_lift_compensation(distance_m)
+        except GeometryDeadlineExceeded:
+            return None, {'reason': 'compensation_wall_time_exhausted'}
+
     def _pick_binding(self, action, options):
         geometry = action.geometric_parameters
         options["expert_grasp_lateral_offset_m"] = geometry.get("grasp_lateral_offset_m", 0.0)
         options["tamp_joint_skill_plan"] = _joint_pick_plan(geometry["checks"])
+        if self.grasp_compensation is not None:
+            options["grasp_compensation"] = self.grasp_compensation
         return SkillInvocation("ExecutePickLift")
 
 

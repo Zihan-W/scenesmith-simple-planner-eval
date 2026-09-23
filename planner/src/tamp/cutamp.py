@@ -59,7 +59,7 @@ class CuTAMPSettings:
     postcheck_timeout_s: float = 180.0
     postcheck_order: str = "cost_quantiles"
     reuse_navigation_pick_witness: bool = True
-    postcheck_quality_window: int | None = None
+    postcheck_quality_window: int | None = 0
     adaptive_postcheck: dict | None = None
 
     def __post_init__(self):
@@ -314,6 +314,9 @@ def postcheck_cutamp_candidates(registry, domain, world, program, candidates, in
                 valid, reason = False, "excluded_assignment"
             if any(variable in assignments and assignments[variable] != value for variable, value in values.items()):
                 valid, reason = False, "shared_variable_conflict"
+            if not valid and not incomplete and hasattr(domain, 'failure_positions'):
+                details = {**details, 'sampled_failure_positions': domain.failure_positions(
+                    step, index, parameters, reason, details)}
             step_checks.append({"skill": step.skill, "valid": valid, "reason": reason,
                                 "details": details, "assignment": parameters})
             if not valid:

@@ -60,7 +60,15 @@ def constraint_category(reason: str, details: Mapping[str, Any] | None = None) -
             return "joint_limits"
         return "collision"
     runtime_reason = reason.removeprefix("skill_runtime_failed:")
-    if runtime_reason == "planned_hold_timeout":
+    if runtime_reason in {'planned_compensation_contact_lost', 'planned_compensation_contact_precondition'}:
+        return 'grasp_validity'
+    if runtime_reason in {'planned_compensation_edge_rejected', 'planned_compensation_unexpected_contact'}:
+        return 'collision'
+    if runtime_reason == 'planned_compensation_ik_rejected':
+        return 'ik'
+    if runtime_reason in {'planned_compensation_continuity_rejected', 'planned_compensation_wall_time_exhausted'}:
+        return 'execution'
+    if runtime_reason in {"planned_hold_timeout", 'planned_compensation_exhausted', 'planned_compensation_missing_height'}:
         return "verification"
     if runtime_reason in {"planned_lost_contact", "planned_bilateral_contact_timeout"}:
         return "grasp_validity"
@@ -112,8 +120,11 @@ class ProgramFailure:
     attribution_scope: str = "skill"
     program_step: int | None = None
     budget_scope: str = "none"
+    sampled_failure_positions: tuple[Mapping, ...] = ()
 
     def __post_init__(self):
+        from .failure_positions import validate_positions
+        object.__setattr__(self, 'sampled_failure_positions', validate_positions(self.sampled_failure_positions))
         if self.failure_source not in FAILURE_SOURCES:
             raise ValueError("Unknown failure source")
         if self.attribution_scope not in ATTRIBUTION_SCOPES:
@@ -133,6 +144,7 @@ class ProgramFailure:
             raise ValueError("Unknown exhausted budget scope")
 
     def as_feedback(self) -> dict[str, Any]:
+        from .failure_positions import SCOPE
         return {
             "skill": self.skill,
             "failed_constraints": list(self.failed_constraints),
@@ -143,6 +155,8 @@ class ProgramFailure:
             "attribution_scope": self.attribution_scope,
             "program_step": self.program_step,
             "budget_scope": self.budget_scope,
+            **({'sampled_failure_positions': list(self.sampled_failure_positions),
+                'sampled_failure_scope': SCOPE} if self.sampled_failure_positions else {}),
         }
 
     @classmethod
@@ -158,6 +172,7 @@ class ProgramFailure:
             item.get("failure_source", "unspecified"),
             item.get("attribution_scope", "skill" if item.get("skill") else "global"),
             item.get("program_step"), item.get("budget_scope", "none"),
+            item.get("sampled_failure_positions", ()),
         )
 
     @classmethod
@@ -166,13 +181,18 @@ class ProgramFailure:
                          failure_source: str = "unspecified", attribution_scope: str = "skill",
                          program_step: int | None = None,
                          budget_scope: str = "none") -> ProgramFailure:
+        positions = []
+        for item in constraints:
+            for point in item.details.get('sampled_failure_positions', ()):
+                if point not in positions and len(positions) < 8:
+                    positions.append(point)
         counts = Counter(constraint_category(item.constraint, item.details) for item in constraints)
         objects = {name for item in constraints for name in item.involved_objects}
         if target:
             objects.add(target)
         return cls(skill, tuple(name for name, _ in counts.most_common()) or ("no_candidates",),
                    tuple(sorted(objects)), program_unsat, search_budget_exhausted,
-                   failure_source, attribution_scope, program_step, budget_scope)
+                   failure_source, attribution_scope, program_step, budget_scope, tuple(positions))
 
     def abstract(self) -> dict[str, Any]:
         """Do not expose skill names or constraint categories to semantic repair."""

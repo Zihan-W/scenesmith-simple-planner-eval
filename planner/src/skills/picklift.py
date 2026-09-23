@@ -11,7 +11,8 @@ from simulation.src import GripperAction, JointPositionAction, RobotCommand
 class JointWaypointPickLiftSkill:
     """Follow TAMP-certified staging, grasp and lifted joint waypoints."""
 
-    def __init__(self, config, plan: Mapping, *, joint_step_limits: Mapping | None = None):
+    def __init__(self, config, plan: Mapping, *, joint_step_limits: Mapping | None = None,
+                 compensation=None, compensation_planner=None):
         expected = {"arm_joint_names", "staging_joint_positions",
                     "grasp_joint_positions", "lift_waypoints"}
         if (not isinstance(plan, Mapping) or not expected.issubset(plan)
@@ -34,6 +35,12 @@ class JointWaypointPickLiftSkill:
         waypoints = plan["lift_waypoints"]
         if not isinstance(waypoints, list) or not 1 <= len(waypoints) <= 32:
             raise ValueError("PickLift requires bounded lift waypoints")
+        if (compensation is None) != (compensation_planner is None):
+            raise ValueError('Compensation requires both explicit bounds and a certified planner')
+        if compensation is not None:
+            validate_compensation(compensation)
+        self.compensation = compensation
+        self.compensation_planner = compensation_planner
         self.config = config
         self.names = names
         if joint_step_limits is not None:
@@ -51,11 +58,16 @@ class JointWaypointPickLiftSkill:
         self.approach = tuple(positions(item) for item in approach)
         if self.approach[-1] != self.grasp:
             raise ValueError("Approach path must terminate at the planned grasp")
-        self.waypoints = tuple(positions(item) for item in waypoints)
+        self.initial_waypoints = tuple(positions(item) for item in waypoints)
         self.reset(None, {})
 
     def reset(self, observation, info):
         del observation, info
+        self.waypoints = self.initial_waypoints
+        self.compensation_attempts = 0
+        self.compensation_distance_m = 0.
+        self.compensation_history = []
+        self.contact_ticks = 0
         self.stage = "pregrasp"
         self.stop_reason = None
         self.ticks = 0
@@ -76,7 +88,10 @@ class JointWaypointPickLiftSkill:
                 "approach_count": len(self.approach),
                 "commanded_arm_goal": self.last_joint_target,
                 "stable_ticks": self.stable_ticks,
-                "lost_contact_ticks": self.lost_contact_ticks}
+                "lost_contact_ticks": self.lost_contact_ticks,
+                "compensation_attempts": self.compensation_attempts,
+                "compensation_distance_m": self.compensation_distance_m,
+                "compensation_history": self.compensation_history}
 
     def _set_stage(self, stage):
         self.stage = stage
@@ -165,6 +180,9 @@ class JointWaypointPickLiftSkill:
             else:
                 return self._arm(self.grasp, self.config.closed_width_m)
         if self.stage == "verify":
+            if self.compensation_attempts and (not observation.task.get('bilateral_gripper_contact', False)
+                                              or observation.task.get('unexpected_target_contacts')):
+                return self._fail('planned_compensation_contact_lost')
             if observation.task.get("bilateral_gripper_contact", False):
                 self.lost_contact_ticks = 0
             else:
@@ -185,7 +203,58 @@ class JointWaypointPickLiftSkill:
             if self.stage == "verify":
                 return self._arm(goal, self.config.closed_width_m)
         if self.stage == "hold":
+            if self.compensation is not None:
+                if not observation.task.get('bilateral_gripper_contact', False):
+                    return self._fail('planned_compensation_contact_lost')
+                if observation.task.get('unexpected_target_contacts'):
+                    return self._fail('planned_compensation_unexpected_contact')
+                self.contact_ticks += 1
+                settled = self._reached(observation, self.waypoints[-1], contact_mode=True)
+                lift = observation.task.get('lift_m')
+                required = observation.task.get('required_lift_m')
+                if not all(isinstance(value, (float, int)) and math.isfinite(value)
+                           for value in (lift, required)):
+                    return self._fail('planned_compensation_missing_height')
+                if (lift < required and settled
+                        and self.contact_ticks >= self.config.stable_contact_steps):
+                    bounds = self.compensation
+                    remaining = bounds['max_total_m'] - self.compensation_distance_m
+                    if self.compensation_attempts >= bounds['max_attempts'] or remaining < .006:
+                        return self._fail('planned_compensation_exhausted')
+                    distance = min(required - lift + bounds['height_margin_m'],
+                                   bounds['max_step_m'], remaining)
+                    self.compensation_attempts += 1
+                    waypoints, evidence = self.compensation_planner(observation, distance)
+                    self.compensation_history.append(evidence)
+                    if waypoints is None:
+                        return self._fail('planned_' + evidence['reason'])
+                    if (not isinstance(waypoints, list) or len(waypoints) != 1
+                            or len(waypoints[0]) != len(self.names)
+                            or not all(math.isfinite(v) for v in waypoints[0])):
+                        raise ValueError('Invalid certified compensation waypoint')
+                    self.compensation_distance_m += distance
+                    self.waypoints = tuple(tuple(point) for point in waypoints)
+                    self.waypoint_index = 0
+                    self.contact_ticks = 0
+                    self._set_stage('verify')
+                    return self._arm(self.waypoints[0], self.config.closed_width_m)
             if self.stage_ticks > 300:
                 return self._fail("planned_hold_timeout")
             return self._arm(self.waypoints[-1], self.config.closed_width_m)
         return self._fail("invalid_planned_skill_stage")
+
+
+def validate_compensation(settings):
+    """Validate conservative experimental limits; policy remains opt-in."""
+    keys = {'max_attempts', 'max_step_m', 'max_total_m', 'height_margin_m'}
+    if not isinstance(settings, Mapping) or set(settings) != keys:
+        raise ValueError('Compensation requires explicit attempt, step, total and height margin bounds')
+    if type(settings['max_attempts']) is not int or not 1 <= settings['max_attempts'] <= 3:
+        raise ValueError('Compensation permits at most three plans')
+    for key in keys - {'max_attempts'}:
+        if type(settings[key]) not in (float, int) or not math.isfinite(settings[key]):
+            raise ValueError('Compensation distances must be finite meters')
+    if not (.006 <= settings['max_step_m'] <= .01
+            and settings['max_step_m'] <= settings['max_total_m'] <= .03
+            and .006 <= settings['height_margin_m'] <= .01):
+        raise ValueError('Compensation bounds exceed the experimental 10 mm step / 30 mm total envelope')

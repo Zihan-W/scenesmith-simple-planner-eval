@@ -53,3 +53,13 @@ The geometry worker and exact checker both enforce these bounds. Narrowing a
 domain is not a feasibility guarantee. Collision/IK failures in sampled points
 cannot prove the entire domain or the program structure is impossible. A
 provider error or wall-time limit is not evidence for changing the program/domain.
+
+Optional sampled_failure_positions locate actual checked failures in the FULL
+registered normalized envelope, not the narrowed subdomain. Each item names
+program_step, variable, sampler, position axes, and failed_constraint. These
+are projections of checked samples: a grasp's lateral projection omits its
+joint configuration. Do not infer that another grasp at that lateral position
+fails, or that any whole interval is infeasible. Use them as search hints only;
+retain or expand to the full registered envelope when evidence is insufficient.
+No position is supplied for untested candidates, native timeout, provider error,
+excluded assignments, or approximate optimizer-only violations.

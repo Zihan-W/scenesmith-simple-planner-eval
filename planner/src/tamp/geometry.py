@@ -238,6 +238,9 @@ class SamplingSolver:
                     if excluded:
                         continue
                     if not feasible:
+                        if hasattr(self.domain, 'failure_positions'):
+                            details = {**details, 'sampled_failure_positions': self.domain.failure_positions(
+                                step, index, candidate, reason, details)}
                         failures.append(ConstraintResult(
                             False, reason, next(iter(values), ""), str(details.get("message", reason)),
                             _constraint_objects(details, target), dict(details),

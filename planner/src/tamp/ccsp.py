@@ -128,6 +128,9 @@ class Proc3sCCSPSolver:
                                 "step": index, "skill": step.skill, "feasible": feasible,
                                 "constraint": reason, "details": details, "excluded": excluded})
                 if not feasible or excluded:
+                    if not excluded and hasattr(self.domain, 'failure_positions'):
+                        details = {**details, 'sampled_failure_positions': self.domain.failure_positions(
+                            step, index, candidate, reason, details)}
                     failures.append(ConstraintResult(
                         False, "excluded_assignment" if excluded else reason,
                         next(iter(values), ""), reason,

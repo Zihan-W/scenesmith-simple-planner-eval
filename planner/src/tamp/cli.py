@@ -79,6 +79,8 @@ def main(argv=None):
                         help="Hierarchical TAMP wall-time limit; default 1200 seconds")
     parser.add_argument("--seed", type=int,
                         help="Shared explicit seed; BT defaults to experiment seeds, TAMP to 500")
+    parser.add_argument("--model-replay", type=Path,
+                        help="Strict complete model transcript replay; no network fallback")
     parser.add_argument("--recorded-subgoals", type=Path)
     parser.add_argument("--recorded-proposal", type=Path)
     parser.add_argument("--recorded-program", type=Path)
@@ -87,6 +89,9 @@ def main(argv=None):
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY")
     parser.add_argument("--_deadline-worker-start", type=float, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.model_replay and (args.planner != "tamp" or args.tamp_mode != "hierarchical"
+                              or args.recorded_subgoals or args.recorded_program or args.recorded_proposal):
+        parser.error("--model-replay requires hierarchical TAMP without partial recorded inputs")
     if args.planner == "tamp" and args.tamp_mode == "hierarchical":
         if args._deadline_worker_start is None:
             from .supervision import supervise_simulation
@@ -216,10 +221,16 @@ def main(argv=None):
         json.dumps(experiment.resolved_config, indent=2, default=str) + "\n")
     client = None
     if not args.recorded_subgoals or args.skill_planner == "proc3s":
-        key = os.environ.get(args.api_key_env)
-        if not args.base_url or not key:
-            parser.error("Live hierarchical TAMP requires OPENAI_BASE_URL and API key")
-        client = OpenAICompatibleChatClient(base_url=args.base_url, api_key=key)
+        from .model_transcript import TranscriptChatClient
+        if args.model_replay:
+            client = TranscriptChatClient(output=output / "model_transcript.jsonl",
+                                          replay=args.model_replay)
+        else:
+            key = os.environ.get(args.api_key_env)
+            if not args.base_url or not key:
+                parser.error("Live hierarchical TAMP requires OPENAI_BASE_URL and API key")
+            transport = OpenAICompatibleChatClient(base_url=args.base_url, api_key=key)
+            client = TranscriptChatClient(output=output / "model_transcript.jsonl", client=transport)
         client.set_deadline(cli_start + recovery_limits.max_wall_time_s)
     if args.recorded_subgoals:
         semantic = RecordedSemantic(args.recorded_subgoals.read_text(encoding="utf-8"))
@@ -240,8 +251,8 @@ def main(argv=None):
         env=env, experiment=experiment, repository_root=repo,
         output_root=output, observation=observation, reset_info=reset_info,
         max_skill_steps=int(settings["max_skill_steps"]),
-        model_called=args.recorded_subgoals is None,
-        registry=registry,
+        model_called=client is not None and not args.model_replay,
+        registry=registry, grasp_compensation=settings.get("grasp_compensation"),
     )
     scene_manifest = experiment.resolved_config["provenance"].get("scene_manifest")
     observer = SceneSmithWorldObserver(
@@ -255,6 +266,7 @@ def main(argv=None):
         debug_candidates = tuple(tuple(float(part) for part in value.split(","))
                                  for value in args.base_candidate)
 
+    from .model_transcript import ReplayDivergence
     from planner.src.tamp.application import build_runner
     from planner.src.tamp.task_domain import PICK_LIFT_DOMAIN
     runner = build_runner(semantic=semantic, client=client, settings=settings,
@@ -275,7 +287,17 @@ def main(argv=None):
             images=images,
             deadline_monotonic_s=cli_start + recovery_limits.max_wall_time_s,
         )
+    except ReplayDivergence as error:
+        (output / "result.json").write_text(json.dumps({
+            "planner": "tamp", "success": False, "reason": "model_replay_divergence",
+            "detail": str(error), "seed": seed, "model_source": "strict_replay",
+            "model_evidence": client.evidence(),
+        }, indent=2) + "\n")
+        return 2
     finally:
+        if client is not None:
+            (output / "model_evidence.json").write_text(
+                json.dumps(client.evidence(), indent=2) + "\n")
         if args.record_html:
             env.save_recording(output / "simulation.html")
     (output / "result.json").write_text(json.dumps({
@@ -284,7 +306,10 @@ def main(argv=None):
         "skill_planner": args.skill_planner,
         "recording_html": str(output / "simulation.html") if args.record_html else None,
         "seed": seed,
-        "model_source": "recorded" if args.recorded_subgoals else "live_vlm",
+        "model_source": ("strict_replay" if args.model_replay else
+                         "mixed_recorded_semantic_live_program" if args.recorded_subgoals and client else
+                         "recorded_semantic" if args.recorded_subgoals else "live_record"),
+        "model_evidence": client.evidence() if client is not None else None,
         "success": result.success, "reason": result.reason,
         "metrics": dict(result.metrics),
         "final_facts": [dataclasses.asdict(fact) for fact in result.world.facts],

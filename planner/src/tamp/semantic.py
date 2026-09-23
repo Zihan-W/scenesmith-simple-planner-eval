@@ -64,11 +64,16 @@ class SemanticSubgoalPlanner:
         known_objects = frozenset(world.get("objects", {}))
         if not task.strip() or not known_objects:
             raise ValueError("Semantic planning requires a task and observed objects")
+        # Facts are a set in WorldState. Use the predicate contract order,
+        # then arguments, so process hash randomization cannot change prompts.
+        predicate_order = {name: index for index, name in enumerate(predicate_arity)}
         semantic_world = {
             "objects": {name: {key: value for key, value in metadata.items()
                                if key in {"category", "movable", "articulated", "surface"}}
                         for name, metadata in world["objects"].items()},
-            "facts": world.get("facts", []),
+            "facts": sorted(world.get("facts", []), key=lambda item: (
+                predicate_order.get(item["predicate"], len(predicate_order)),
+                item["predicate"], tuple(item["arguments"]))),
         }
         satisfied = {PredicateGoal(item["predicate"], tuple(item["arguments"]))
                      for item in semantic_world["facts"]}
@@ -79,7 +84,7 @@ class SemanticSubgoalPlanner:
                    "observations": [{key: item[key] for key in (
                        "camera", "timestamp_s", "annotations") if key in item}
                        for item in images]}
-        content = [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, default=str)}]
+        content = [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, default=str, sort_keys=True)}]
         for item in images:
             content.append({"type": "image_url", "image_url": {
                 "path": item["path"], "sha256": item["sha256"],

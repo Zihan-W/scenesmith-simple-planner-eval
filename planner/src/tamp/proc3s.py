@@ -169,12 +169,35 @@ class PRoC3SProgramGenerator:
         # Whitelist at the receiving boundary: particle/IK/collision numerics
         # and arbitrary execution failure messages are not program prompts.
         program_feedback = []
+        previous_domains = {item['variable']: item['sampler']
+                            for item in (self.last_program or {}).get('domains', ())}
+        previous_steps = (self.last_program or {}).get('steps', ())
+        def position_in_previous_program(point):
+            from .snapshot import world_token
+            if (previous_domains.get(point['variable']) != point['sampler']
+                    or point['object'] not in world.objects
+                    or point['state_token'] != world_token(world)):
+                return None
+            indices = [index for index, step in enumerate(previous_steps)
+                       if '$' + point['variable'] in step['continuous_variables'].values()
+                       and step['arguments'].get('object') == point['object']]
+            # The current-station shortcut checks only PickLift from a model's
+            # NavigateToPick+PickLift pair. Map its solver step 0 back to 1.
+            if point['program_step'] in indices:
+                index = point['program_step']
+            elif len(indices) == 1:
+                index = indices[0]
+            else:
+                return None  # Never guess when a shared variable is ambiguous.
+            return {**point, 'program_step': index}
         for item in feedback:
             failure = ProgramFailure.from_feedback(item)
             sanitized = dataclasses.replace(
                 failure,
                 skill=failure.skill if failure.skill in {spec.name for spec in self.registry} else "",
                 involved_objects=tuple(name for name in failure.involved_objects if name in world.objects),
+                sampled_failure_positions=tuple(mapped for point in failure.sampled_failure_positions
+                                                if (mapped := position_in_previous_program(point)) is not None),
             )
             program_feedback.append(sanitized.as_feedback())
         skills = [{key: value for key, value in dataclasses.asdict(spec).items()
@@ -190,13 +213,13 @@ class PRoC3SProgramGenerator:
             "skills": skills, "domain_samplers": self.registry.domain_samplers,
             "constraint_feedback": program_feedback,
             "normalized_subdomain_axes": {sampler: sorted(AXES[sampler])
-                                           for sampler in set(self.registry.domain_samplers.values())},
+                                           for sampler in sorted(set(self.registry.domain_samplers.values()))},
             "domain_revision_scope": "subsets_of_registered_envelopes_only_not_unsat_proofs",
             "excluded_skeletons": sorted(excluded_programs),
             "previous_program": self.last_program if feedback else None,
         }
         messages = [{"role": "system", "content": self.prompt},
-                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False, sort_keys=True)}]
         response_format = _response_format(self.settings.response_format, self.registry, world.objects)
         options = {} if response_format is None else {"response_format": response_format}
         error_message = ""

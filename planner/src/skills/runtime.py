@@ -112,7 +112,7 @@ class SingleSkillPolicy(SkillDriver):
 
 
 
-def make_skill_policy(context, invocation, *, navigation_query=None):
+def make_skill_policy(context, invocation, *, navigation_query=None, pick_compensation=None):
     """Bind one certified TAMP skill to existing navigation/pick controllers."""
     options, repo = context.options, context.repository_root
     config = context.environment_config
@@ -166,7 +166,9 @@ def make_skill_policy(context, invocation, *, navigation_query=None):
             for joint in spec.controlled_joints if joint.name in spec.arm_groups["left"]}
         expert = JointWaypointPickLiftSkill(
             expert.config, options["tamp_joint_skill_plan"],
-            joint_step_limits=joint_limits)
+            joint_step_limits=joint_limits,
+            compensation=options.get("grasp_compensation"),
+            compensation_planner=pick_compensation)
     metadata = {"mode": "tamp", **options.get("tamp_generation", {})}
     return SingleSkillPolicy(invocation, task, expert, navigator, metadata,
                              config.timing.policy_dt)
