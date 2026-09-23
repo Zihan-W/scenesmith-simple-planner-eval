@@ -1,0 +1,17 @@
+{
+  "schema": "scenesmith.bt.navigation_picklift_task_plan.v1",
+  "task": "navigate_to_coffee_table_then_pick_lift_red_target",
+  "success_condition": "PickLiftSucceeded",
+  "calibrated_base_xyz_m": [2.65, 2.95, 0.1815],
+  "calibrated_base_yaw_deg": 180.0,
+  "steps": [
+    {"skill": "Wait", "duration_s": 1.0},
+    {"skill": "NavigateTo", "goal": {
+      "xyz_m": [2.7056, 2.95, 0.0],
+      "yaw_rad": 3.141592653589793,
+      "frame_id": "world"
+    }},
+    {"skill": "BaseParkedAtPickPose"},
+    {"skill": "ExecutePickLift"}
+  ]
+}

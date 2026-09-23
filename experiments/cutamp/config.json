@@ -1,0 +1,19 @@
+{
+  "gpu_python": "${CUTAMP_PYTHON}",
+  "cutamp_root": "${CUTAMP_ROOT}",
+  "kinematics_template": "kinematics.json",
+  "robot_template": "robot.json",
+  "multipliers": "multipliers.json",
+  "tolerances": "tolerances.json",
+  "grasp_calibration": "../inputs/pick_lift/pick_lift_calibration.json",
+  "num_particles": 64,
+  "num_opt_steps": 2000,
+  "conf_lr": 0.001,
+  "max_postchecks": 24,
+  "seed": 500,
+  "integrity_manifest": "integrity.json",
+  "solve_timeout_s": 360.0,
+  "postcheck_timeout_s": 180.0,
+  "postcheck_order": "cost_quantiles",
+  "reuse_navigation_pick_witness": true
+}

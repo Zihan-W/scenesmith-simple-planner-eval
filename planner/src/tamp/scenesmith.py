@@ -10,13 +10,16 @@ from __future__ import annotations
 import dataclasses
 import json
 import math
+import time
+
+from .geometry import GeometryDeadlineExceeded, require_time_remaining
 from collections.abc import Mapping
 from pathlib import Path
 
 from pydrake.common.eigen_geometry import Quaternion
 
-from planner.src.bt.core import Node
-from planner.src.bt.runtime import _certified_local_map
+from planner.src.skills.runtime import SkillInvocation
+from planner.src.skills.navigation import certified_local_map
 from planner.src.tamp.planner import Subgoal
 from simulation.src import PickLiftPolicyConfig, Pose, build_planning_query
 from simulation.src.robots.adapters.description import drake_pose, public_pose
@@ -80,14 +83,14 @@ class SceneSmithPickDomain:
                  pick_home_path: Path,
                  base_candidates: tuple[tuple[float, float, float], ...] = (),
                  open_width_m: float | None = None,
-                 lift_distance_m: float | None = None):
+                 lift_distance_m: float | None = None,
+                 planning_query=None):
         self.config = environment_config
-        self.observation = observation
+        from .snapshot import PlanningSnapshot
+        self.snapshot = PlanningSnapshot(observation, planning_query)
         self.calibration = json.loads(Path(calibration_path).read_text())
         self.pick_home = json.loads(Path(pick_home_path).read_text())
         self.candidates = tuple(base_candidates)
-        self._query_cache = None
-        self._navigation_query_cache = None
         task = self.config.task_factory()
         self.task_config = getattr(task, "task", task).config
         if lift_distance_m is None:
@@ -106,6 +109,11 @@ class SceneSmithPickDomain:
         self.config.robot_adapter.gripper_position_targets(self.open_width_m, "left")
         if not self.candidates:
             self.candidates = self._automatic_base_candidates()
+
+    @property
+    def observation(self):
+        """Return the snapshot observation without exposing its owned storage."""
+        return self.snapshot.observation
 
     def _automatic_base_candidates(self):
         """Generate bounded target-relative poses; physical checks decide feasibility.
@@ -179,16 +187,25 @@ class SceneSmithPickDomain:
         query.set_observed_body_poses({name: item.pose
                                        for name, item in self.observation.objects.items()})
 
-    def _candidate_query(self, base_pose: Pose):
-        """Build at the candidate base and measured joints; reuse within one snapshot."""
-        if self._query_cache is not None and self._query_cache[0] == base_pose:
-            return self._query_cache[1:]
-        placed = self._placed_adapter(base_pose)
+    def _query_at_base(self, adapter):
+        """Use a live full-state snapshot, or the existing offline observation input."""
+        query = self.snapshot.fork_query()
+        if query is not None:
+            query.set_robot_base_pose(adapter.spec.base_pose)
+            return query
+        # Offline callers have no environment; preserve their observation-only API.
         query = build_planning_query(scenario=self.config.scenario,
-                                     robot_adapter=placed, timing=self.config.timing)
+                                     robot_adapter=adapter, timing=self.config.timing)
         self._synchronize_observation(query)
-        self._query_cache = (base_pose, query, placed)
-        return query, placed
+        return query
+
+    def planning_query_at(self, base_pose: Pose):
+        """Return an independently mutable candidate query from this snapshot."""
+        return self._query_at_base(self._placed_adapter(base_pose))
+
+    def _candidate_query(self, base_pose: Pose):
+        placed = self._placed_adapter(base_pose)
+        return self._query_at_base(placed), placed
 
     def rank_candidate(self, subgoal, parameters, checks):
         """Prefer balanced finger gaps, then lift margin and centered offsets."""
@@ -252,16 +269,7 @@ class SceneSmithPickDomain:
             measured = self.observation.base["base_link_pose"]
             start_pose = Pose(tuple(measured["translation_m"]), tuple(measured["quaternion_wxyz"]))
         adapter = self._placed_adapter(start_pose)
-        if self._navigation_query_cache is None or self._navigation_query_cache[0] != start_pose:
-            query = build_planning_query(scenario=self.config.scenario,
-                                         robot_adapter=adapter, timing=self.config.timing)
-            self._synchronize_observation(query)
-            self._navigation_query_cache = (start_pose, query, query.plant.GetPositions(query.context).copy())
-        _, query, initial_positions = self._navigation_query_cache
-        # The corridor checker mutates the query, including on rejection.
-        # Reset every position before another candidate; a cached check result
-        # would be unsafe. This cache belongs to just one observed snapshot.
-        query.plant.SetPositions(query.context, initial_positions)
+        query = self._query_at_base(adapter)
         plant, context = query.plant, query.context
         instance = query.robot_model_instance
         base = plant.GetFrameByName(adapter.spec.base_link_name, instance)
@@ -270,21 +278,61 @@ class SceneSmithPickDomain:
         X_WN = drake_pose(base_pose) @ X_BN
         x, y = X_WN.translation()[:2]
         yaw = X_WN.rotation().ToRollPitchYaw().yaw_angle()
-        goal = Node("action", "NavigateTo", (str(x), str(y), str(yaw), "world"))
+        goal = SkillInvocation("NavigateTo", (str(x), str(y), str(yaw), "world"))
         return query, goal
 
+    def set_deadline(self, deadline_monotonic_s):
+        """Bound nested witness search, without weakening any native check."""
+        self.deadline_monotonic_s = deadline_monotonic_s
+
+    def _require_time(self):
+        require_time_remaining(getattr(self, "deadline_monotonic_s", None))
+
+    def _timed_check(self, label, function, *args, **kwargs):
+        self._require_time()
+        started = time.perf_counter()
+        try:
+            return function(*args, **kwargs)
+        finally:
+            work = getattr(self, "search_work", {})
+            item = work.setdefault(label, {"calls": 0, "wall_time_s": 0.0})
+            item["calls"] += 1
+            item["wall_time_s"] += time.perf_counter() - started
+            self.search_work = work
+            self._require_time()
+
+    def check_navigation_corridor(self, subgoal, parameters, state):
+        """Check only the original corridor; not a complete navigation certificate.
+
+        Callers must also attach a complete target-specific PickLift witness
+        before returning a usable NavigateToPick action.
+        """
+        self._require_time()
+        if subgoal.arguments.get("target") != self.target_name:
+            return False, "unknown_target", {}
+        base_pose = _yaw_pose(parameters["base_x_m"], parameters["base_y_m"],
+                              state["base_height_m"], parameters["base_yaw_rad"])
+        try:
+            query, goal = self._navigation_goal(base_pose, state.get("base_pose"))
+            self._timed_check("navigation_corridor", certified_local_map, query, self.config.robot_adapter,
+                                 self.config.scenario, goal)
+        except GeometryDeadlineExceeded:
+            raise
+        except (ValueError, RuntimeError) as error:
+            return False, "navigation_geometry", {"message": str(error)}
+        return True, "valid", {"navigation_goal": list(goal.args),
+                                "base_xyz_yaw": [parameters["base_x_m"], parameters["base_y_m"],
+                                                 parameters["base_yaw_rad"]],
+                                "swept_robot_checked": True}
+
     def check(self, subgoal: Subgoal, parameters: Mapping, state: Mapping):
+        self._require_time()
         if subgoal.arguments.get("target") != self.target_name:
             return False, "unknown_target", {"target": subgoal.arguments.get("target")}
         if subgoal.skill == "NavigateToPick":
-            base_pose = _yaw_pose(parameters["base_x_m"], parameters["base_y_m"],
-                                  state["base_height_m"], parameters["base_yaw_rad"])
-            try:
-                query, goal = self._navigation_goal(base_pose, state.get("base_pose"))
-                _certified_local_map(query, self.config.robot_adapter,
-                                     self.config.scenario, goal)
-            except (ValueError, RuntimeError) as error:
-                return False, "navigation_geometry", {"message": str(error)}
+            valid, reason, corridor = self.check_navigation_corridor(subgoal, parameters, state)
+            if not valid:
+                return valid, reason, corridor
             # A stop for picking needs a complete geometric witness before
             # moving. This does not add a symbolic fact or authorize execution
             # of the witness: measured-state PickLift is solved again on arrival.
@@ -292,17 +340,15 @@ class SceneSmithPickDomain:
             pick = Subgoal("PickLift", {"target": self.target_name})
             failures = []
             for candidate in self.samples(pick, predicted):
-                feasible, reason, details = self.check(pick, candidate, predicted)
+                feasible, reason, details = self._timed_check(
+                    "navigation_pick_witness", self.check, pick, candidate, predicted)
                 if feasible:
                     break
                 failures.append({"parameters": candidate, "reason": reason, "details": details})
             else:
                 return False, "navigation_pick_infeasible", {"pick_failures": failures}
-            return True, "valid", {"navigation_goal": list(goal.args),
-                                    "pick_witness": {"parameters": candidate, "checks": details},
-                                    "base_xyz_yaw": [parameters["base_x_m"], parameters["base_y_m"],
-                                                     parameters["base_yaw_rad"]],
-                                    "swept_robot_checked": True}
+            return True, "valid", {**corridor,
+                                    "pick_witness": {"parameters": candidate, "checks": details}}
 
         if subgoal.skill == "PickLift":
             if parameters["target"] != self.target_name or parameters["arm"] != "left":
@@ -365,7 +411,7 @@ class SceneSmithPickDomain:
                         if label == "grasp_pose_in_target" and waypoint == len(poses) - 1 and supplied is not None:
                             result = self._check_supplied_grasp_configuration(query, waypoint_pose, seed, supplied)
                         else:
-                            result = query.solve_ik(
+                            result = self._timed_check("ik", query.solve_ik,
                                 waypoint_pose, frame_name=frame, seed=seed,
                                 position_tolerance_m=0.001,
                                 orientation_tolerance_rad=math.radians(2.0),
@@ -381,7 +427,7 @@ class SceneSmithPickDomain:
                                                                  for i in arm_indices]}
                         if not result.success:
                             return False, "pick_ik_" + label, checks
-                        edge = query.check_edge(
+                        edge = self._timed_check("joint_edge", query.check_edge,
                             start, result.configuration,
                             contact_policy=self._grasp_contact_policy(),
                             maximum_joint_step=0.01,
@@ -438,7 +484,7 @@ class SceneSmithPickDomain:
                      desired.translation_m[2] + lift_distance),
                     desired.quaternion_wxyz,
                 )
-                result = query.solve_ik(
+                result = self._timed_check("ik", query.solve_ik,
                     lift_desired, frame_name=frame, seed=seed,
                     position_tolerance_m=self.lift_ik_tolerance_m,
                     orientation_tolerance_rad=math.radians(2.0),
@@ -460,7 +506,7 @@ class SceneSmithPickDomain:
                                  desired.translation_m[1],
                                  desired.translation_m[2] + height),
                                 desired.quaternion_wxyz)
-                    candidate = query.solve_ik(
+                    candidate = self._timed_check("ik", query.solve_ik,
                         pose, frame_name=frame, seed=seed,
                         position_tolerance_m=self.lift_ik_tolerance_m,
                         orientation_tolerance_rad=math.radians(2.0),
@@ -490,7 +536,7 @@ class SceneSmithPickDomain:
                             "min_joint_margin_rad": margin,
                             "actual_z_m": actual_pose.translation_m[2]}
                         return False, "pick_lift_path_continuity", checks
-                    edge = query.check_edge(
+                    edge = self._timed_check("joint_edge", query.check_edge,
                         seed, candidate.configuration, contact_policy=lift_contacts,
                         maximum_joint_step=0.01,
                     )
@@ -524,6 +570,8 @@ class SceneSmithPickDomain:
                                                    "gripper_geometry": "planned_open_width",
                                                    "arm_joint_names": list(arm_names),
                                                    "waypoints": waypoints}
+            except GeometryDeadlineExceeded:
+                raise
             except (ValueError, RuntimeError) as error:
                 return False, "pick_geometry", {"message": str(error)}
             return True, "valid", {"ik": checks, "dynamics_pending": True}

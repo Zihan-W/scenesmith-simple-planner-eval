@@ -154,6 +154,9 @@ TAMP_SEED="$("$REPO_ROOT/.venv/bin/python" -c 'import secrets; print(secrets.ran
 正式 CLI 输出 `result.json`、`tamp_trace.jsonl`、`skill_steps.jsonl`、
 `skills/`、`observations/` 和 `simulation.html`。后者的名称不表示成功；
 必须检查 `result.json`。`--recorded-*` 参数属于离线对照，不是真实模型调用。
+分层 TAMP 的默认整轮规划墙钟上限为 1200 秒；可用
+`--max-wall-time-s <秒数>` 覆盖。到期会停止后续搜索和技能指令，
+并在 `result.json` 中记录 `wall_time_budget_exhausted`。
 
 ## 两条路线的关系与当前验收
 
@@ -219,3 +222,38 @@ simulation/                  # 原 src 中的仿真实现
 公共接口见[API 与配置契约](docs/GENERIC_ONLINE_EXAMPLE.md)。
 历史维护记录可用 `git show 708edf0:docs/EVAL_STRUCTURE_PROGRESS.md` 查看。
 旧发布说明只代表当时版本。生产模型、控制律、任务阈值未因本次文档更新改变。
+
+## 从零重建及验收 GPU 环境
+
+使用项目 CPU 环境 `.venv`，另准备 **Python 3.11.9**、CUDA 12.1 编译工具链（含 nvcc）、
+兼容驱动，以及 `experiments/cutamp/upstream-archives.json` 指定的两个原始归档。
+归档必须逐字节匹配 SHA256；请从保存的制品库取得，不能用当前 main 或同版本 pip 包替代。
+重建只向新的目标目录写入，不就地修改已安装上游树：
+
+```bash
+# ARCHIVES 指向两个锁定归档的目录；GPU_ENV 是尚不存在的绝对目标目录。
+python3.11 -m scripts.rebuild_cutamp_environment --archive-dir "$ARCHIVES" --destination "$GPU_ENV"
+# 按输出 environment.json 设置这两个变量（CUTAMP_ROOT 是解压且已应用补丁的目录）。
+export CUTAMP_PYTHON="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["CUTAMP_PYTHON"])' "$GPU_ENV/environment.json")"
+export CUTAMP_ROOT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["CUTAMP_ROOT"])' "$GPU_ENV/environment.json")"
+.venv/bin/python -m scripts.check_cutamp_environment --archive-dir "$ARCHIVES" \
+  --cutamp-config experiments/cutamp/config.json --output "$GPU_ENV/verified.json"
+```
+
+重建入口校验归档、重放补丁、安装锁定依赖与本地源码；验收入口再次独立重放并校验安装。
+当前开发机已实测补丁重放和安装校验；这不等于已在第二台机器完成全新 CUDA 编译。
+
+在线仿真验收统一入口如下，默认先做补丁重放 + `verify_installation`，无跳过开关。
+模型凭据由环境提供，不写进报告。每个 seed 同时用于场景和首次 GPU 求解，后续求解递增 GPU seed。
+
+```bash
+.venv/bin/python -m scripts.validate_cutamp_online --archive-dir "$ARCHIVES" \
+  --scene-root "$SCENE_ROOT" --config experiments/tamp_current_validation.json \
+  --cutamp-config experiments/cutamp/config.json --seeds 500 501 502 \
+  --validation-ref refs/validation/my-unique-run --output "$NEW_RUN_DIRECTORY"
+```
+
+每轮记录原始结果和同源码多 seed 汇总（含失败分类与 Wilson 区间）；小样本不构成可靠性认证。
+`refs/validation/current` 是本地最新已完成验收的源码指针；具体结果见
+`runs/cutamp-closure-20260923/REPORT.md`，引用本身不表示任务全部成功。
+可选后验策略与软/硬截止边界见 [预算契约](docs/CUTAMP_BUDGET_CONTRACT.md)。正式配置仍关闭。

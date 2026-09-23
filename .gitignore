@@ -58,9 +58,10 @@ scripts/simulate_zerith_safe_pregrasp.py
 !/experiments/inputs/bt_navigation_picklift/bt_tree_backed.json
 
 
-# Tests remain available locally but are not tracked.
-/tests/
 
 # Local agent instructions and packaging metadata.
 /AGENTS.md
-/pyproject.toml
+
+!/docs/ARCHITECTURE_REPAIR.md
+!/experiments/tamp_current_validation.json
+!/experiments/cutamp/

@@ -6,17 +6,17 @@ import argparse
 import dataclasses
 import json
 import os
+import time
+import sys
 from pathlib import Path
 
 from planner.src.bt.generation import OpenAICompatibleChatClient
-from planner.src.tamp.geometry import SamplingSolver
 from planner.src.tamp.hierarchy import (
     PredicateGoal, parse_semantic_goals, picklift_registry,
 )
 from planner.src.tamp.online import (
     IncrementalTampRunner, JsonlTrace, RecoveryLimits,
 )
-from planner.src.tamp.scenesmith import SceneSmithPickDomain
 from planner.src.tamp.scenesmith_online import (
     SceneSmithSkillExecutor, SceneSmithWorldObserver,
 )
@@ -50,12 +50,17 @@ def _execution_options(run_options, seed):
 
 
 def main(argv=None):
+    cli_start = time.perf_counter()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--planner", choices=("bt", "tamp"), default="tamp")
     parser.add_argument("--tamp-mode", choices=("hierarchical", "legacy-vlm-domain"),
                         default="hierarchical")
     parser.add_argument("--geometry-backend", choices=("sampling", "proc3s", "cutamp"),
                         default="sampling")
+    parser.add_argument("--shift-world-x-m", type=float, default=0.0,
+                        help="Explicit target translation at reset, shared with validation")
+    parser.add_argument("--cutamp-config", type=Path,
+                        help="Explicit cuTAMP installation, model artifacts and GPU budgets")
     parser.add_argument("--skill-planner", choices=("strips", "proc3s"), default="strips")
     parser.add_argument("--request", type=Path, help="BT baseline generation request")
     parser.add_argument("--model-response", type=Path,
@@ -70,6 +75,8 @@ def main(argv=None):
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument("--task")
     parser.add_argument("--config", type=Path)
+    parser.add_argument("--max-wall-time-s", type=float,
+                        help="Hierarchical TAMP wall-time limit; default 1200 seconds")
     parser.add_argument("--seed", type=int,
                         help="Shared explicit seed; BT defaults to experiment seeds, TAMP to 500")
     parser.add_argument("--recorded-subgoals", type=Path)
@@ -78,7 +85,23 @@ def main(argv=None):
     parser.add_argument("--base-candidate", action="append", help="Legacy/debug only")
     parser.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL"))
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY")
+    parser.add_argument("--_deadline-worker-start", type=float, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.planner == "tamp" and args.tamp_mode == "hierarchical":
+        if args._deadline_worker_start is None:
+            from .supervision import supervise_simulation
+            if args.repository_root is None:
+                parser.error("Hierarchical TAMP requires --repository-root")
+            config_path = args.config or args.repository_root / "experiments/tamp_hierarchical_config.json"
+            configured = json.loads(config_path.read_text()).get("recovery", {}).get("max_wall_time_s", 1200.0)
+            limit = args.max_wall_time_s if args.max_wall_time_s is not None else configured
+            RecoveryLimits(max_wall_time_s=limit)
+            command = [sys.executable, "-m", "planner.src.tamp.cli",
+                       *(sys.argv[1:] if argv is None else argv),
+                       "--_deadline-worker-start", str(cli_start)]
+            return supervise_simulation(command, output=args.output_root,
+                                        started_at=cli_start, max_wall_time_s=limit)
+        cli_start = args._deadline_worker_start
 
     if args.planner == "bt":
         if args.request is None:
@@ -154,20 +177,33 @@ def main(argv=None):
             command += ["--seed", str(args.seed)]
         return legacy_main(command)
 
+    cutamp_settings = None
     if args.geometry_backend == "cutamp":
-        parser.error("The fixed-skeleton cuTAMP adapter for Zerith is not implemented; "
-                     "use --geometry-backend sampling or proc3s")
+        if args.cutamp_config is None:
+            parser.error("--geometry-backend cutamp requires --cutamp-config")
+        from planner.src.tamp.cutamp import CuTAMPSettings
+        cutamp_settings = CuTAMPSettings.from_file(args.cutamp_config)
+    elif args.cutamp_config is not None:
+        parser.error("--cutamp-config requires --geometry-backend cutamp")
     output = args.output_root.resolve()
     if output.exists() and any(output.iterdir()):
         raise FileExistsError(f"Output directory is not empty: {output}")
     output.mkdir(parents=True, exist_ok=True)
     repo = args.repository_root.resolve()
+    from planner.src.tamp.provenance import record_source_evidence
+    record_source_evidence(repo, output / "provenance")
     config_path = args.config or repo / "experiments/tamp_hierarchical_config.json"
     settings = json.loads(config_path.read_text(encoding="utf-8"))
+    settings["recovery"] = dict(settings["recovery"])
+    if args.max_wall_time_s is not None:
+        settings["recovery"]["max_wall_time_s"] = args.max_wall_time_s
+    recovery_limits = RecoveryLimits(**settings["recovery"])
+    settings["recovery"] = dataclasses.asdict(recovery_limits)
     (output / "planner_config.json").write_text(json.dumps({
         "settings": settings, "task": args.task, "seed": 500 if args.seed is None else args.seed,
         "skill_planner": args.skill_planner, "geometry_backend": args.geometry_backend,
         "record_html": args.record_html,
+        "cutamp": dataclasses.asdict(cutamp_settings) if cutamp_settings else None,
     }, indent=2, ensure_ascii=False) + "\n")
     experiment = load_experiment(
         args.experiment, repository_root=repo,
@@ -184,25 +220,22 @@ def main(argv=None):
         if not args.base_url or not key:
             parser.error("Live hierarchical TAMP requires OPENAI_BASE_URL and API key")
         client = OpenAICompatibleChatClient(base_url=args.base_url, api_key=key)
+        client.set_deadline(cli_start + recovery_limits.max_wall_time_s)
     if args.recorded_subgoals:
         semantic = RecordedSemantic(args.recorded_subgoals.read_text(encoding="utf-8"))
     else:
         semantic = SemanticSubgoalPlanner(client, ModelSettings(**settings["subgoal_model"]),
                                          trace=trace)
-    env = make_env(experiment.environment_config)
+    from planner.src.tamp.scene_setup import reset_scene
     seed = 500 if args.seed is None else args.seed
-    observation, reset_info = env.reset(seed=seed)
+    experiment, env, observation, reset_info, shift_protocol = reset_scene(
+        experiment, seed=seed, shift_world_x_m=args.shift_world_x_m)
+    if shift_protocol is not None:
+        (output / "shift_protocol.json").write_text(json.dumps(shift_protocol, indent=2) + "\n")
     task = experiment.environment_config.task_factory()
     task = getattr(task, "task", task)
     target = task.config.target_observation_name
     registry = picklift_registry()
-    from planner.src.tamp.skill_planning import StripsProgramGenerator
-    if args.skill_planner == "proc3s":
-        from planner.src.tamp.proc3s import PRoC3SProgramGenerator
-        program_generator = PRoC3SProgramGenerator(
-            client, ModelSettings(**settings["skill_model"]), registry, trace=trace)
-    else:
-        program_generator = StripsProgramGenerator(registry)
     executor = SceneSmithSkillExecutor(
         env=env, experiment=experiment, repository_root=repo,
         output_root=output, observation=observation, reset_info=reset_info,
@@ -222,47 +255,25 @@ def main(argv=None):
         debug_candidates = tuple(tuple(float(part) for part in value.split(","))
                                  for value in args.base_candidate)
 
-    import random
-    ccsp_rng = random.Random(seed)
-
-    def solver_factory(world):
-        del world
-        domain = SceneSmithPickDomain(
-            environment_config=experiment.environment_config,
-            observation=executor.observation,
-            calibration_path=repo / "experiments/inputs/pick_lift/pick_lift_calibration.json",
-            pick_home_path=repo / "experiments/inputs/pick_lift/pick_home.json",
-            base_candidates=debug_candidates,
-            open_width_m=experiment.resolved_config["user_config"]["policy_options"].get(
-                "expert_policy_overrides", {}).get("open_width_m"),
-            lift_distance_m=experiment.resolved_config["user_config"]["policy_options"].get(
-                "expert_policy_overrides", {}).get("lift_distance_m"),
-        )
-        if args.geometry_backend == "proc3s":
-            from planner.src.tamp.ccsp import Proc3sCCSPSolver
-            return Proc3sCCSPSolver(registry, domain, trace=trace, rng=ccsp_rng,
-                                    **settings.get("proc3s_ccsp", {}))
-        return SamplingSolver(registry, domain, trace=trace, **settings["sampling"])
-
-    runner = IncrementalTampRunner(
-        semantic=semantic, registry=registry, solver_factory=solver_factory,
-        executor=executor, observer=observer,
-        trace=trace,
-        limits=RecoveryLimits(**settings["recovery"]),
-        program_generator=program_generator,
-    )
+    from planner.src.tamp.application import build_runner
+    from planner.src.tamp.task_domain import PICK_LIFT_DOMAIN
+    runner = build_runner(semantic=semantic, client=client, settings=settings,
+        registry=registry, executor=executor, observer=observer, env=env,
+        experiment=experiment, repository_root=repo, output_root=output, trace=trace,
+        skill_planner=args.skill_planner, geometry_backend=args.geometry_backend,
+        seed=seed, cutamp_settings=cutamp_settings, base_candidates=debug_candidates)
     if args.record_html:
         env.start_recording()
     try:
         result = runner.run(
             task=args.task,
-            task_goals=(PredicateGoal("holding", (target,)),),
+            task_goals=PICK_LIFT_DOMAIN.goals(target),
             initial_observation=observation,
             initial_geometry_state={"base_height_m":
                 experiment.environment_config.robot_adapter.base_config.base_height_m},
-            predicate_arity={"observed": 1, "at_pick_pose": 1,
-                             "holding": 1, "gripper_empty": 0},
+            predicate_arity=registry.predicate_arity,
             images=images,
+            deadline_monotonic_s=cli_start + recovery_limits.max_wall_time_s,
         )
     finally:
         if args.record_html:

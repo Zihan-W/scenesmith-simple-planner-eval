@@ -15,8 +15,16 @@ from typing import Any
 CONSTRAINT_CATEGORIES = frozenset({
     "ik", "collision", "corridor", "reachability", "joint_limits", "grasp_validity",
     "approach", "shared_variable", "excluded_assignment", "execution",
-    "verification", "no_candidates", "other",
+    "verification", "no_candidates", "other", "domain_restriction",
 })
+
+
+FAILURE_SOURCES = frozenset({
+    "unspecified", "sampling_budget_exhausted", "approximate_tolerance_unmet",
+    "optimizer_timeout", "exact_postcheck_rejected", "candidate_exclusion", "geometry_wall_time",
+    "execution_failure", "geometric_search_failed", "backend_precondition",
+})
+ATTRIBUTION_SCOPES = frozenset({"global", "skill", "step"})
 
 
 def constraint_category(reason: str, details: Mapping[str, Any] | None = None) -> str:
@@ -40,7 +48,26 @@ def constraint_category(reason: str, details: Mapping[str, Any] | None = None) -
         return "ik"
     if reason.startswith("pick_joint_edge_") or reason in {
             "joint_edge_rejected", "skill_runtime_failed:joint_edge_rejected"}:
+        checks = details or {}
+        if reason.startswith("pick_joint_edge_"):
+            label = reason.removeprefix("pick_joint_edge_")
+            if label == "lift_waypoint":
+                label = "lift_waypoints_world"
+            edge = checks.get(label, {}).get("joint_edge", {})
+        else:
+            edge = checks.get("last_action_rejection", checks).get("edge", {})
+        if edge.get("joint_limits_valid") is False:
+            return "joint_limits"
         return "collision"
+    runtime_reason = reason.removeprefix("skill_runtime_failed:")
+    if runtime_reason == "planned_hold_timeout":
+        return "verification"
+    if runtime_reason in {"planned_lost_contact", "planned_bilateral_contact_timeout"}:
+        return "grasp_validity"
+    if runtime_reason in {
+            "planned_staging_timeout", "planned_grasp_timeout",
+            "planned_lift_waypoint_timeout"}:
+        return "execution"
     if reason in {"navigation_geometry", "skill_runtime_failed:navigation_blocked"}:
         return "corridor"
     if reason == "base_not_parked":
@@ -69,7 +96,7 @@ class LowLevelFailure:
     def abstract(self) -> ProgramFailure:
         """Drop numeric details and arbitrary failure text."""
         return ProgramFailure(self.skill, (constraint_category(self.reason, self.details),),
-                              tuple(sorted(set(self.involved_objects))))
+                              tuple(sorted(set(self.involved_objects))), failure_source="execution_failure")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -81,6 +108,29 @@ class ProgramFailure:
     involved_objects: tuple[str, ...]
     program_unsat: bool = False
     search_budget_exhausted: bool = False
+    failure_source: str = "unspecified"
+    attribution_scope: str = "skill"
+    program_step: int | None = None
+    budget_scope: str = "none"
+
+    def __post_init__(self):
+        if self.failure_source not in FAILURE_SOURCES:
+            raise ValueError("Unknown failure source")
+        if self.attribution_scope not in ATTRIBUTION_SCOPES:
+            raise ValueError("Unknown failure attribution scope")
+        if self.attribution_scope == "global" and (self.skill or self.program_step is not None):
+            raise ValueError("A global failure cannot name a skill or program step")
+        if self.attribution_scope == "skill" and not self.skill:
+            raise ValueError("Skill attribution requires a nonempty skill")
+        if self.attribution_scope == "step" and (
+                not self.skill or type(self.program_step) is not int or self.program_step < 0):
+            raise ValueError("Step attribution requires a known skill and nonnegative index")
+        if self.attribution_scope != "step" and self.program_step is not None:
+            raise ValueError("Only step attribution may include a program index")
+        if self.budget_scope not in {"none", "outer_assignments", "optimizer_steps",
+                                     "optimizer_wall_time", "exact_postchecks",
+                                     "geometry_wall_time", "exact_postcheck_wall_time"}:
+            raise ValueError("Unknown exhausted budget scope")
 
     def as_feedback(self) -> dict[str, Any]:
         return {
@@ -89,6 +139,10 @@ class ProgramFailure:
             "involved_objects": list(self.involved_objects),
             "program_unsat": self.program_unsat,
             "search_budget_exhausted": self.search_budget_exhausted,
+            "failure_source": self.failure_source,
+            "attribution_scope": self.attribution_scope,
+            "program_step": self.program_step,
+            "budget_scope": self.budget_scope,
         }
 
     @classmethod
@@ -99,19 +153,26 @@ class ProgramFailure:
             str(item.get("skill", "")),
             tuple(dict.fromkeys(constraint_category(str(reason)) for reason in reasons)),
             tuple(sorted(set(item.get("involved_objects", ())))),
-            bool(item.get("program_unsat", item.get("type") == "GEOMETRIC_INFEASIBLE")),
+            bool(item.get("program_unsat", False)),
             bool(item.get("search_budget_exhausted", False)),
+            item.get("failure_source", "unspecified"),
+            item.get("attribution_scope", "skill" if item.get("skill") else "global"),
+            item.get("program_step"), item.get("budget_scope", "none"),
         )
 
     @classmethod
     def from_constraints(cls, constraints, *, skill: str, target: str | None = None,
-                         search_budget_exhausted: bool = True) -> ProgramFailure:
+                         search_budget_exhausted: bool = False, program_unsat: bool = False,
+                         failure_source: str = "unspecified", attribution_scope: str = "skill",
+                         program_step: int | None = None,
+                         budget_scope: str = "none") -> ProgramFailure:
         counts = Counter(constraint_category(item.constraint, item.details) for item in constraints)
         objects = {name for item in constraints for name in item.involved_objects}
         if target:
             objects.add(target)
-        return cls(skill, tuple(name for name, _ in counts.most_common(2)) or ("no_candidates",),
-                   tuple(sorted(objects)), True, search_budget_exhausted)
+        return cls(skill, tuple(name for name, _ in counts.most_common()) or ("no_candidates",),
+                   tuple(sorted(objects)), program_unsat, search_budget_exhausted,
+                   failure_source, attribution_scope, program_step, budget_scope)
 
     def abstract(self) -> dict[str, Any]:
         """Do not expose skill names or constraint categories to semantic repair."""

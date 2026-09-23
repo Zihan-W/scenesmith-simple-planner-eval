@@ -124,6 +124,10 @@ class OnlineManipulationEnv:
         """Write selected final object poses without changing the input DMD."""
         return self._backend.write_updated_scenario(Path(output_path))
 
+    def capture_cameras(self):
+        """Render fresh camera images at the current state without stepping."""
+        return self._backend.capture_cameras()
+
     def get_planning_query(self):
         """Return a planning snapshot synchronized to current base and objects.
 

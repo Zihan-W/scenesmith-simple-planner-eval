@@ -1,6 +1,10 @@
 # 当前仿真项目架构报告
 
-日期：2026-09-21。依据开发机当前源码及本次保留的在线成功记录编写。
+> 2026-09-22 架构修复：当前入口、共用组装、快照/求解器契约及验收以 [ARCHITECTURE_REPAIR.md](ARCHITECTURE_REPAIR.md) 为准。下文 §6 的入口差异表保留为旧版实验记录；当前 CLI 与验证脚本已共用 application.build_runner 和 scene_setup.reset_scene。
+
+
+日期：2026-09-22。TAMP 公共接口更新及验证见 [专项报告](TAMP_PUBLIC_INTERFACE_VALIDATION.md)。
+下文历史实验数据仍按其原记录日期解读。
 规划行为基线为 `dce9d32`。当前结构将原 `examples/` 重组为 `planner/`，
 原 `src/` 重组为 `simulation/`；并将代码按职责分组。
 只调整模块导入、动态入口、资源定位和源码清单范围，未修改提示词内容、规划算法、
@@ -10,8 +14,9 @@
 ## 1. 架构总览
 
 本项目消费外部 SceneSmith 场景，在 Drake 中装配 Zerith 机器人、物体、传感器和任务。
-BT 与 TAMP 是不同的规划/调度路径；它们共享低层运行环境，并可通过同一
-`JsonBtPolicy` 调用导航和抓取。共享入口不意味着两条路径使用相同的抓取轨迹。
+BT 与 TAMP 是独立的规划/调度路径，共享仿真环境、Navigator 和 PickLift 关节轨迹技能。
+BT 保留 `JsonBtPolicy`；在线 TAMP 通过 `SingleSkillPolicy` 直接执行一个已绑定参数的技能，
+不生成或解释 BT。共享控制器不意味着两条路径使用相同的抓取轨迹。
 
 ```mermaid
 flowchart TD
@@ -27,8 +32,11 @@ flowchart TD
     J --> K[SceneSmithPickDomain: IK、碰撞、轨迹边、导航抓取联检]
     K --> L[带几何参数的技能]
     L --> M[SceneSmithSkillExecutor]
-    M --> F
-    F --> N[RobotCommand → Runtime 检查与提交]
+    M --> Q[SingleSkillPolicy]
+    Q --> N[env.step / RobotCommand → Runtime 检查与提交]
+    F --> N
+    C --> R[env.get_planning_query / 完整独立状态快照]
+    R --> K
     N --> C
     C --> O[真实接触与 PickLiftTask 成功判定]
     O --> G
@@ -48,7 +56,7 @@ flowchart TD
 | 编译 | `planner/src/bt/picklift.py` / `planner/src/bt/navigation.py` | 校验模型返回的两个字段及 MDSL，要求严格匹配输入计划 |
 | 树基础 | `planner/src/bt/core.py` | 有限技能注册、节点、解析器与 tick 逻辑 |
 | 输出 | `write_result()` | 计划 JSON、BT JSON/MDSL/Mermaid、HTML 树查看器 |
-| 可选执行 | `planner/src/tamp/cli.py --execute` → `planner.src.bt.runtime.make_policy()` | 构造共享策略并运行仿真 |
+| 可选执行 | `planner/src/tamp/cli.py --execute` → `planner.src.bt.runtime.make_policy()` | 构造 BT 策略并运行仿真 |
 
 请求包括 `schema`、`request_id`、`environment`、`task`、`observations`、`model`。
 当前 PickLift 请求需要头部和左腕两张 PNG；导航 profile 的 `observations` 为空。
@@ -73,7 +81,7 @@ BT 模型在既定任务计划上生成可编译的树，不承担 CCSP 站位�
 | 技能程序 | `planner/src/tamp/proc3s.py: PRoC3SProgramGenerator` | 子目标、前提和技能表 → 开放连续变量的程序 |
 | 连续约束 | `planner/src/tamp/ccsp.py: Proc3sCCSPSolver` | 程序、参数域、实测状态 → 首个可行的完整赋值 |
 | 几何后端 | `planner/src/tamp/scenesmith.py: SceneSmithPickDomain` | 候选参数 → IK、配置/边检查和几何见证 |
-| 技能绑定 | `planner/src/tamp/scenesmith_online.py: SceneSmithSkillExecutor` | 带参数技能 → BT 叶节点与运行配置 |
+| 技能绑定 | `planner/src/tamp/scenesmith_online.py: SceneSmithSkillExecutor` | 带参数技能 → SkillInvocation / SingleSkillPolicy |
 | 闭环调度 | `planner/src/tamp/online.py: IncrementalTampRunner` | 单技能执行、重新观测、效果验证与有界重规划 |
 
 模型输出被解析为受限制的结构化程序，不是直接运行任意模型生成的 Python。
@@ -81,7 +89,7 @@ BT 模型在既定任务计划上生成可编译的树，不承担 CCSP 站位�
 
 ### 技能与事实
 
-| TAMP 技能 | 连续参数 | Runtime 叶节点 |
+| TAMP 技能 | 连续参数 | 独立运行技能 |
 |---|---|---|
 | `NavigateToPick` | `base_pose` | `NavigateTo` |
 | `PickLift` | `grasp_pose`、`approach_pose` | `ExecutePickLift` |
@@ -89,7 +97,7 @@ BT 模型在既定任务计划上生成可编译的树，不承担 CCSP 站位�
 当前事实包括 `observed`、`gripper_empty`、`at_pick_pose`、`holding`。
 `at_pick_pose` 仍表示站位到达，不是抓取可行性的永久证明。
 正式分层 CLI 的终态目标目前固定为目标物体 `holding`；尚不是任意任务/任意技能系统。
-`--geometry-backend cutamp` 在该入口明确报未实现；本次路径没有接入 cuTAMP。
+后续第三层接入已增加 `--geometry-backend cutamp --cutamp-config <file>`；使用真实 GPU 候选与 Drake 后验，详见 [cuTAMP 接入报告](CUTAMP_INTEGRATION_VALIDATION.md)。此前 CCSP 验证结果不计作 cuTAMP 结果。
 
 ## 4. CCSP 检查及其边界
 
@@ -118,15 +126,24 @@ CCSP 使用 `simulation/src/geometry/planning.py: PlanningQuery.solve_ik()`：Dr
 ## 5. 共享执行与实际 PickLift
 
 `SceneSmithSkillExecutor._pick_binding()` 把检查结果中的左臂关节解与路径传入
-`tamp_joint_skill_plan`。`planner.src.bt.runtime.make_policy()` 在有该参数时选择
-`JointWaypointPickLiftSkill`；没有时使用原专家策略 `PickLiftPolicy`。
-因此共同的 BT 叶节点下仍存在“专家轨迹”和“CCSP 关节轨迹”两种执行分支。
+`tamp_joint_skill_plan`。`planner.src.skills.runtime.make_skill_policy()` 要求该计划存在，
+并使用现有 `JointWaypointPickLiftSkill`。BT 模块保持原样，其原有专家/关节技能分支未改动。
 TAMP 绑定按关节名称传递左臂的七个关节，不能将不同模型的 q 数组按下标互拷。
 
-当前 `JsonBtPolicy._picklift()` 在闭合阶段持续发布专家的最终闭合目标，
-默认 0 m；不再每拍从实测开口减去小步长。请求、最终接受回执和实测状态分别记录，
-`record_action_result()` 只在 Runtime 确认接受后更新最后接受目标。
-该行为是此前用户批准的生产状态，本轮未修改。
+独立适配层保留闭合阶段的最终目标发布及接受回执记录，默认目标仍为 0 m。
+请求、最终接受回执和实测状态分别记录，只有 Runtime 确认接受才更新最后接受目标。
+TAMP 完成必须依据最新任务观测。
+
+在线几何求解通过 `env.get_planning_query().fork()` 保存完整场景状态，
+通过 `set_robot_base_pose()` 设置候选站位；候选变换不写入真实仿真。
+导航预检查内部使用独立 fork，成功或异常都不会污染调用者快照。
+重新执行环境 step 后获取新查询；构造在线 domain 时检查查询与观测时间一致。
+图像通过 `env.capture_cameras()` 获取，动作仍经 `env.step()` 验证和执行。
+`execute_validated_joint_goal()` 保持原有用途，未替代多阶段抓取和导航控制器。
+
+历史 `planner/src/tamp/pipeline.py` 仍是将整段步骤转换成 BT 的旧实验入口，
+本次修改的在线 CLI 和 `run_current_tamp.py` 均不经过它；旧入口不是独立 TAMP 的验证对象。
+`diagnostics.py` 中的后端插桩同样未扩展成公共执行接口。
 
 必须准确描述当前接触配置：`navigation_picklift_tamp.json` 中目标—手指允许穿透量
 为 **1.0 m**，支撑接触为 **0.0001 m**；前者在该对象尺度上大幅放宽了这类几何拒绝。

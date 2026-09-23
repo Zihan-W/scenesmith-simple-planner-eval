@@ -1,0 +1,7 @@
+{
+  "schema": "scenesmith.tamp.goals.v2",
+  "subgoals": [
+    {"predicate": "at_pick_pose", "target": "pick_target"},
+    {"predicate": "holding", "target": "pick_target"}
+  ]
+}

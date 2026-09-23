@@ -47,6 +47,8 @@ class SkillSpec:
     constraints: tuple[str, ...] = ()
     supports_geometric_conditioning: bool = True
     runtime_action: str | None = None
+    domain_samplers: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    runtime_binding: str | None = None
 
     def __post_init__(self):
         if not self.name or len(set(self.symbolic_parameters)) != len(self.symbolic_parameters):
@@ -70,6 +72,29 @@ class SkillRegistry:
 
     def __getitem__(self, name: str) -> SkillSpec:
         return self._specs[name]
+
+    @property
+    def domain_samplers(self):
+        result = {}
+        for spec in self:
+            for parameter, sampler in spec.domain_samplers.items():
+                if parameter not in spec.geometric_parameters:
+                    raise ValueError(f"Sampler for unknown parameter: {parameter}")
+                if parameter in result and result[parameter] != sampler:
+                    raise ValueError(f"Conflicting sampler for {parameter}")
+                result[parameter] = sampler
+        return result
+
+    @property
+    def predicate_arity(self):
+        result = {}
+        for spec in self:
+            for fact in (*spec.preconditions, *spec.add_effects, *spec.delete_effects):
+                arity = len(fact.arguments)
+                if fact.predicate in result and result[fact.predicate] != arity:
+                    raise ValueError(f"Conflicting predicate arity: {fact.predicate}")
+                result[fact.predicate] = arity
+        return result
 
     @property
     def names(self) -> frozenset[str]:
@@ -287,6 +312,8 @@ def picklift_registry() -> SkillRegistry:
             (PredicateGoal("at_pick_pose", target),),
             constraints=("corridor", "base_collision", "reachability"),
             runtime_action="NavigateTo",
+            runtime_binding="_navigate_binding",
+            domain_samplers={"base_pose": "scene_base_pose"},
         ),
         SkillSpec(
             "PickLift", ("object",), ("grasp_pose", "approach_pose"),
@@ -297,5 +324,7 @@ def picklift_registry() -> SkillRegistry:
             (PredicateGoal("gripper_empty", ()),),
             constraints=("ik", "joint_limits", "joint_edge", "contact"),
             runtime_action="ExecutePickLift",
+            runtime_binding="_pick_binding",
+            domain_samplers={"grasp_pose": "calibrated_grasp_pose", "approach_pose": "calibrated_approach_pose"},
         ),
     ))

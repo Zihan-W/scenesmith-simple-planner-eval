@@ -1,0 +1,13 @@
+{
+  "cutamp-main.tar.gz": {
+    "sha256": "5a51c43fa0b844c3c4802ffade79ce8b4a8e9c99aa5402d4ef1a15a456c305f2",
+    "repository": "NVlabs/cuTAMP",
+    "git_commit": "7932e6cf0ee216331e37e06b60f18bb8b3ec1fbd"
+  },
+  "curobo-v0.7.8.tar.gz": {
+    "sha256": "702415790acf030aaf48c49f3381b8963d24b80bc4ab40d4a10808244ad5ee19",
+    "repository": "NVlabs/curobo",
+    "git_commit": "d64c4b005459db10c5dd867d8b30a87d5bda9bdb"
+  },
+  "note": "Pinned commits read from GitHub source archive PAX headers; checkout these commits, then apply upstream-local.patch to cuTAMP."
+}

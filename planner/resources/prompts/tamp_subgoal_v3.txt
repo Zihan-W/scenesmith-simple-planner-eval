@@ -21,3 +21,6 @@ all physical constraints.
 Example: task "put red_cube in target_bin", known predicates inside(2) and
 holding(1), known objects red_cube and target_bin:
 {"schema":"scenesmith.tamp.goals.v3","subgoals":[{"predicate":"holding","arguments":["red_cube"]},{"predicate":"inside","arguments":["red_cube","target_bin"]}]}
+
+Only propose unmet goals. Treat world.facts as already observed: do not repeat
+satisfied predicates such as gripper_empty. Do not repeat a goal within a response.

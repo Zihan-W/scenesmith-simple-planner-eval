@@ -1,4 +1,4 @@
-"""SceneSmith bindings for the shared BT skill runtime and online verifier."""
+"""SceneSmith bindings for standalone skill execution and online verification."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-from planner.src.bt.core import Node, SKILLS, to_dict
-from planner.src.bt.runtime import make_policy, _certified_local_map
+from planner.src.skills.runtime import SkillInvocation, make_skill_policy
+from planner.src.skills.navigation import certified_local_map
 from planner.src.tamp.hierarchy import PredicateGoal, WorldState, picklift_registry
 from planner.src.tamp.online import JsonlTrace, SkillExecution
 from simulation.src import Pose
@@ -120,7 +120,7 @@ def failed_pick_recovery_status(observation, navigation_valid, navigation_reason
 
 
 class SceneSmithSkillExecutor:
-    """Run one grounded action with the same JsonBtPolicy leaves as BT baseline."""
+    """Run one grounded action through a standalone controller and env.step."""
 
     def __init__(self, *, env, experiment, repository_root: Path,
                  output_root: Path, observation, reset_info,
@@ -134,11 +134,18 @@ class SceneSmithSkillExecutor:
         self.max_skill_steps = max_skill_steps
         self.model_called = model_called
         self.registry = picklift_registry() if registry is None else registry
-        self.bindings = {"NavigateTo": self._navigate_binding,
-                         "ExecutePickLift": self._pick_binding}
+        self.bindings = {}
+        for spec in self.registry:
+            if spec.runtime_binding is not None:
+                self.bindings[spec.runtime_action] = getattr(self, spec.runtime_binding)
         self.skill_count = 0
         self.last_navigation_goal = None
+        self.deadline_monotonic_s = None
         self.step_trace = JsonlTrace(self.output / "skill_steps.jsonl")
+
+    def set_deadline(self, deadline_monotonic_s):
+        """Stop issuing new skill commands after the run's wall-time limit."""
+        self.deadline_monotonic_s = deadline_monotonic_s
 
     def execute(self, action) -> SkillExecution:
         spec = self.registry[action.skill_name]
@@ -146,7 +153,7 @@ class SceneSmithSkillExecutor:
             raise ValueError("Skill arguments differ from the registered contract")
         if action.supports_geometric_conditioning != spec.supports_geometric_conditioning:
             raise ValueError("Skill geometric-conditioning claim differs from its registry")
-        if spec.runtime_action not in self.bindings or spec.runtime_action not in SKILLS:
+        if spec.runtime_action not in self.bindings:
             raise ValueError(f"No registered runtime binding for {action.skill_name}")
         self.skill_count += 1
         destination = self.output / "skills" / f"skill_{self.skill_count:03d}"
@@ -167,10 +174,8 @@ class SceneSmithSkillExecutor:
             "parameter_bindings": dict(action.parameter_bindings),
             "scope": "runtime_parameter_consumption_not_physical_success",
         }, indent=2) + "\n")
-        tree = Node("root", children=(Node("sequence", children=(leaf,)),))
-        bt_path = destination / "skill_bt.json"
-        bt_path.write_text(json.dumps(to_dict(tree), indent=2) + "\n")
-        options["bt_json_input"] = str(bt_path)
+        (destination / "skill.json").write_text(
+            json.dumps(dataclasses.asdict(leaf), indent=2) + "\n")
         options["tamp_generation"] = {
             "mode": "tamp", "model_called": self.model_called,
             "candidate": str(destination),
@@ -180,18 +185,9 @@ class SceneSmithSkillExecutor:
             self.experiment.environment_config.robot_adapter.spec,
             options, self.repo,
         )
-        if spec.runtime_action == "NavigateTo":
-            # Corridor validation must start at the measured post-skill scene,
-            # not the experiment's reset pose. The query owns a separate context.
-            backend = self.env.backend
-            query = backend.planning
-            query.synchronize_state(backend.plant_context)
-            try:
-                policy = make_policy(context, navigation_query=query)
-            finally:
-                query.synchronize_state(backend.plant_context)
-        else:
-            policy = make_policy(context)
+        query = (self.env.get_planning_query()
+                 if spec.runtime_action == "NavigateTo" else None)
+        policy = make_skill_policy(context, leaf, navigation_query=query)
         policy.reset(self.observation, self.last_info)
         start = time.perf_counter()
         reason = "skill_step_limit"
@@ -199,7 +195,12 @@ class SceneSmithSkillExecutor:
         episode_finished = False
         retryable = True
         last_rejection = {}
+        diagnostics = {}
         for index in range(self.max_skill_steps):
+            if (self.deadline_monotonic_s is not None
+                    and time.perf_counter() >= self.deadline_monotonic_s):
+                reason, retryable = "wall_time_budget_exhausted", False
+                break
             command = policy.act(self.observation)
             self.observation, _, terminated, truncated, self.last_info = self.env.step(command)
             action_result = getattr(policy, "record_action_result", None)
@@ -225,12 +226,12 @@ class SceneSmithSkillExecutor:
                 "base": dict(self.observation.base),
             })
             if episode_finished and observed_pick_success(action, self.observation.task):
-                # The environment may finish on this step before the BT sees
+                # The environment may finish on this step before the skill sees
                 # the new observation on its next tick. Never step a finished
                 # episode or predict completion from elapsed hold time.
                 success, reason = True, "observed_task_success"
                 break
-            if diagnostics["tree_status"] == "SUCCESS":
+            if diagnostics["skill_status"] == "SUCCESS":
                 success, reason = True, "skill_runtime_success"
                 break
             stage = (diagnostics.get("expert") or {}).get("stage")
@@ -251,22 +252,20 @@ class SceneSmithSkillExecutor:
             "last_action_rejection": last_rejection,
             "runtime_diagnostics": diagnostics,
         }
-        if not success and action.skill_name == "PickLift":
-            query = self.env.backend.planning
-            query.synchronize_state(self.env.backend.plant_context)
+        if (not success and action.skill_name == "PickLift"
+                and reason != "wall_time_budget_exhausted"):
+            query = self.env.get_planning_query()
             pose = self.observation.base["pose"]
             w, x, y, z = pose["quaternion_wxyz"]
             yaw = math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
-            goal = Node("action", "NavigateTo", tuple(str(v) for v in
+            goal = SkillInvocation("NavigateTo", tuple(str(v) for v in
                         (*pose["translation_m"][:2], yaw)) + ("world",))
             valid, nav_reason = True, "valid"
             try:
-                _certified_local_map(query, self.experiment.environment_config.robot_adapter,
+                certified_local_map(query, self.experiment.environment_config.robot_adapter,
                                      self.experiment.environment_config.scenario, goal)
             except ValueError as error:
                 valid, nav_reason = False, str(error)
-            finally:
-                query.synchronize_state(self.env.backend.plant_context)
             failure_details["recovery_preconditions"] = failed_pick_recovery_status(
                 self.observation, valid, nav_reason)
             if not failure_details["recovery_preconditions"]["allowed"]:
@@ -301,13 +300,13 @@ class SceneSmithSkillExecutor:
         del options
         goal = action.geometric_parameters["checks"]["navigation_goal"]
         self.last_navigation_goal = tuple(float(value) for value in goal[:3])
-        return Node("action", "NavigateTo", tuple(goal))
+        return SkillInvocation("NavigateTo", tuple(goal))
 
     def _pick_binding(self, action, options):
         geometry = action.geometric_parameters
         options["expert_grasp_lateral_offset_m"] = geometry.get("grasp_lateral_offset_m", 0.0)
         options["tamp_joint_skill_plan"] = _joint_pick_plan(geometry["checks"])
-        return Node("action", "ExecutePickLift")
+        return SkillInvocation("ExecutePickLift")
 
 
 class SceneSmithWorldObserver:
@@ -353,12 +352,16 @@ class SceneSmithWorldObserver:
             facts.add(PredicateGoal("holding", (self.target_name,)))
         if self.executor.last_navigation_goal is not None:
             goal_x, goal_y, goal_yaw = self.executor.last_navigation_goal
+            resolved = getattr(self.executor.experiment, "resolved_config", {})
+            policy_options = resolved.get("user_config", {}).get("policy_options", {})
+            navigation_tolerance_m = float(
+                policy_options.get("navigation_position_tolerance_m", 0.03))
             pose = observation.base["pose"]
             x, y = pose["translation_m"][:2]
             w, qx, qy, qz = pose["quaternion_wxyz"]
             yaw = math.atan2(2 * (w * qz + qx * qy),
                              1 - 2 * (qy * qy + qz * qz))
-            if (math.hypot(x - goal_x, y - goal_y) <= 0.03
+            if (math.hypot(x - goal_x, y - goal_y) <= navigation_tolerance_m
                     and abs(math.atan2(math.sin(yaw - goal_yaw),
                                        math.cos(yaw - goal_yaw))) <= math.radians(3)
                     and np.linalg.norm(observation.base["linear_velocity_world_m_s"][:2]) <= 0.01
@@ -378,14 +381,16 @@ class SceneSmithWorldObserver:
                                      observation.robot.gripper_widths_m)})
 
     def geometry_state(self, observation, previous):
+        from .snapshot import observation_token
         state = dict(previous)
+        state["snapshot_token"] = observation_token(observation)
         base = observation.base["base_link_pose"]
         state["base_pose"] = Pose(tuple(base["translation_m"]),
                                   tuple(base["quaternion_wxyz"]))
         return state
 
     def capture_images(self, observation):
-        cameras = self.executor.env.backend.capture_cameras()
+        cameras = self.executor.env.capture_cameras()
         self.capture_count += 1
         folder = self.output / "observations" / f"observation_{self.capture_count:03d}"
         folder.mkdir(parents=True)

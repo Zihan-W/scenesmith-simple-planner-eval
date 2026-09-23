@@ -9,6 +9,9 @@ physics rollout; actual contact dynamics remain the executor's responsibility.
 
 from __future__ import annotations
 
+from planner.src.tamp.geometry import SolverCapabilities
+from .subdomains import validate_program_subdomains, restrict_sample, candidate_in_subdomain
+
 import copy
 import random
 from collections import Counter
@@ -19,11 +22,11 @@ from planner.src.tamp.geometry import (
     GeometricUnsat, _bind_effect, _constraint_objects, _parameter_value, assignment_identity,
     receive_failure_context,
 )
+from planner.src.tamp.geometry import require_time_remaining
 from planner.src.tamp.hierarchy import (
     ConstraintResult, ParameterizedSkillAction, ParameterizedSkillPlan, validate_skill_program,
 )
 from planner.src.tamp.planner import Subgoal
-from planner.src.tamp.proc3s import DOMAIN_SAMPLERS
 
 
 class PRoC3SProgramUnsat(GeometricUnsat):
@@ -36,11 +39,14 @@ class PRoC3SProgramUnsat(GeometricUnsat):
         failed_index = Counter(failed_steps).most_common(1)[0][0] if failed_steps else 0
         self.program_feedback = ProgramFailure.from_constraints(
             constraints, skill=program.steps[failed_index].skill if program.steps else "",
+            search_budget_exhausted=True, failure_source="sampling_budget_exhausted",
+            budget_scope="outer_assignments",
         ).as_feedback()
 
 
 class Proc3sCCSPSolver:
     """Sample one whole assignment at a time and accept the first feasible one."""
+    capabilities = SolverCapabilities()
 
     def __init__(self, registry, domain, *, max_samples=250, seed=0, trace=None, rng=None):
         if max_samples < 1:
@@ -49,14 +55,19 @@ class Proc3sCCSPSolver:
         self.max_samples, self.trace = max_samples, trace
         self.random = rng if rng is not None else random.Random(seed)
 
+    def set_deadline(self, deadline_monotonic_s):
+        """Apply the enclosing run's absolute monotonic deadline."""
+        self.deadline_monotonic_s = deadline_monotonic_s
+
     def solve(self, world, program, initial_state, *, failure_context=None,
               excluded_assignments=frozenset()):
         """Return the common parameterized plan or structured program failure."""
         self.failure_context = receive_failure_context(failure_context, self.trace)
         validate_skill_program(program, self.registry, frozenset(world.objects))
+        validate_program_subdomains(program, self.registry)
         domains = getattr(program, "parameter_domains", None)
         if domains is not None:
-            expected = {variable: DOMAIN_SAMPLERS[parameter] for step in program.steps
+            expected = {variable: self.registry.domain_samplers[parameter] for step in program.steps
                         for parameter, variable in step.continuous_variables.items()}
             if dict(domains) != expected:
                 raise ValueError("CCSP cannot ignore or substitute program domains")
@@ -64,6 +75,7 @@ class Proc3sCCSPSolver:
             return ParameterizedSkillPlan((), {}, ())
         failures = []
         for trial in range(self.max_samples):
+            require_time_remaining(getattr(self, "deadline_monotonic_s", None))
             # Sample full candidate controls first. These instantiate calibrated
             # poses; derived IK configurations are solved during validation.
             candidates, skills = [], []
@@ -74,7 +86,8 @@ class Proc3sCCSPSolver:
                 if "object" in arguments:
                     arguments["target"] = arguments.pop("object")
                 skill = Subgoal(step.skill, arguments)
-                candidate = dict(self.domain.sample_candidate(skill, sampling_state, self.random))
+                candidate = restrict_sample(self.domain, program, step,
+                    dict(self.domain.sample_candidate(skill, sampling_state, self.random)))
                 # Correlate shared open variables before validation, rather than
                 # independently sampling continuous values with zero equality probability.
                 for parameter, variable in step.continuous_variables.items():
@@ -95,7 +108,11 @@ class Proc3sCCSPSolver:
             assignments, actions = {}, []
             rejected = False
             for index, (step, skill, candidate) in enumerate(zip(program.steps, skills, candidates, strict=True)):
-                feasible, reason, details = self.domain.check(skill, candidate, validation_state)
+                require_time_remaining(getattr(self, "deadline_monotonic_s", None))
+                if not candidate_in_subdomain(self.domain, program, step, candidate):
+                    feasible, reason, details = False, "domain_restriction", {"subdomain": True}
+                else:
+                    feasible, reason, details = self.domain.check(skill, candidate, validation_state)
                 details = {**details, "program_step": index}
                 values = {variable: _parameter_value(parameter, candidate, details)
                           for parameter, variable in step.continuous_variables.items()}

@@ -1,5 +1,6 @@
 """Read-only planning queries backed by an independent Drake context."""
 
+import copy
 import dataclasses
 import math
 from collections.abc import Mapping, Sequence
@@ -9,6 +10,7 @@ import numpy as np
 from pydrake.all import (
     InverseKinematics,
     JacobianWrtVariable,
+    JointIndex,
     LoadModelDirectives,
     ProcessModelDirectives,
     Quaternion,
@@ -37,6 +39,24 @@ from simulation.src.core.specs import (
     ScenarioSpec,
     TimingConfig,
 )
+
+
+# Existing measured-state tolerance, shared with IK input canonicalization.
+JOINT_STATE_NUMERICAL_TOLERANCE = 1e-9
+
+
+def _canonical_ik_seed(values, joint_specs):
+    """Remove only existing-tolerance roundoff before exact bound equalities.
+
+    Simulation measurements and motion-edge start states remain unchanged.
+    Substantial limit violations are deliberately preserved for rejection.
+    """
+    result = np.array(values, dtype=float, copy=True)
+    for index, spec in enumerate(joint_specs):
+        bounded = np.clip(result[index], spec.position_lower, spec.position_upper)
+        if abs(bounded - result[index]) <= JOINT_STATE_NUMERICAL_TOLERANCE:
+            result[index] = bounded
+    return result
 
 
 @dataclasses.dataclass(frozen=True)
@@ -199,6 +219,12 @@ class PlanningQuery:
             dtype=int,
         )
         self._base_positions = plant.GetPositions(self._plant_context).copy()
+        self._quaternion_position_starts = tuple(
+            joint.position_start()
+            for index in range(plant.num_joints())
+            if (joint := plant.get_joint(JointIndex(index))).num_positions() == 7
+            and joint.num_velocities() == 6
+        )
         self._robot_body_indices = set(
             plant.GetBodyIndices(robot_model_instance)
         )
@@ -232,6 +258,28 @@ class PlanningQuery:
         self.plant.SetPositions(self._plant_context, self._base_positions)
         self.plant.SetVelocities(self._plant_context, self.plant.GetVelocities(actual_context))
         self._root_context.SetTime(actual_context.get_time())
+
+    def fork(self) -> "PlanningQuery":
+        """Clone the complete query state into an independently mutable snapshot.
+
+        The model/diagram are shared; context, base positions and contact limit
+        mappings are independent. Reacquire the environment query after stepping
+        before making a new snapshot.
+        """
+        result = copy.copy(self)
+        result._root_context = self._root_context.Clone()
+        result._plant_context = self.plant.GetMyMutableContextFromRoot(result._root_context)
+        result._base_positions = self._base_positions.copy()
+        result.support_limits_m = dict(self.support_limits_m)
+        result.support_geometry_limits_m = dict(self.support_geometry_limits_m)
+        return result
+
+    def set_robot_base_pose(self, pose: Pose) -> None:
+        """Place a free robot base in world coordinates in this query only."""
+        body = self.plant.GetBodyByName(
+            self.robot_adapter.spec.base_link_name, self.robot_model_instance)
+        set_free_body_world_pose(self.plant, self._plant_context, body, _rigid_transform(pose))
+        self._base_positions = self.plant.GetPositions(self._plant_context).copy()
 
     @property
     def state_time_s(self) -> float:
@@ -475,7 +523,8 @@ class PlanningQuery:
             # The discrete contact solver can put an open finger ~1e-11 m
             # outside its stop. This is a numerical state-check tolerance,
             # not a relaxed command limit or collision clearance.
-            spec.position_lower - 1e-9 <= value <= spec.position_upper + 1e-9
+            spec.position_lower - JOINT_STATE_NUMERICAL_TOLERANCE <= value
+            <= spec.position_upper + JOINT_STATE_NUMERICAL_TOLERANCE
             for spec, value in zip(
                 self.robot_adapter.spec.controlled_joints,
                 values,
@@ -673,6 +722,9 @@ class PlanningQuery:
             if seed is not None
             else np.asarray(self.configuration())
         )
+        # Fixed inactive joints must not impose lower > upper on the next
+        # refinement Solve due solely to contact-solver boundary roundoff.
+        q_seed = _canonical_ik_seed(q_seed, self.robot_adapter.spec.controlled_joints)
         self._set_configuration(q_seed)
         frame = self.plant.GetFrameByName(
             frame_name or self.robot_adapter.spec.end_effector_frame_name,
@@ -711,9 +763,20 @@ class PlanningQuery:
             np.arange(self.plant.num_positions()),
             self._controlled_indices,
         )
+        # Drake integration can leave free-body quaternions slightly non-unit.
+        # Fixing those raw values conflicts with IK's unit-quaternion constraints,
+        # even when the desired arm pose is reachable. Canonicalize the solver's
+        # fixed pose representation only; preserve the measured query snapshot.
+        fixed_positions = self._base_positions.copy()
+        for start in self._quaternion_position_starts:
+            quaternion = fixed_positions[start:start + 4]
+            norm = np.linalg.norm(quaternion)
+            if not math.isfinite(norm) or norm == 0:
+                raise ValueError("IK requires finite nonzero free-body quaternions")
+            fixed_positions[start:start + 4] = quaternion / norm
         program.AddBoundingBoxConstraint(
-            self._base_positions[fixed_indices],
-            self._base_positions[fixed_indices],
+            fixed_positions[fixed_indices],
+            fixed_positions[fixed_indices],
             q[fixed_indices],
         )
         gripper = self.robot_adapter.spec.gripper
@@ -738,7 +801,7 @@ class PlanningQuery:
             q_seed,
             q[self._controlled_indices],
         )
-        initial = self._base_positions.copy()
+        initial = fixed_positions.copy()
         initial[self._controlled_indices] = q_seed
         program.SetInitialGuess(q, initial)
         contact_policy = self._contact_policy(contact_policy)

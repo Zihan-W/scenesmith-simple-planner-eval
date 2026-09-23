@@ -1,9 +1,10 @@
 """Observed-scene continuous problem export for a fixed Zerith skill skeleton.
 
 This builder performs no skeleton search, no optimization and no execution.
-Only PickLift and NavigateToPick -> PickLift are currently supported. The
+NavigateToPick, PickLift and NavigateToPick -> PickLift are supported. The
 official MoveFree/Pick pair represents the grasp approach witness; it does not
-insert an additional executable navigation skill into a PickLift-only program.
+insert executable skills. A navigation-only program uses Pick as a reachability
+witness, matching the existing NavigateToPick domain contract.
 """
 
 import copy
@@ -12,10 +13,12 @@ import hashlib
 import json
 from pathlib import Path
 
-from scripts.export_cutamp_geometry import export_query_geometry, stationary_support_check
+from .cutamp_backend.geometry_export import export_query_geometry, stationary_support_check
 from simulation.src import Pose
 from simulation.src.robots.adapters.description import drake_pose
 
+from .subdomains import validate_program_subdomains, restrict_base_candidates, grasp_range, step_bounds
+from .cutamp_contact_audits import audit_locked_self_pairs, audit_planar_support
 from .hierarchy import picklift_registry, validate_skill_program
 
 
@@ -32,27 +35,16 @@ class ContinuousProblemBuilder:
         """Write fresh geometry, measured joints and FK references without solving."""
         domain = self.domain
         validate_skill_program(program, picklift_registry(), frozenset(world.objects))
+        validate_program_subdomains(program, picklift_registry())
+        from .task_domain import PICK_LIFT_DOMAIN
+        PICK_LIFT_DOMAIN.validate_cutamp_program(program)
         names = tuple(step.skill for step in program.steps)
-        if names not in (("PickLift",), ("NavigateToPick", "PickLift")):
-            raise ValueError(f"Unsupported fixed cuTAMP skeleton: {names}")
         if any(step.arguments["object"] != domain.target_name for step in program.steps):
             raise ValueError("The fixed-skeleton adapter supports only the configured target")
-        if world.observation_id != f"{domain.observation.time_s:.6f}":
-            raise ValueError("World and geometry observations have different timestamps")
+        domain.snapshot.require_world(world)
         measured = domain.observation.base["base_link_pose"]
-        if world.robot["base_link_pose"] != measured:
-            raise ValueError("World and geometry observations have different base poses")
-        if (list(world.robot["joint_names"]) != list(domain.observation.robot.joint_names)
-                or list(world.robot["q"]) != list(domain.observation.robot.q)):
-            raise ValueError("World and geometry observations have different joint states")
-        for name, item in domain.observation.objects.items():
-            for key, value in item.pose.as_dict().items():
-                if list(world.objects[name][key]) != value:
-                    raise ValueError("World and geometry observations have different object poses")
         pose = Pose(tuple(measured["translation_m"]), tuple(measured["quaternion_wxyz"]))
-        # Do not reuse a cached query modified by a previous constraint check.
-        domain._query_cache = None
-        query, _ = domain._candidate_query(pose)
+        query = domain.planning_query_at(pose)
         spec = query.robot_adapter.spec
         if hashlib.sha256(spec.model_path.read_bytes()).hexdigest() != self.reference["urdf_sha256"]:
             raise ValueError("Robot model changed since the collision/kinematics export")
@@ -62,6 +54,7 @@ class ContinuousProblemBuilder:
         for key in ("urdf_path", "base_link", "ee_link", "extra_links"):
             if kin[key] != reference_kin[key]:
                 raise ValueError(f"Collision and kinematics templates disagree: {key}")
+        kin["urdf_path"] = str(spec.model_path.resolve())
         plant, context, instance = query.plant, query.context, query.robot_model_instance
         positions = plant.GetPositions(context)
 
@@ -85,8 +78,19 @@ class ContinuousProblemBuilder:
                                          check_stationary_target=True)
         geometry["observed_robot_base_world_matrix"] = drake_pose(pose).GetAsMatrix4().tolist()
         geometry["observation_id"] = world.observation_id
+        base_step = next((step for step in program.steps if step.skill == "NavigateToPick"), None)
+        pick_step = next((step for step in program.steps if step.skill == "PickLift"), None)
+        geometry["base_candidates_xyz_yaw"] = restrict_base_candidates(
+            domain.candidates, step_bounds(program, base_step, "base_pose") if base_step else {})
+        geometry["grasp_lateral_range_m"] = grasp_range(
+            domain, step_bounds(program, pick_step, "grasp_pose") if pick_step else {})
+        geometry["declared_subdomains"] = getattr(program, "parameter_subdomains", {})
+        geometry["locked_self_collision_audit"] = audit_locked_self_pairs(query, geometry, robot)
         if names == ("PickLift",):
             geometry["stationary_robot_support_check"] = stationary_support_check(query, geometry)
+        else:
+            geometry["planar_robot_support_check"] = audit_planar_support(query, geometry, robot)
+            geometry["stationary_robot_support_check"] = geometry["planar_robot_support_check"]["stationary_audit"]
         if not geometry["stationary_target_world_check"]["valid"]:
             raise ValueError("Observed target violates the unchanged static-world contact checks")
         output = Path(output_root)
@@ -95,6 +99,7 @@ class ContinuousProblemBuilder:
                     "program": dataclasses.asdict(program), "observation_id": world.observation_id,
                     "optimize_base_xy": names[0] == "NavigateToPick",
                     "grasp_gradient_optimized": False,
+                    "pick_is_navigation_witness_only": names == ("NavigateToPick",),
                     "physical_success": False,
                     "full_robot_collision_model_validated": False}
         for filename, document in (("geometry.json", geometry), ("kinematics.json", reference),

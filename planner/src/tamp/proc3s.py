@@ -10,29 +10,35 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import time
+
+from .model_budget import model_stage_budget
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from planner.src.bt.generation import GenerationError
+from planner.src.bt.generation import GenerationError, ProviderError
 from planner.src.tamp.failures import ProgramFailure
 from planner.src.tamp.hierarchy import (
     SKILL_PROGRAM_SCHEMA, PredicateGoal, SkillProgram, SkillRegistry, SkillStep,
     WorldState, _bind, program_identity, validate_skill_program,
 )
 from planner.src.tamp.semantic import ModelSettings
+from .subdomains import AXES, validate_subdomain
 
 
 PROC3S_SCHEMA = "scenesmith.proc3s.program.v1"
-DOMAIN_SAMPLERS = {
-    "base_pose": "scene_base_pose",
-    "grasp_pose": "calibrated_grasp_pose",
-    "approach_pose": "calibrated_approach_pose",
-}
+from planner.src.tamp.hierarchy import picklift_registry
+
+DOMAIN_SAMPLERS = picklift_registry().domain_samplers
 
 
 class PRoC3SGenerationFailure(ValueError):
     """No valid LLM program was obtained; no symbolic fallback is permitted."""
+
+    def __init__(self, message, *, provider_failure=None):
+        super().__init__(message)
+        self.provider_failure = provider_failure
 
 
 @dataclasses.dataclass(frozen=True)
@@ -40,6 +46,7 @@ class PRoC3SSkillProgram(SkillProgram):
     """Common executor-facing skill program with LLM-declared open domains."""
 
     parameter_domains: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    parameter_subdomains: Mapping[str, Mapping] = dataclasses.field(default_factory=dict)
 
 
 def parse_proc3s_program(content: str, *, registry: SkillRegistry,
@@ -70,12 +77,13 @@ def parse_proc3s_program(content: str, *, registry: SkillRegistry,
     expected_domains = {}
     for step in steps:
         for parameter, variable in step.continuous_variables.items():
-            if parameter not in DOMAIN_SAMPLERS:
+            if parameter not in registry.domain_samplers:
                 raise ValueError(f"No registered domain sampler for {parameter}")
-            expected_domains[variable] = DOMAIN_SAMPLERS[parameter]
-    domains = {}
+            expected_domains[variable] = registry.domain_samplers[parameter]
+    domains, subdomains = {}, {}
     for domain in document["domains"]:
-        if not isinstance(domain, dict) or set(domain) != {"variable", "sampler"}:
+        if (not isinstance(domain, dict) or not {"variable", "sampler"}.issubset(domain)
+                or set(domain) - {"variable", "sampler", "subdomain"}):
             raise ValueError("A domain requires variable and sampler, never numeric solutions")
         variable, sampler = domain["variable"], domain["sampler"]
         if not isinstance(variable, str) or not variable.isidentifier() or variable in domains:
@@ -83,6 +91,9 @@ def parse_proc3s_program(content: str, *, registry: SkillRegistry,
         if not isinstance(sampler, str) or expected_domains.get(variable) != sampler:
             raise ValueError("Domain sampler does not match the open parameter type")
         domains[variable] = sampler
+        bounds = validate_subdomain(sampler, domain.get("subdomain", {}))
+        if bounds:
+            subdomains[variable] = bounds
     if set(domains) != set(expected_domains):
         raise ValueError("Every open variable needs exactly one domain")
     facts = world.facts
@@ -94,7 +105,7 @@ def parse_proc3s_program(content: str, *, registry: SkillRegistry,
                           | {_bind(fact, step.arguments) for fact in spec.add_effects})
     if not set(goals).issubset(facts):
         raise ValueError("Program does not symbolically achieve the requested goals")
-    return PRoC3SSkillProgram(program.steps, parameter_domains=domains)
+    return PRoC3SSkillProgram(program.steps, parameter_domains=domains, parameter_subdomains=subdomains)
 
 
 def _response_format(mode: str, registry: SkillRegistry, objects):
@@ -119,10 +130,14 @@ def _response_format(mode: str, registry: SkillRegistry, objects):
     schema = object_schema({
         "schema": {"type": "string", "enum": [PROC3S_SCHEMA]},
         "steps": {"type": "array", "maxItems": 20, "items": {"anyOf": variants}},
-        "domains": {"type": "array", "items": object_schema({
-            "variable": {"type": "string"},
-            "sampler": {"type": "string", "enum": sorted(set(DOMAIN_SAMPLERS.values()))},
-        })},
+        "domains": {"type": "array", "items": {"anyOf": [
+            object_schema({"variable": {"type": "string"},
+                           "sampler": {"type": "string", "enum": [sampler]}, **extra})
+            for sampler in sorted(set(registry.domain_samplers.values()))
+            for extra in ({}, {"subdomain": object_schema({
+                axis: {"type": "array", "minItems": 2, "maxItems": 2,
+                       "items": {"type": "number", "minimum": 0, "maximum": 1}}
+                for axis in sorted(AXES[sampler])})})]}},
     })
     return {"type": "json_schema", "json_schema": {
         "name": "proc3s_program", "strict": True, "schema": schema}}
@@ -132,6 +147,7 @@ class PRoC3SProgramGenerator:
     """Actually query the LLM for structure/domains and regenerate on feedback."""
 
     name = "proc3s"
+    supports_domain_revision = True
 
     def __init__(self, client, settings: ModelSettings, registry: SkillRegistry, *, trace=None):
         self.client, self.settings, self.registry = client, settings, registry
@@ -140,7 +156,12 @@ class PRoC3SProgramGenerator:
         self.last_program = None
         self.prompt = ((Path(__file__).resolve().parents[2] / "resources" / "prompts") / "proc3s_program_v1.txt").read_text()
 
-    def generate(self, world: WorldState, goals: tuple[PredicateGoal, ...], *,
+    def generate(self, world, goals, **kwargs):
+        """Generate within a single bounded stage, including all retries."""
+        with model_stage_budget(self.client, self.settings) as deadline:
+            return self._generate(world, goals, deadline=deadline, **kwargs)
+
+    def _generate(self, world: WorldState, goals: tuple[PredicateGoal, ...], *, deadline,
                  feedback: tuple[Mapping[str, Any], ...] = (),
                  excluded_programs: frozenset[tuple] = frozenset()
                  ) -> PRoC3SSkillProgram:
@@ -166,8 +187,11 @@ class PRoC3SProgramGenerator:
                                           if key in {"category", "movable", "articulated", "surface"}}
                                   for name, metadata in world.objects.items()},
                       "facts": [dataclasses.asdict(fact) for fact in sorted(world.facts)]},
-            "skills": skills, "domain_samplers": DOMAIN_SAMPLERS,
+            "skills": skills, "domain_samplers": self.registry.domain_samplers,
             "constraint_feedback": program_feedback,
+            "normalized_subdomain_axes": {sampler: sorted(AXES[sampler])
+                                           for sampler in set(self.registry.domain_samplers.values())},
+            "domain_revision_scope": "subsets_of_registered_envelopes_only_not_unsat_proofs",
             "excluded_skeletons": sorted(excluded_programs),
             "previous_program": self.last_program if feedback else None,
         }
@@ -176,7 +200,10 @@ class PRoC3SProgramGenerator:
         response_format = _response_format(self.settings.response_format, self.registry, world.objects)
         options = {} if response_format is None else {"response_format": response_format}
         error_message = ""
+        provider_failure = None
         for _ in range(self.settings.max_attempts):
+            if time.perf_counter() >= deadline:
+                raise PRoC3SGenerationFailure("model_stage_wall_time_exhausted", provider_failure=provider_failure)
             self.calls += 1
             response = None
             if self.trace is not None:
@@ -186,15 +213,20 @@ class PRoC3SProgramGenerator:
             try:
                 response = self.client.complete(model=self.settings.model, messages=messages,
                                                 temperature=self.settings.temperature, **options)
+                if time.perf_counter() >= deadline:
+                    raise GenerationError("model_stage_wall_time_exhausted")
                 program = parse_proc3s_program(response.content, registry=self.registry,
                                                world=world, goals=goals)
                 if program_identity(program) in excluded_programs:
                     raise ValueError("The returned skeleton already failed; revise its structure")
             except (GenerationError, ValueError, TypeError, KeyError) as error:
                 error_message = str(error)
+                provider_failure = error.as_dict() if isinstance(error, ProviderError) else None
                 if self.trace is not None:
                     self.trace({"event": "proc3s_generation_error", "call": self.calls,
-                                "reason": error_message})
+                                "reason": error_message, "provider_failure": provider_failure})
+                if provider_failure is not None and not provider_failure["retryable"]:
+                    raise PRoC3SGenerationFailure(str(error), provider_failure=provider_failure) from error
                 if response is not None:
                     messages.extend((
                         {"role": "assistant", "content": response.content},
@@ -211,4 +243,5 @@ class PRoC3SProgramGenerator:
                             "program": self.last_program})
             return program
         raise PRoC3SGenerationFailure(
-            f"PRoC3SGenerationFailure after {self.settings.max_attempts} attempts: {error_message}")
+            f"PRoC3SGenerationFailure after {self.settings.max_attempts} attempts: {error_message}",
+            provider_failure=provider_failure)

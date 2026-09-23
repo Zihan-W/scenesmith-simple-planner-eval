@@ -1,6 +1,6 @@
 """Bounded live planning audit using unchanged registered SceneSmith skills.
 
-Only this harness and new run artifacts are added. Symbolic counterfactuals are
+Supports explicit PRoC3S or cuTAMP geometry. Symbolic counterfactuals are
 explicitly separate from physical execution; no injected facts enter execution.
 """
 
@@ -14,12 +14,10 @@ import random
 import time
 
 from planner.src.bt.generation import OpenAICompatibleChatClient
-from planner.src.tamp.ccsp import Proc3sCCSPSolver
 from planner.src.tamp.failures import ProgramFailure
 from planner.src.tamp.hierarchy import PredicateGoal, picklift_registry, program_identity
 from planner.src.tamp.online import IncrementalTampRunner, JsonlTrace, RecoveryLimits
 from planner.src.tamp.proc3s import PRoC3SProgramGenerator, PRoC3SGenerationFailure
-from planner.src.tamp.scenesmith import SceneSmithPickDomain
 from planner.src.tamp.scenesmith_online import SceneSmithSkillExecutor, SceneSmithWorldObserver
 from planner.src.tamp.semantic import SemanticSubgoalPlanner, SemanticModelError, ModelSettings
 from simulation.src import Pose, make_env
@@ -46,6 +44,10 @@ class RecordedClient:
     def __init__(self, client, trace):
         self.client, self.trace = client, trace
         self.case = "initialization"
+
+    def set_deadline(self, deadline_monotonic_s):
+        """Pass the enclosing run deadline to the actual model transport."""
+        self.client.set_deadline(deadline_monotonic_s)
 
     def complete(self, **kwargs):
         self.trace({"event": "raw_model_request", "case": self.case, **kwargs})
@@ -127,7 +129,7 @@ def counterfactuals(client, settings, registry, world, images, output, target, r
             try:
                 goals = semantic.propose(task=task,
                     world={"objects": world.objects, "facts": [dataclasses.asdict(f) for f in sorted(world.facts)]},
-                    predicate_arity={"observed": 1, "at_pick_pose": 1, "holding": 1, "gripper_empty": 0}, images=images)
+                    predicate_arity=registry.predicate_arity, images=images)
                 item.update(goals=[dataclasses.asdict(f) for f in goals],
                             passed=expected in goals and (name != "navigate_only" or holding not in goals))
             except SemanticModelError as error:
@@ -144,76 +146,46 @@ def main():
     parser.add_argument("--scene-root", type=Path, required=True)
     parser.add_argument("--experiment", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
-    parser.add_argument("--max-samples", type=int, default=16)
+    parser.add_argument("--geometry-backend", choices=("proc3s", "cutamp"), default="proc3s")
+    parser.add_argument("--cutamp-config", type=Path)
+    parser.add_argument("--max-samples", type=int)
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--seed", type=int, default=500)
+    parser.add_argument("--task", default="Pick up the red object and hold it.")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--shift-world-x-m", type=float, required=True)
     args = parser.parse_args()
+    cutamp_settings = None
+    if args.geometry_backend == "cutamp":
+        if args.cutamp_config is None:
+            parser.error("cutamp requires --cutamp-config")
+        from planner.src.tamp.cutamp import CuTAMPSettings
+        cutamp_settings = CuTAMPSettings.from_file(args.cutamp_config)
+    elif args.cutamp_config is not None:
+        parser.error("--cutamp-config requires --geometry-backend cutamp")
     if args.shift_world_x_m != 0.10:
         raise ValueError("This isolated online comparison is scoped to +0.100 m world X")
     repo, output = args.repository_root.resolve(), args.output_root.resolve()
     output.mkdir(parents=True, exist_ok=False)
+    from planner.src.tamp.provenance import record_source_evidence
+    record_source_evidence(repo, output / "provenance")
     before = source_hashes(repo)
     save(output / "protected_sources_before.json", before)
-    settings = json.loads((repo / "experiments/tamp_hierarchical_config.json").read_text())
-    settings["proc3s_ccsp"] = {"max_samples": args.max_samples}
-    settings["recovery"].update(semantic_replans=0, skill_replans=1, geometry_retries=1, max_skill_executions=6)
+    settings = json.loads((args.config or repo / "experiments/tamp_current_validation.json").read_text())
+    if args.max_samples is not None:
+        settings["proc3s_ccsp"] = {"max_samples": args.max_samples}
     save(output / "audit_config.json", {"arguments": vars(args), "settings": settings,
-          "scope": "unseeded_bounded_online_simulation", "random_seed_fixed": False,
+          "scope": "configured_bounded_online_simulation", "random_seed_fixed": True,
           "diagnostic_runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-          "counterfactuals_are_not_physical_trials": True})
+          "counterfactuals_are_not_physical_trials": True,
+          "cutamp": dataclasses.asdict(cutamp_settings) if cutamp_settings else None})
     experiment = load_experiment(args.experiment, repository_root=repo,
         cache_root=output / "scene_cache", scene_root=args.scene_root, trust_factories=True, meshcat=True)
     save(output / "resolved_experiment.json", experiment.resolved_config)
-    # The current +100 mm scene was previously constructed at simulation reset.
-    # Preserve that exact change while retaining the live model/CCSP/executor path.
-    reference_env = make_env(experiment.environment_config)
-    reference_observation, _ = reference_env.reset()
-    original_pose = reference_observation.objects["pick_target"].pose
-    if experiment.environment_config.scenario.pose_randomizations:
-        raise ValueError("The scene must not randomize any object pose")
-    shifted_pose = Pose(
-        (original_pose.translation_m[0] + args.shift_world_x_m,
-         original_pose.translation_m[1], original_pose.translation_m[2]),
-        original_pose.quaternion_wxyz,
-    )
-    scenario = dataclasses.replace(
-        experiment.environment_config.scenario,
-        initial_object_poses={
-            **experiment.environment_config.scenario.initial_object_poses,
-            "pick_target": shifted_pose,
-        },
-    )
-    experiment = dataclasses.replace(
-        experiment,
-        environment_config=dataclasses.replace(experiment.environment_config, scenario=scenario),
-    )
-    reference_base = reference_observation.base["base_link_pose"]
-    del reference_env
-    env = make_env(experiment.environment_config)
-    observation, reset_info = env.reset()
-    measured_pose = observation.objects["pick_target"].pose
-    measured_base = observation.base["base_link_pose"]
-    position_delta = [a - b for a, b in zip(
-        measured_pose.translation_m, original_pose.translation_m, strict=True)]
-    base_delta = [a - b for a, b in zip(
-        measured_base["translation_m"], reference_base["translation_m"], strict=True)]
-    if max(abs(a - b) for a, b in zip(
-            position_delta, (args.shift_world_x_m, 0.0, 0.0), strict=True)) >= 5e-5:
-        raise RuntimeError(f"Measured target shift differs from protocol: {position_delta}")
-    if max(map(abs, base_delta)) >= 1e-8:
-        raise RuntimeError(f"Initial robot base moved unexpectedly: {base_delta}")
-    save(output / "shift_protocol.json", {
-        "mode": "DIAGNOSTIC_ONLINE_TAMP_OBJECT_PLUS_X_100MM",
-        "requested_world_translation_m": [args.shift_world_x_m, 0.0, 0.0],
-        "measured_world_translation_m": position_delta,
-        "original_object_pose": dataclasses.asdict(original_pose),
-        "shifted_object_pose": dataclasses.asdict(measured_pose),
-        "original_base_link_pose": reference_base,
-        "shifted_base_link_pose": measured_base,
-        "scene_pose_randomizations": 0,
-        "random_seed_fixed": False,
-        "production_experiment_modified": False,
-    })
+    from planner.src.tamp.scene_setup import reset_scene
+    experiment, env, observation, reset_info, shift_protocol = reset_scene(
+        experiment, seed=args.seed, shift_world_x_m=args.shift_world_x_m)
+    save(output / "shift_protocol.json", shift_protocol)
     task = experiment.environment_config.task_factory()
     target = getattr(task, "task", task).config.target_observation_name
     registry = picklift_registry()
@@ -239,40 +211,33 @@ def main():
             if event["event"] in {"skill_skeleton", "semantic_subgoal", "ccsp_solved", "recovery_action", "execution_outcome", "online_result"}:
                 print(json.dumps({"phase": "live", **event}, default=str), flush=True)
 
-        rng = random.Random()
-
-        def solver_factory(current_world):
-            del current_world
-            overrides = experiment.resolved_config["user_config"]["policy_options"].get("expert_policy_overrides", {})
-            domain = SceneSmithPickDomain(environment_config=experiment.environment_config,
-                observation=executor.observation,
-                calibration_path=repo / "experiments/inputs/pick_lift/pick_lift_calibration.json",
-                pick_home_path=repo / "experiments/inputs/pick_lift/pick_home.json",
-                open_width_m=overrides.get("open_width_m"), lift_distance_m=overrides.get("lift_distance_m"))
-            return Proc3sCCSPSolver(registry, domain, trace=trace, rng=rng, max_samples=args.max_samples)
-
+        from planner.src.tamp.application import build_runner
+        from planner.src.tamp.task_domain import PICK_LIFT_DOMAIN
         client.case = "live_end_to_end"
-        runner = IncrementalTampRunner(
+        runner = build_runner(
             semantic=SemanticSubgoalPlanner(client, ModelSettings(**settings["subgoal_model"]), trace=trace),
-            registry=registry, solver_factory=solver_factory, executor=executor, observer=observer,
-            trace=trace, limits=RecoveryLimits(**settings["recovery"]),
-            program_generator=PRoC3SProgramGenerator(client, ModelSettings(**settings["skill_model"]), registry, trace=trace))
+            client=client, settings=settings, registry=registry, executor=executor,
+            observer=observer, env=env, experiment=experiment, repository_root=repo,
+            output_root=output, trace=trace, skill_planner="proc3s",
+            geometry_backend=args.geometry_backend, seed=args.seed,
+            cutamp_settings=cutamp_settings)
         env.start_recording()
         start = time.perf_counter()
         recording_name = "simulation_01_failure.html"
         try:
-            result = runner.run(task="Pick up the red object and hold it.",
-                task_goals=(PredicateGoal("holding", (target,)),), initial_observation=observation,
+            result = runner.run(task=args.task,
+                task_goals=PICK_LIFT_DOMAIN.goals(target), initial_observation=observation,
                 initial_geometry_state=observer.geometry_state(observation, {
                     "base_height_m": experiment.environment_config.robot_adapter.base_config.base_height_m}),
-                predicate_arity={"observed": 1, "at_pick_pose": 1, "holding": 1, "gripper_empty": 0}, images=images)
+                predicate_arity=registry.predicate_arity, images=images)
             final_success = bool(result.success and executor.observation.task.get("success", False))
             if final_success:
                 recording_name = "simulation_01_success.html"
             save(output / "live_result.json", {"success": final_success, "reason": result.reason,
+                "geometry_backend": args.geometry_backend,
                 "metrics": dict(result.metrics), "final_task": dict(executor.observation.task),
                 "wall_time_s": time.perf_counter() - start,
-                "random_seed_fixed": False,
+                "random_seed_fixed": True,
                 "final_facts": [dataclasses.asdict(f) for f in sorted(result.world.facts)],
                 "recording": str(output / recording_name)})
             print(json.dumps({"phase": "complete", "success": final_success, "reason": result.reason}), flush=True)

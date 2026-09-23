@@ -1,0 +1,27 @@
+{
+  "schema": "scenesmith.tamp.program.v1",
+  "variables": {
+    "base_x_m": {"type": "discrete", "values": [2.77, 2.76, 2.78]},
+    "grasp_lateral_offset_m": {"type": "discrete", "values": [-0.00293, -0.00343]}
+  },
+  "steps": [
+    {
+      "skill": "NavigateToPick",
+      "arguments": {"target": "pick_target"},
+      "parameters": {
+        "base_x_m": {"var": "base_x_m"},
+        "base_y_m": {"const": 2.95},
+        "base_yaw_rad": {"const": 3.141592653589793}
+      }
+    },
+    {
+      "skill": "PickLift",
+      "arguments": {"target": "pick_target"},
+      "parameters": {
+        "target": {"const": "pick_target"},
+        "arm": {"const": "left"},
+        "grasp_lateral_offset_m": {"var": "grasp_lateral_offset_m"}
+      }
+    }
+  ]
+}

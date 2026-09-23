@@ -1,0 +1,85 @@
+{
+  "robot": "zerith_dual",
+  "robot_options": {
+    "camera_options": {
+      "enabled_names": [
+        "head_camera",
+        "left_wrist_camera"
+      ],
+      "width": 640,
+      "height": 480,
+      "fov_y_rad": 1.5707963267948966,
+      "update_period_s": 200
+    },
+    "locked_joint_positions": {
+      "neck_yaw_joint": 0,
+      "neck_pitch_joint": 0
+    }
+  },
+  "base": {
+    "mode": "wheel_dynamic",
+    "base_height_m": 0.1815
+  },
+  "control": "picklift",
+  "control_options": {
+    "episode_duration": 180.1
+  },
+  "initial_state": "picklift",
+  "initial_state_options": {
+    "robot_xyz": [
+      3.25,
+      2.95,
+      0.1815
+    ]
+  },
+  "scene": "scenesmith",
+  "scene_options": {
+    "variant": "furniture_welded",
+    "overrides": "experiments/inputs/tamp/scene_overrides_reachable_12cm.yaml",
+    "additional_package_xmls": [
+      "models/zerith_pick_eval/package.xml"
+    ]
+  },
+  "policy": "planner.src.bt.runtime:make_policy",
+  "policy_options": {
+    "bt_json_input": "experiments/inputs/bt_navigation_picklift/bt_tree_backed.json",
+    "calibrated_base_xyz_m": [
+      2.65,
+      2.95,
+      0.1815
+    ],
+    "calibrated_base_yaw_deg": 180,
+    "expert_inputs": "experiments/inputs/pick_lift",
+    "expert_calibration": "experiments/inputs/pick_lift/pick_lift_calibration.json",
+    "navigation_position_tolerance_m": 0.005,
+    "expert_policy_overrides": {
+      "target_pose_position_tolerance_m": 0.0035,
+      "maximum_close_steps": 180,
+      "lift_distance_m": 0.12
+    }
+  },
+  "task": "picklift",
+  "task_options": {
+    "maximum_allowed_contact_penetration_m": 0.0005,
+    "maximum_allowed_support_penetration_m": 0.0035
+  },
+  "evaluator": "task_result",
+  "requires": {
+    "arms": [
+      "left"
+    ],
+    "grippers": [
+      "left"
+    ],
+    "sensors": [
+      "head_camera",
+      "left_wrist_camera"
+    ]
+  },
+  "run": {
+    "seeds": [
+      500
+    ],
+    "max_steps": 1600
+  }
+}

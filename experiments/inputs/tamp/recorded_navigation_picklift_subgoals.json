@@ -1,0 +1,7 @@
+{
+  "schema": "scenesmith.tamp.subgoals.v1",
+  "subgoals": [
+    {"skill": "NavigateToPick", "arguments": {"target": "pick_target"}},
+    {"skill": "PickLift", "arguments": {"target": "pick_target"}}
+  ]
+}

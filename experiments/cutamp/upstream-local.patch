@@ -1,0 +1,91 @@
+diff -ruN '--exclude=__pycache__' '--exclude=.git' a/cutamp/cost_function.py b/cutamp/cost_function.py
+--- a/cutamp/cost_function.py	2026-05-31 02:45:52.000000000 +0800
++++ b/cutamp/cost_function.py	2026-09-19 18:47:11.400043119 +0800
+@@ -44,7 +44,8 @@
+     The __init__ function caches constraints and costs for quicker indexing during rollout evaluation.
+     """
+ 
+-    def __init__(self, plan_skeleton: PlanSkeleton, world: TAMPWorld, config: TAMPConfiguration):
++    def __init__(self, plan_skeleton: PlanSkeleton, world: TAMPWorld, config: TAMPConfiguration,
++                 *, allow_nonexperimental_self_collision: bool = False):
+         if config.enable_traj:
+             raise NotImplementedError("Trajectories not supported in cost function yet")
+ 
+@@ -100,7 +101,10 @@
+         self.self_collision_cost_fn = SelfCollisionCost(self_collision_config)
+         # Should be using experimental kernel by default
+         if not self.self_collision_cost_fn.self_collision_kin_config.experimental_kernel:
+-            raise ValueError("Expected self-collision cost to use experimental kernel")
++            if not allow_nonexperimental_self_collision:
++                raise ValueError("Expected self-collision cost to use experimental kernel")
++            warnings.warn("Using cuRobo's nonexperimental self-collision kernel; "
++                          "collision constraints remain enabled")
+ 
+         # Conf parameters for kinematic constraints, order in rollout should match
+         self.kinematic_confs, self.kinematic_actions = zip(*(con.params for con in self.kinematic_constraints))
+diff -ruN '--exclude=__pycache__' '--exclude=.git' a/cutamp/tamp_world.py b/cutamp/tamp_world.py
+--- a/cutamp/tamp_world.py	2026-05-31 02:45:52.000000000 +0800
++++ b/cutamp/tamp_world.py	2026-09-23 18:37:12.867407211 +0800
+@@ -7,6 +7,7 @@
+ # without an express license agreement from NVIDIA CORPORATION or
+ # its affiliates is strictly prohibited.
+ 
++import hashlib
+ import logging
+ import warnings
+ from functools import cached_property
+@@ -48,6 +49,8 @@
+         collision_activation_distance: float = 0.0,
+         coll_n_spheres: int = 50,
+         coll_sphere_radius: float = 0.005,
++        ik_solver=None,
++        sphere_seed: int | None = None,
+     ):
+         self.env = env
+         self.tensor_args = tensor_args
+@@ -71,7 +74,9 @@
+         self.q_init = q_init
+ 
+         # Setup the IK solver, right now it needs WorldCfg and I don't know the behavior, can speed up later
+-        if self.robot_name == "panda":
++        if ik_solver is not None:
++            self.ik_solver = ik_solver
++        elif self.robot_name == "panda":
+             self.ik_solver = get_franka_ik_solver(self.world_cfg)
+         elif self.robot_name == "ur5":
+             self.ik_solver = get_ur5_ik_solver(self.world_cfg)
+@@ -81,7 +86,13 @@
+         # Sample collision spheres for all movables
+         self._obj_to_spheres: Dict[str, Float[torch.Tensor, "n 4"]] = {}
+         for obj in self.movables:
+-            spheres = sample_greedy_surface_spheres(obj, n_spheres=coll_n_spheres, sphere_radius=coll_sphere_radius)
++            # Derive one stable stream per object; object order cannot change
++            # the collision approximation for an individual movable.
++            sample_seed = (None if sphere_seed is None else int.from_bytes(
++                hashlib.sha256(f"{sphere_seed}:{obj.name}".encode()).digest()[:8], "big"))
++            spheres = sample_greedy_surface_spheres(
++                obj, n_spheres=coll_n_spheres, sphere_radius=coll_sphere_radius,
++                seed=sample_seed)
+             self._obj_to_spheres[obj.name] = spheres.to(tensor_args.device)
+ 
+         # AABB cache
+diff -ruN '--exclude=__pycache__' '--exclude=.git' a/cutamp/utils/shapes.py b/cutamp/utils/shapes.py
+--- a/cutamp/utils/shapes.py	2026-05-31 02:45:52.000000000 +0800
++++ b/cutamp/utils/shapes.py	2026-09-23 18:37:12.147393130 +0800
+@@ -153,6 +153,7 @@
+     n_spheres: int,
+     sphere_radius: float,
+     n_samples: int = 1000,
++    seed: int | None = None,
+ ) -> Float[torch.Tensor, "n 4"]:
+     """
+     Samples approximately non-overlapping surface spheres on a 3D object using a greedy algorithm. Thanks Caelan!
+@@ -173,7 +174,7 @@
+ 
+     # Sample surface
+     n_samples = max(n_spheres, n_samples)
+-    n_pts = trimesh.sample.sample_surface(mesh, n_samples)[0]
++    n_pts = trimesh.sample.sample_surface(mesh, n_samples, seed=seed)[0]
+     cloud = trimesh.PointCloud(n_pts)
+ 
+     # Build neighbor graph

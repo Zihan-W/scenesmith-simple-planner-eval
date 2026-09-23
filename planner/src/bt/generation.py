@@ -11,9 +11,11 @@ import argparse
 import base64
 import dataclasses
 import hashlib
+from http.client import HTTPException
 import json
 import mimetypes
 import os
+import time
 from pathlib import Path
 from typing import Protocol
 from urllib.error import HTTPError, URLError
@@ -57,6 +59,20 @@ PROFILES = {
 
 class GenerationError(RuntimeError):
     """The provider or strict BT compiler could not produce a result."""
+
+
+class ProviderError(GenerationError):
+    """Sanitized transport/protocol failure, distinct from a planning rejection."""
+
+    def __init__(self, message, *, kind, retryable, status_code=None):
+        super().__init__(message)
+        self.kind = kind
+        self.retryable = retryable
+        self.status_code = status_code
+
+    def as_dict(self):
+        return {"kind": self.kind, "retryable": self.retryable,
+                "status_code": self.status_code}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -365,7 +381,7 @@ def generate(loaded: LoadedRequest, client: ChatClient) -> dict:
     for number in range(1, model["max_attempts"] + 1):
         completion = client.complete(model=model["id"], messages=messages)
         if not isinstance(completion.content, str) or not completion.content.strip():
-            raise GenerationError("Provider returned an empty text response")
+            raise ProviderError("Provider returned an empty text response", kind="invalid_response", retryable=True)
         validation_error = None
         try:
             response, root = PROFILES[loaded.task_plan["schema"]]["compile"](
@@ -478,6 +494,11 @@ class OpenAICompatibleChatClient:
         self.timeout_s = float(timeout_s)
         self.max_tokens = int(max_tokens)
         self.token_parameter = token_parameter
+        self.deadline_monotonic_s = None
+
+    def set_deadline(self, deadline_monotonic_s: float | None):
+        """Bound future requests by an enclosing run's absolute deadline."""
+        self.deadline_monotonic_s = deadline_monotonic_s
 
     @staticmethod
     def _wire_messages(messages):
@@ -524,22 +545,33 @@ class OpenAICompatibleChatClient:
             },
             method="POST",
         )
+        timeout_s = self.timeout_s
+        if self.deadline_monotonic_s is not None:
+            timeout_s = min(timeout_s, self.deadline_monotonic_s - time.perf_counter())
+            if timeout_s <= 0:
+                raise GenerationError("Model request wall-time budget exhausted")
         try:
-            with urlopen(request, timeout=self.timeout_s) as response:
+            with urlopen(request, timeout=timeout_s) as response:
                 payload = json.load(response)
         except HTTPError as error:
-            raise GenerationError(f"Provider HTTP {error.code}") from None
-        except (URLError, TimeoutError, OSError, json.JSONDecodeError):
-            raise GenerationError("Provider connection failed or returned invalid JSON") from None
+            raise ProviderError(f"Provider HTTP {error.code}", kind="http",
+                retryable=error.code in {408, 429} or 500 <= error.code < 600,
+                status_code=error.code) from None
+        except (TimeoutError, URLError, OSError, HTTPException) as error:
+            timeout = isinstance(error, TimeoutError) or isinstance(getattr(error, "reason", None), TimeoutError)
+            raise ProviderError("Provider request timed out" if timeout else "Provider connection failed",
+                                kind="timeout" if timeout else "connection", retryable=True) from None
+        except json.JSONDecodeError:
+            raise ProviderError("Provider returned invalid JSON", kind="invalid_json", retryable=True) from None
         try:
             choice = payload["choices"][0]
             content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError):
-            raise GenerationError("Provider returned an invalid Chat Completions response") from None
+            raise ProviderError("Provider returned an invalid Chat Completions response", kind="invalid_response", retryable=True) from None
         if choice.get("finish_reason") not in ("stop", None):
             raise GenerationError("Provider did not finish one complete response")
         if not isinstance(content, str) or not content.strip():
-            raise GenerationError("Provider returned an empty text response")
+            raise ProviderError("Provider returned an empty text response", kind="invalid_response", retryable=True)
         return ChatCompletion(
             content=content,
             model=str(payload.get("model", model)),

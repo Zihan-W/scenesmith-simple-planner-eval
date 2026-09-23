@@ -12,6 +12,8 @@ import numpy as np
 from pydrake.all import RigidTransform, RollPitchYaw
 
 from planner.src.bt.core import Node, SKILLS, Status, TickOutcome, tick_tree, to_dict, to_mdsl
+from planner.src.skills.driver import SkillDriver
+from planner.src.skills.navigation import certified_local_map
 from planner.src.skills.picklift import JointWaypointPickLiftSkill
 from simulation.src import (
     BaseVelocityAction, CompositeAction, GripperAction, HoldAction,
@@ -77,71 +79,10 @@ def _leaves(node):
         yield from _leaves(child)
 
 
-def _certified_local_map(query, adapter, scenario, navigate: Node):
-    """Check translation and the differential-drive turning envelope.
-
-    Sample all headings between the initial, forward/reverse travel, and final
-    headings along the corridor. This conservatively covers the controller's
-    blended turning; it remains a geometric precheck, not a dynamics proof.
-    """
-    plant, context = query.plant, query.context
-    instance = query.robot_model_instance
-    body = plant.GetBodyByName(adapter.spec.base_link_name, instance)
-    base_frame = plant.GetFrameByName(adapter.spec.base_link_name, instance)
-    navigation_frame = plant.GetFrameByName(adapter.navigation_frame_name, instance)
-    X_BN = base_frame.CalcPoseInWorld(context).inverse() @ navigation_frame.CalcPoseInWorld(context)
-    x, y, yaw = map(float, navigate.args[:3])
-    if navigate.args[3] != "world" or not all(math.isfinite(v) for v in (x, y, yaw)):
-        raise ValueError("NavigateTo must have a finite world-frame goal")
-    X_WB_start = base_frame.CalcPoseInWorld(context)
-    X_WN_start = navigation_frame.CalcPoseInWorld(context)
-    start_xy = X_WN_start.translation()[:2]
-    start_yaw = X_WN_start.rotation().ToRollPitchYaw().yaw_angle()
-    delta = np.array([x, y]) - start_xy
-    wrap = lambda angle: math.atan2(math.sin(angle), math.cos(angle))
-    heading = math.atan2(delta[1], delta[0]) if np.linalg.norm(delta) > 1e-9 else start_yaw
-    if abs(wrap(heading - start_yaw)) > math.pi / 2:
-        heading += math.pi  # Match Navigator's reverse-drive choice.
-    travel_yaw = start_yaw + wrap(heading - start_yaw)
-    end_yaw = travel_yaw + wrap(yaw - travel_yaw)
-    low, high = min(start_yaw, travel_yaw, end_yaw), max(start_yaw, travel_yaw, end_yaw)
-    headings = np.linspace(low, high, max(2, math.ceil((high - low) / math.radians(2)) + 1))
-    count = max(31, math.ceil(np.linalg.norm(delta) / 0.01) + 1)
-    poses = [(0.0, start_yaw, X_WB_start)]
-    for alpha in np.linspace(0, 1, count):
-        xy = start_xy + alpha * delta
-        for sample_yaw in headings:
-            X_WN = RigidTransform(RollPitchYaw(0, 0, sample_yaw), [*xy, 0])
-            poses.append((alpha, sample_yaw, X_WN @ X_BN.inverse()))
-    floor_ids = resolve_ground_geometries(
-        plant, plant.get_geometry_query_input_port().Eval(context).inspector(),
-        scenario.ground_body_names, scenario.ground_geometries,
-    )
-    for alpha, sample_yaw, pose in poses:
-        plant.SetFreeBodyPose(context, body, pose)
-        geometry_query = plant.get_geometry_query_input_port().Eval(context)
-        inspector = geometry_query.inspector()
-        for pair in geometry_query.ComputeSignedDistancePairwiseClosestPoints(0.01):
-            if pair.id_A in floor_ids or pair.id_B in floor_ids:
-                continue
-            a = plant.GetBodyFromFrameId(inspector.GetFrameId(pair.id_A))
-            b = plant.GetBodyFromFrameId(inspector.GetFrameId(pair.id_B))
-            a_robot, b_robot = a.model_instance() == instance, b.model_instance() == instance
-            if not (a_robot or b_robot):
-                continue
-            if a_robot and b_robot and {a.name(), b.name()} == {"neck_yaw_link", "neck_camera_link"}:
-                continue  # fixed, measured CAD overlap; present before motion
-            required = 0.005 if a_robot != b_robot else 0.0
-            if pair.distance < required:
-                raise ValueError(
-                    f"Navigation corridor collision at alpha={alpha:.2f}, yaw={sample_yaw:.4f}: "
-                    f"{a.name()} / {b.name()} = {pair.distance:.4f} m")
-    bounds = (-4.5, -4.5, 4.5, 4.5)
-    return StaticNavigationMap(obstacles=(), robot_radius_m=0.0, bounds=bounds,
-                               resolution_m=0.05)
+_certified_local_map = certified_local_map
 
 
-class JsonBtPolicy:
+class JsonBtPolicy(SkillDriver):
     """One BT interpreter; each skill is bound once to a public robot API."""
 
     required_capabilities = {"arms": ("left",), "grippers": ("left",)}
@@ -214,88 +155,10 @@ class JsonBtPolicy:
                 "mdsl_sha256": self.config["mdsl_sha256"],
                 "tamp_used": self.config["generation"]["mode"] == "tamp"}
 
-    def _active_closure(self):
-        for state in self._leaf_state.values():
-            if "closure" in state:
-                return state["closure"]
-        return None
 
-    def _clear_closure(self, path, *, archive=False):
-        state = self._leaf_state.get(path)
-        closure = state.pop("closure", None) if state is not None else None
-        if archive and closure is not None:
-            self._closure_archive = {**closure, "active": False}
-        self._pending_close = None
 
-    @staticmethod
-    def _observed_gripper_width(observation):
-        width = observation.robot.gripper_widths_m.get(
-            "left", observation.robot.gripper_width_m)
-        if width is None:
-            raise ValueError("PickLift requires an observed left gripper width")
-        return float(width)
 
-    def _remaining_close_budget(self):
-        diagnostics = self.expert.diagnostics()
-        used = diagnostics.get("close_steps")
-        if used is None and diagnostics.get("stage") == "close":
-            used = diagnostics.get("stage_ticks")
-        used = 0 if used is None else int(used)
-        return max(0, int(self.expert.config.maximum_close_steps) - used)
 
-    def record_action_result(self, observation, info):
-        """Commit a close target only after Runtime reports final acceptance."""
-        pending = self._pending_close
-        if pending is None:
-            return
-        decision = info.get("action_decision") if isinstance(info, Mapping) else None
-        if not isinstance(decision, Mapping) or not isinstance(decision.get("accepted"), bool):
-            raise RuntimeError(
-                "PickLift close command requires a final boolean action_decision.accepted")
-        path = pending["path"]
-        leaf = self._leaf_state.get(path)
-        if leaf is None or "closure" not in leaf:
-            self._pending_close = None
-            return
-        state = leaf["closure"]
-        candidate = pending["candidate_target_m"]
-        previous = pending["previous_accepted_target_m"]
-        measured = self._observed_gripper_width(observation)
-        contacts = tuple(bool(value) for value in observation.task.get("finger_contacts", ()))
-        bilateral = bool(observation.task.get("bilateral_gripper_contact", False))
-        actual_progress = pending["measured_width_m"] - measured >= _CLOSE_PROGRESS_M
-        contact_progress = (
-            bilateral and not pending["bilateral_contact"]
-            or any(current and not old for current, old in zip(
-                contacts, pending["finger_contacts"], strict=False))
-        )
-        accepted = decision["accepted"]
-        target_progress = accepted and previous - candidate >= _CLOSE_PROGRESS_M
-
-        state.update({
-            "measured_width_m": measured,
-            "previous_accepted_target_m": previous,
-            "candidate_close_target_m": candidate,
-            "candidate_close_step_m": pending["candidate_step_m"],
-            "accepted": accepted,
-            "target_progress": target_progress,
-            "actual_progress": actual_progress,
-            "contact_progress": contact_progress,
-            "finger_contacts": contacts,
-            "bilateral_gripper_contact": bilateral,
-            "last_action_decision": dict(decision),
-        })
-        if accepted:
-            state["last_accepted_close_target_m"] = candidate
-        else:
-            state["rejection_count"] += 1
-            state["last_rejection"] = dict(decision)
-
-        if target_progress or actual_progress or contact_progress:
-            state["no_safe_or_actual_progress_ticks"] = 0
-        else:
-            state["no_safe_or_actual_progress_ticks"] += 1
-        self._pending_close = None
 
     def behavior_tree_visualization(self):
         return {"title": "JSON Behavior Tree", "tree": to_dict(self.root)}
@@ -336,144 +199,35 @@ class JsonBtPolicy:
         return TickOutcome(Status.RUNNING if running else Status.SUCCESS,
                            HoldAction() if running else None, path)
 
+
+
     def _navigate(self, node, path, observation):
-        if self.navigator is None:
-            return TickOutcome(Status.FAILURE, path=path, reason="navigator_unavailable")
-        state = self._leaf_state.setdefault(path, {})
-        if not state.get("started"):
-            x, y, yaw = map(float, node.args[:3])
-            quaternion = (math.cos(yaw / 2), 0, 0, math.sin(yaw / 2))
-            self.navigator.set_goal(
-                NavigationGoal(Pose((x, y, 0), quaternion), node.args[3]), observation)
-            self._navigation_goal = (x, y, yaw)
-            state["started"] = True
-        action = self.navigator.act(observation)
-        if self.navigator.status in ("blocked", "no_path", "timeout"):
-            return TickOutcome(Status.FAILURE, action, path,
-                               f"navigation_{self.navigator.status}")
-        if self.navigator.status == "arrived":
-            owner = self.navigator.config.control_owner
-            self.navigator.release()
-            return TickOutcome(Status.SUCCESS, BaseVelocityAction(
-                0, 0, control_owner=owner, release_control=True), path)
-        return TickOutcome(Status.RUNNING, action, path)
+        outcome = super()._navigate(node, path, observation)
+        return TickOutcome(Status(outcome.status.value), outcome.action,
+                           outcome.path, outcome.reason)
 
     def _picklift(self, node, path, observation):
-        if self.expert is None:
-            return TickOutcome(Status.FAILURE, path=path, reason="picklift_unavailable")
-        if self.navigator and (self.navigator.status != "arrived" or self.navigator.owner):
-            return TickOutcome(Status.FAILURE, path=path, reason="base_not_released")
-        if self._pending_close is not None:
-            if self._pending_close["path"] != path:
-                raise RuntimeError("Unresolved PickLift close command belongs to another leaf")
-            return TickOutcome(Status.RUNNING, self._pending_close["action"], path)
+        outcome = super()._picklift(node, path, observation)
+        return TickOutcome(Status(outcome.status.value), outcome.action,
+                           outcome.path, outcome.reason)
 
-        action = self.expert.act(observation)
-        # The calibrated expert uses the fixed-arm CompositeAction contract.
-        # The mobile Runtime accepts the same public components as named groups.
-        if isinstance(action, CompositeAction):
-            action = RobotCommand(
-                arms={"left": action.arm} if action.arm is not None else {},
-                grippers={"left": action.gripper} if action.gripper is not None else {},
-            )
-        elif isinstance(action, GripperAction):
-            action = RobotCommand(grippers={"left": action})
-        elif not isinstance(action, (HoldAction, RobotCommand)):
-            action = RobotCommand(arms={"left": action})
-        # Match the direct PickLift policy: keep publishing its final close
-        # target instead of replacing it with measured-width increments.
-        # Runtime still validates the command from the current measured state,
-        # and final acceptance is recorded separately from the request.
-        if isinstance(action, RobotCommand) and "left" in action.grippers:
-            gripper = action.grippers["left"]
-            closing = (self.expert.stage == "close"
-                       and gripper.width_m <= self.expert.config.closed_width_m + 1e-9)
-            if closing:
-                width = self._observed_gripper_width(observation)
-                contacts = tuple(observation.task.get("finger_contacts", ()))
-                bilateral = bool(observation.task.get("bilateral_gripper_contact", False))
-                leaf = self._leaf_state.setdefault(path, {})
-                close_state = leaf.get("closure")
-                if close_state is None:
-                    close_state = {
-                        "active": True,
-                        "target_mode": "direct_expert_target",
-                        "initialized_from_measured_width_m": width,
-                        "last_accepted_close_target_m": width,
-                        "previous_accepted_target_m": width,
-                        "candidate_close_target_m": None,
-                        "candidate_close_step_m": None,
-                        "measured_width_m": width,
-                        "accepted": None,
-                        "target_progress": False,
-                        "actual_progress": False,
-                        "contact_progress": False,
-                        "finger_contacts": tuple(bool(value) for value in contacts),
-                        "bilateral_gripper_contact": False,
-                        "rejection_count": 0,
-                        "no_safe_or_actual_progress_ticks": 0,
-                        "close_command_count": 0,
-                        "remaining_close_budget": self._remaining_close_budget(),
-                        "last_rejection": None,
-                        "last_action_decision": None,
-                    }
-                    leaf["closure"] = close_state
-                    self._closure_archive = None
-                previous_target = close_state["last_accepted_close_target_m"]
-                close_target = gripper.width_m
-                candidate_step = max(0.0, previous_target - close_target)
-                close_state.update({
-                    "measured_width_m": width,
-                    "previous_accepted_target_m": previous_target,
-                    "candidate_close_target_m": close_target,
-                    "candidate_close_step_m": candidate_step,
-                    "finger_contacts": tuple(bool(value) for value in contacts),
-                    "bilateral_gripper_contact": bilateral,
-                    "accepted": None,
-                })
-                close_state["close_command_count"] += 1
-                close_state["remaining_close_budget"] = self._remaining_close_budget()
-                action = RobotCommand(
-                    arms=action.arms,
-                    grippers={**action.grippers, "left": GripperAction(close_target)},
-                    base=action.base,
-                )
-                self._pending_close = {
-                    "path": path,
-                    "action": action,
-                    "previous_accepted_target_m": previous_target,
-                    "candidate_target_m": close_target,
-                    "candidate_step_m": candidate_step,
-                    "measured_width_m": width,
-                    "finger_contacts": tuple(bool(value) for value in contacts),
-                    "bilateral_contact": bilateral,
-                }
-            else:
-                self._clear_closure(path)
-        if self.expert.stop_reason:
-            self._clear_closure(path, archive=True)
-            return TickOutcome(Status.FAILURE, action, path, self.expert.stop_reason)
-        state = observation.task
-        task_config = self.task.config
-        stable = (state.get("lift_m", 0.0) >= task_config.required_lift_m
+    def _pick_complete(self, observation):
+        if observation.task.get("success"):
+            return True
+        if self.config["generation"]["mode"] == "tamp":
+            return False
+        state, config = observation.task, self.task.config
+        stable = (state.get("lift_m", 0.0) >= config.required_lift_m
                   and state.get("bilateral_gripper_contact", False)
                   and not state.get("support_contact", True)
                   and not state.get("unexpected_target_contacts", ())
                   and state.get("target_translational_speed_m_s", math.inf)
-                      <= task_config.maximum_target_translational_speed_m_s
+                      <= config.maximum_target_translational_speed_m_s
                   and state.get("target_rotational_speed_rad_s", math.inf)
-                      <= task_config.maximum_target_rotational_speed_rad_s)
-        completes_next = (self.expert.stage == "hold" and stable
-                          and state.get("held_above_threshold_s", 0.0) + self.policy_dt
-                              >= task_config.required_hold_s - 1e-9)
-        if self.config["generation"]["mode"] == "tamp":
-            # Online verification consumes the post-step task observation. A
-            # predicted completion can still be short of the task timer (or
-            # lose stability on the next tick), causing an unnecessary regrasp.
-            # Keep ordinary BT baseline completion semantics unchanged.
-            completes_next = False
-        return TickOutcome(Status.SUCCESS if state.get("success") or completes_next
-                           else Status.RUNNING, action, path)
+                      <= config.maximum_target_rotational_speed_rad_s)
+        return (self.expert.stage == "hold" and stable
+                and state.get("held_above_threshold_s", 0.0) + self.policy_dt
+                    >= config.required_hold_s - 1e-9)
 
 
 def make_policy(context, *, navigation_query=None):

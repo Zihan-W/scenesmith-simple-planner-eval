@@ -297,7 +297,10 @@ class Navigator:
         ):
             self.status = "blocked"
             return zero
-        if error <= min(0.02, self.config.position_tolerance_m):
+        # Preserve an entry/exit margin at tight parking tolerances too.
+        # Arrival still requires the original position, yaw and stopped gates.
+        alignment_entry = min(0.02, 2 * self.config.position_tolerance_m / 3)
+        if error <= alignment_entry:
             self.aligning_final_yaw = True
         if error > self.config.position_tolerance_m:
             self.aligning_final_yaw = False

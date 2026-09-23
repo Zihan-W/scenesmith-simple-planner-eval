@@ -1,0 +1,6 @@
+{
+  "schema": "scenesmith.tamp.goals.v3",
+  "subgoals": [
+    {"predicate": "holding", "arguments": ["pick_target"]}
+  ]
+}

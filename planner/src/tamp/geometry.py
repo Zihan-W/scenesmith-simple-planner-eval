@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import time
 import dataclasses
 from collections.abc import Mapping
 from typing import Any, Protocol
@@ -22,7 +23,37 @@ class GeometricUnsat(RuntimeError):
         self.constraints = constraints
 
 
+class GeometryBackendError(RuntimeError):
+    """A solver process failed; this is not evidence of geometric UNSAT."""
+
+    def __init__(self, *, returncode: int, log_path: str):
+        super().__init__(f"Geometry worker exited with status {returncode}")
+        self.returncode = returncode
+        self.log_path = log_path
+
+
+class GeometryDeadlineExceeded(RuntimeError):
+    """The run's monotonic wall-time budget expired during geometry work."""
+
+
+def require_time_remaining(deadline_monotonic_s):
+    """Stop cooperative search before starting another costly check."""
+    if deadline_monotonic_s is not None and time.perf_counter() >= deadline_monotonic_s:
+        raise GeometryDeadlineExceeded("Geometry wall-time budget exhausted")
+
+
+@dataclasses.dataclass(frozen=True)
+class SolverCapabilities:
+    """Scheduler-visible guarantees, independent of backend implementation."""
+    retry_after_search_failure: bool = False
+    failure_context_use: str = "diagnostics_only"
+    exclusion_stage: str = "postcheck"
+    base_anchor_requirement: str = "none"
+
+
 class GeometrySolver(Protocol):
+    capabilities: SolverCapabilities
+
     def solve(self, world: WorldState, program: SkillProgram,
               initial_state: Mapping[str, Any], *,
               failure_context: LowLevelFailure | None = None,
@@ -96,6 +127,7 @@ class SamplingSolver:
     ``evaluate_batch`` is the backend seam for a future vectorized/GPU
     implementation. It has no authority to change symbolic skill arguments.
     """
+    capabilities = SolverCapabilities()
 
     def __init__(self, registry: SkillRegistry, domain, *,
                  max_candidates: int = 128, batch_size: int = 8, trace=None):
@@ -110,14 +142,29 @@ class SamplingSolver:
                        candidates: tuple[Mapping[str, Any], ...],
                        state: Mapping[str, Any]):
         """Return full, inspectable constraint checks for one batch."""
-        return tuple((candidate, *self.domain.check(skill, candidate, state))
-                     for candidate in candidates)
+        checked = []
+        for candidate in candidates:
+            require_time_remaining(getattr(self, "deadline_monotonic_s", None))
+            checked.append((candidate, *self.domain.check(skill, candidate, state)))
+        return tuple(checked)
+
+    def set_deadline(self, deadline_monotonic_s):
+        """Apply the enclosing run's absolute monotonic deadline."""
+        self.deadline_monotonic_s = deadline_monotonic_s
 
     def solve(self, world: WorldState, program: SkillProgram,
               initial_state: Mapping[str, Any], *,
               failure_context: LowLevelFailure | None = None,
               excluded_assignments: frozenset[str] = frozenset()
               ) -> ParameterizedSkillPlan:
+        if getattr(program, "parameter_subdomains", {}):
+            constraint = ConstraintResult(False, "domain_restriction", "", "unsupported_subdomain", (), {})
+            error = GeometricUnsat((constraint,))
+            error.retryable_search = False
+            error.program_feedback = ProgramFailure.from_constraints(
+                (constraint,), skill="", failure_source="backend_precondition",
+                attribution_scope="global").as_feedback()
+            raise error
         self.failure_context = receive_failure_context(failure_context, self.trace)
         validate_skill_program(program, self.registry, frozenset(world.objects))
         if not program.steps:
@@ -146,6 +193,7 @@ class SamplingSolver:
             skill = Subgoal(step.skill, arguments)
             source = iter(self.domain.samples(skill, state))
             while self.candidates_checked < self.max_candidates:
+                require_time_remaining(getattr(self, "deadline_monotonic_s", None))
                 batch = []
                 for _ in range(min(self.batch_size,
                                    self.max_candidates - self.candidates_checked)):
@@ -231,6 +279,7 @@ def _bind_effect(effect, arguments):
 
 class ExternalGeometrySolverAdapter:
     """Validate an external solver's output; this is not a cuTAMP optimizer."""
+    capabilities = SolverCapabilities()
 
     def __init__(self, backend=None):
         self.backend = backend
