@@ -1,5 +1,7 @@
 # Planner：任务规划与共享技能执行
 
+Planner 发布标签：`planner-v0.1`。共享仿真包/API 版本独立管理。
+
 本目录由原 `examples/` 中的规划实现整理而来。它依赖 `simulation.src` 的公共能力，
 不包含另一套仿真 Runtime。完整 Bash 命令见[项目 README](../README.md)。
 
@@ -92,8 +94,15 @@ Runtime 完成检查和提交后，通过 `record_action_result(observation, inf
 
 ## TAMP 入口
 
-`python -m planner.src.tamp.cli` 是通用入口。
-`--skill-planner proc3s --geometry-backend proc3s` 选择模型生成开放程序与完整赋值拒绝采样。
-默认 STRIPS + SamplingSolver 是不同基线。分层入口直接进入规划/仿真闭环，没有纯规划开关。
-本次 +100 mm、无固定 seed 的场景入口为 `scripts/run_current_tamp.py`；
-参数与边界见根目录 README 和[架构报告](../docs/CURRENT_ARCHITECTURE.md)。
+`python -m planner.src.tamp` 是包级入口，原 `planner.src.tamp.cli` 和安装命令继续有效。
+Python 模块提供 `TampRunRequest` / `run()` 自动闭环，以及 `create_session()` 的
+`plan()` / `execute()` 分离接口。两者复用同一程序生成、几何求解和恢复流程。
+
+`--skill-planner proc3s --geometry-backend proc3s` 选择 PRoC3S CCSP；
+替换为 `--geometry-backend cutamp --cutamp-config ...` 选择 cuTAMP。
+省略选择时默认 PRoC3S 程序生成 + CCSP。STRIPS 可显式选择，并搭配 PRoC3S CCSP 或 cuTAMP。独立 `sampling` 后端已删除。
+分离接口也接受 `skill_planner` 与 `geometry_backend`，缺省均为 `proc3s`，不在失败时切换算法。
+
+规划结果绑定当前会话和当前观测，只允许执行下一项技能。不能跨 reset/step 复用，
+也不能加载一份旧 JSON 直接执行整段轨迹。执行后再次调用 `plan()` 消费实际观测并续规划。
+接口、完整 Python 示例、截止时间和输出契约见 [TAMP 模块接口](../docs/TAMP_MODULE.md)。

@@ -1,52 +1,120 @@
-**/__pycache__/*
+# Secrets and local authentication. Commit only redacted example templates.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+.netrc
+credentials*.json
+
+# Patch rejects, editor backups and machine-local settings.
+*.orig
+*.rej
+*.bak
+*.tmp
+*.swp
+*~
+.DS_Store
+._*
+Thumbs.db
+.idea/
+.vscode/
+.direnv/
+.envrc
+
+# Python environments, bytecode, build products and test caches.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+build/
+dist/
+*.whl
+wheelhouse/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Large model/checkpoint arrays and exported evidence archives.
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.npy
+*.npz
+*.bundle
+*.evidence.tar.gz
+
+# Generated run artifacts. JSON configs, validation indexes, patches and HTML
+# templates remain eligible for tracking; do not add extension-wide ignores.
+/runs/
+output/
+meshcats/
+logs/
+/patches/
+*.log
+*.pdf
 /*.dmd.yaml
-
-models/scene_008/*
-models/21-20-10_cleaned/*
-models/15-15-01_cleaned/*
-output/*
-
-snopt.log
+/result.json
 robot_waypoints.json
 robot_plan.json
 robot_plan_good.json
 robot_plan_bad.json
-
+tamp_trace.jsonl
+skill_steps.jsonl
+model_transcript.jsonl
+checks.jsonl
+candidate_selection.json
+supervision.json
+worker_command.json
 simulation.html
 simulation_good.html
 simulation_bad.html
 zerith_online_control.csv
 zerith_online_control.html
-meshcats/*
-.venv
-logs
-*.egg-info/
-build/
-dist/
-models/zerith_drake/meshes/*.obj
-# Deprecated local prototype; preserved for reference but never committed.
-scripts/simulate_zerith_safe_pregrasp.py
-*.log
-*.pdf
 
-# Local documentation, experiment artifacts, and exported patches.
+# Optional local scene assets and generated robot meshes.
+# models/21-20-10_cleaned is intentionally versioned; Zerith_Model is a submodule.
+/models/scene_008/
+/models/15-15-01_cleaned/
+/models/zerith_drake/meshes/*.obj
+
+# Local agent instructions and a deprecated, uncommitted prototype.
+/AGENTS.md
+/scripts/simulate_zerith_safe_pregrasp.py
+
+# Documentation and experiment allowlists are kept together below.
+# 新增文档或实验必须在此加入白名单；用 git check-ignore -v 检查。
+# Existing tracked files remain tracked regardless of ignore rules.
 /docs/*
+!/docs/README.md
 !/docs/CURRENT_ARCHITECTURE.md
-# All run artifacts stay local.
-/runs/
-/patches/
+!/docs/TAMP_MODULE.md
+!/docs/BT_GENERATION_PIPELINE.md
+!/docs/PICKLIFT_BT_GENERATION_MODULE.md
+!/docs/QUICKSTART_ONLINE_ENV.md
+!/docs/GENERIC_ONLINE_EXAMPLE.md
+!/docs/CUTAMP_BUDGET_CONTRACT.md
+!/docs/TAMP_REPRODUCIBILITY.md
+!/docs/ZERITH_CAMERA_INVENTORY.md
+!/docs/contracts/
 
-# Python test, lint, and type-check caches.
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Local experiment configurations and generated inputs.
-# Keep the current runtime configuration and its required inputs visible.
-# Previously tracked example configurations remain tracked.
 /experiments/*
 !/experiments/navigation_picklift_tamp.json
 !/experiments/tamp_hierarchical_config.json
+!/experiments/tamp_current_validation.json
+!/experiments/cutamp/
 !/experiments/inputs/
 /experiments/inputs/*
 !/experiments/inputs/pick_lift/
@@ -56,12 +124,3 @@ scripts/simulate_zerith_safe_pregrasp.py
 !/experiments/inputs/bt_navigation_picklift/
 /experiments/inputs/bt_navigation_picklift/*
 !/experiments/inputs/bt_navigation_picklift/bt_tree_backed.json
-
-
-
-# Local agent instructions and packaging metadata.
-/AGENTS.md
-
-!/docs/ARCHITECTURE_REPAIR.md
-!/experiments/tamp_current_validation.json
-!/experiments/cutamp/

@@ -92,7 +92,7 @@ def figure_flow(font, out_path: Path):
         fill=INPUT_FILL, font=font, size=7.6)
     box(ax, 0.010, 0.490, 0.170, 0.605, "输入：任务与种子\ntask 自然语言\nseed=500 默认\nskills: picklift_registry()",
         fill=INPUT_FILL, font=font, size=7.6)
-    box(ax, 0.010, 0.355, 0.170, 0.470, "输入：模型设置\ntamp_hierarchical_config.json\nsubgoal_model / skill_model\nrecovery / sampling 预算",
+    box(ax, 0.010, 0.355, 0.170, 0.470, "输入：模型设置\ntamp_hierarchical_config.json\nsubgoal_model / skill_model\nrecovery / proc3s_ccsp 预算",
         fill=INPUT_FILL, font=font, size=7.6)
 
     # ---------------- stages ----------------
@@ -104,7 +104,7 @@ def figure_flow(font, out_path: Path):
          "in : task, WorldState, predicates/arity, 图像, 抽象反馈\nout: PredicateGoal 元组（只含谓词+对象名）"),
         (0.555, 0.665, "③ 骨架层  SkillProgramGenerator：strips | proc3s",
          "in : WorldState, 目标, SkillRegistry(模型视图 6 字段)\nout: SkillProgram（技能名 + 对象 + 开放变量名）"),
-        (0.410, 0.520, "④ 几何层  GeometrySolver：sampling | proc3s(CCSP) | cutamp",
+        (0.410, 0.520, "④ 几何层  GeometrySolver：proc3s(CCSP) | cutamp",
          "in : SkillProgram, geometry_state, 失败排除集, SceneSmithPickDomain 检查\nout: ParameterizedSkillPlan（连续赋值 + 约束结果）"),
         (0.265, 0.375, "⑤ 执行层  SceneSmithSkillExecutor",
          "in : ParameterizedSkillAction（单技能）\nout: SkillExecution（成功/原因/耗时/新观测）"),
@@ -183,7 +183,7 @@ def figure_skills(font, out_path: Path):
     consumers = [
         (0.020, 0.760, 0.300, 0.930, "① 符号搜索  refine_goals\n读 preconditions / add / delete\n输出 SkillProgram（技能+对象+开放变量）\n不在骨架里搜索物理参数"),
         (0.700, 0.760, 0.980, 0.930, "② 模型输入  proc3s payload\n白名单 6 字段（去掉 constraints /\nruntime_action / conditioning）\n模型只看到符号契约"),
-        (0.020, 0.470, 0.300, 0.690, "③ 几何求解\ngeometric_parameters → 开放变量角色\nSamplingSolver / Proc3sCCSPSolver / CuTAMPSolver\n均以注册表校验 program 不被改写"),
+        (0.020, 0.470, 0.300, 0.690, "③ 几何求解\ngeometric_parameters → 开放变量角色\nProc3sCCSPSolver / CuTAMPSolver\n均以注册表校验 program 不被改写"),
         (0.700, 0.470, 0.980, 0.690, "④ 执行绑定  SceneSmithSkillExecutor\nruntime_action → NavigateTo / ExecutePickLift\n并校验名字同时存在于 bt_core.SKILLS"),
         (0.020, 0.170, 0.300, 0.390, "⑤ 记录与产物\nasdict(spec) 全字段写 tamp_trace.jsonl\nskill_registry 事件\n= 事后审计用的快照"),
         (0.700, 0.170, 0.980, 0.390, "注意 constraints 字段\n当前没有任何代码读取\ncorridor / ik / joint_edge 等标签\n只是描述，检查逻辑按技能名硬编码"),

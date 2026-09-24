@@ -146,10 +146,24 @@ TAMP_SEED="$("$REPO_ROOT/.venv/bin/python" -c 'import secrets; print(secrets.ran
 
 **接口边界：**分层 TAMP CLI 会自动执行仿真，不需要 `--execute`，
 目前没有该路径的纯规划开关。省略 `--seed` 会默认使用 500，
-省略两个 planner/backend 参数会选择 STRIPS + SamplingSolver。
+省略两个 planner/backend 参数会选择 PRoC3S 程序生成 + PRoC3S CCSP。
 该 CLI 不自动添加 `+100 mm` 物体平移，因此其默认实验初态与上面的当前场景复现不同；
 要运行本次场景，请使用上一条命令，不能将两者视为同条件复测。
 当前任务目标仍固定为已注册目标的 `holding`，不是任意自然语言任务执行器。
+
+两条 PRoC3S 路径共用上述 CLI，显式选择以下参数即可：
+
+| 模式 | 参数 |
+| --- | --- |
+| PRoC3S 程序生成 + PRoC3S CCSP 完整赋值采样 | `--skill-planner proc3s --geometry-backend proc3s` |
+| PRoC3S 程序生成 + cuTAMP GPU 求解 | `--skill-planner proc3s --geometry-backend cutamp --cutamp-config experiments/cutamp/config.json` |
+
+这里 PRoC3S 是仓库内的受限实现。两者共享模型生成、精确几何检查及执行反馈闭环；
+每轮固定所选后端，失败时不会自动切换。PRoC3S CCSP 不需要 cuTAMP 的 GPU 环境，
+采样预算由 `proc3s_ccsp.max_samples` 控制。省略选择时默认 PRoC3S；cuTAMP 必须显式启用。
+STRIPS 仍可用 `--skill-planner strips` 选择，并搭配 PRoC3S CCSP 或 cuTAMP。独立 `sampling` 后端已删除。
+模块入口为 `python -m planner.src.tamp`；Python 规划/执行分离及自动闭环接口见
+[TAMP 模块文档](docs/TAMP_MODULE.md)。
 
 正式 CLI 输出 `result.json`、`tamp_trace.jsonl`、`skill_steps.jsonl`、
 `skills/`、`observations/` 和 `simulation.html`。后者的名称不表示成功；
@@ -168,7 +182,7 @@ TAMP_SEED="$("$REPO_ROOT/.venv/bin/python" -c 'import secrets; print(secrets.ran
 | 调度 | 编译树后 tick | 每次执行一个技能，重新观测、求解并验证 |
 | 共同执行基础 | `JsonBtPolicy`、RobotCommand、Drake Runtime | 同一共享入口，抓取可使用 CCSP 关节轨迹 |
 
-详细调用链、检查边界及已知差异见[当前项目架构报告](docs/CURRENT_ARCHITECTURE.md)。
+详细调用链、检查边界及已知差异见[当前架构](docs/CURRENT_ARCHITECTURE.md)。
 
 保留的本次成功结果为
 开发机本地 `runs/object-plusx100mm-online-unseeded-20260921/run_001/live_result.json`：
@@ -200,7 +214,7 @@ simulation/                  # 原 src 中的仿真实现
   examples/                  # 公共 API、相机、导航、抓取演示
 ```
 
-模块入口为 `python -m planner.src.bt`、`python -m planner.src.tamp.cli` 和
+模块入口为 `python -m planner.src.bt`、`python -m planner.src.tamp` 和
 `python -m simulation.src`。旧 `examples.*` / `src.online_manipulation.*`
 导入路径已迁移，不再保留同名重复实现。外部调用方需要同步新路径。
 配置文件中的 `module:function` 入口和本地安装的 console scripts 均随本次迁移更新。
@@ -219,7 +233,7 @@ simulation/                  # 原 src 中的仿真实现
 | `runs/` | 所有运行产物，仅本地保留；整个目录忽略且不跟踪 |
 | `docs/` | 当前使用、接口、架构与模型说明；旧实验报告已清理 |
 
-公共接口见[API 与配置契约](docs/GENERIC_ONLINE_EXAMPLE.md)。
+文档入口见[文档索引](docs/README.md)，公共接口见[API 与配置契约](docs/GENERIC_ONLINE_EXAMPLE.md)。
 历史维护记录可用 `git show 708edf0:docs/EVAL_STRUCTURE_PROGRESS.md` 查看。
 旧发布说明只代表当时版本。生产模型、控制律、任务阈值未因本次文档更新改变。
 
@@ -243,19 +257,40 @@ export CUTAMP_ROOT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv
 重建入口校验归档、重放补丁、安装锁定依赖与本地源码；验收入口再次独立重放并校验安装。
 当前开发机已实测补丁重放和安装校验；这不等于已在第二台机器完成全新 CUDA 编译。
 
-在线仿真验收统一入口如下，默认先做补丁重放 + `verify_installation`，无跳过开关。
+在线仿真验收统一入口如下，保留历史模块名 `validate_cutamp_online`，可选择两个后端。
+验收入口默认 `--geometry-backend proc3s`；显式选择 cuTAMP 时必须先做补丁重放 + `verify_installation`，无跳过开关。
 模型凭据由环境提供，不写进报告。每个 seed 同时用于场景和首次 GPU 求解，后续求解递增 GPU seed。
 
 ```bash
-.venv/bin/python -m scripts.validate_cutamp_online --archive-dir "$ARCHIVES" \
+.venv/bin/python -m scripts.validate_cutamp_online --geometry-backend cutamp --archive-dir "$ARCHIVES" \
   --scene-root "$SCENE_ROOT" --config experiments/tamp_current_validation.json \
   --cutamp-config experiments/cutamp/config.json --seeds 500 501 502 \
   --validation-ref refs/validation/my-unique-run --output "$NEW_RUN_DIRECTORY"
 ```
 
+改为 PRoC3S CCSP 验收时，不传 GPU 配置和归档目录：
+
+```bash
+.venv/bin/python -m scripts.validate_cutamp_online --geometry-backend proc3s \
+  --scene-root "$SCENE_ROOT" --config experiments/tamp_current_validation.json \
+  --seeds 500 501 502 --validation-ref refs/validation/my-unique-proc3s-run \
+  --output "$NEW_PROC3S_RUN_DIRECTORY"
+```
+
+两种模式均支持 `--model-replay` / `--replay-from`，并将 `geometry_backend`、`skill_planner`
+写入 `summary.json`、`index.json` 及各轮结果。索引保留历史 schema 名以兼容既有消费者；
+请读取 `geometry_backend` 判定后端。PRoC3S 模式的 GPU seed、cuTAMP 设置和后验窗口字段为 `null`。
+严格模型回放会核对完整请求；不同求解结果造成后续反馈不同，可能产生回放分歧，不能当成跨后端物理失败。
+
 每轮记录原始结果和同源码多 seed 汇总（含失败分类与 Wilson 区间）；小样本不构成可靠性认证。
-`refs/validation/current` 是本地最新已完成验收的源码指针；具体结果见
-`runs/cutamp-closure-20260923/REPORT.md`，引用本身不表示任务全部成功。
+`refs/validation/current` 是本地最新已完成验收的源码指针；小型已发布索引见 `validation/`。
+引用本身不表示任务全部成功。
 可选后验策略与软/硬截止边界见 [预算契约](docs/CUTAMP_BUDGET_CONTRACT.md)。自适应计时策略仍默认关闭；正式后验现在默认首个完整通过即停止。
 
 完整模型记录/严格回放、条件化统计口径、可选有界抓持补偿与验证 ref 归档见 [TAMP 实验契约](docs/TAMP_REPRODUCIBILITY.md)。
+
+## Planner 版本
+
+`planner-v0.1` 发布 BT/TAMP 模块入口、独立 plan/execute 与自动闭环、默认 PRoC3S 和可选 cuTAMP；
+独立 sampling 后端已移除。此标签与共享仿真包/API 的版本号独立。
+文档和实验白名单集中在 `.gitignore` 末尾；新增文件后用 `git check-ignore -v --no-index` 核对。

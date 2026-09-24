@@ -146,7 +146,7 @@ PY
 相机例子保存 RGB PNG、米制深度 NPY并打印 shape/dtype/时间戳。
 组合例子展示一次 step 同时发送左右臂、双夹爪和底盘动作，以及当前规划状态同步。
 相机安装定义属于 RobotAdapter，不随场景复制。
-标定/真实内容图与几何依据见 [相机清单](ZERITH_CAMERA_INVENTORY.md)；
+安装变换和仿真假设见 [相机清单](ZERITH_CAMERA_INVENTORY.md)；
 示例的空场景图只用于 API，不代替几何和可见性验收。
 没有目标检测或视觉抓取模型。
 
@@ -173,7 +173,7 @@ HTML 位于 episode 子目录的 simulation.html，可下载离线查看。
 取消后仍需 step 执行减速，满足停车窗口才 cancelled；到达/取消后显式 release
 再交还底盘控制权。到达要求位置3cm、yaw3°、实际速度0.01m/s、
 角速度0.02rad/s同时保持0.5s，不宣称完全静止。细节见API契约和 navigate_demo.py。
-运动学不等价轮地动力学，差异证据见 [底盘审计](BASE_MODE_IMPLEMENTATION_AUDIT.md)。
+运动学与轮地动力学是不同运行模式；动作与状态语义见 [公共接口](GENERIC_ONLINE_EXAMPLE.md)。
 
 ## 6. 固定 PickLift：明确依赖外部 SceneSmith 场景
 
@@ -257,8 +257,7 @@ export IIWA_RUN="$(mktemp -d /tmp/iiwa-run-XXXXXX)"
 这些仅属于原IIWA基线，不是在线Zerith的真实接触实现。
 本轮实际验证范围见维护记录；不以 --help 或资产加载冒充完整pick-place成功。
 
-已验证四阶段启动以及真实场景/机器人加载（46模型、2742碰撞几何）；
-本轮没有完整重跑IIWA离线规划和抓放。
+IIWA 是独立可选基线，按该入口的模型与依赖要求准备环境。
 
 ## 8. 迁移、开发与限制
 
@@ -273,7 +272,7 @@ export IIWA_RUN="$(mktemp -d /tmp/iiwa-run-XXXXXX)"
 | TAMP执行helper | 公共execute_validated_joint_goal；例子不持有正式实现 |
 
 单臂动作/相机公共契约不变。私有旧导入与脚本路径不兼容。
-TAMP只同步并检查直接边后执行，不是完整TAMP或动态重规划。
+底层直接关节执行示例不等同于完整 TAMP；自动闭环和规划/执行分离见 [TAMP 模块接口](TAMP_MODULE.md)。
 
 ```bash
 "$PYTHON" -m pip install -e "$REPO_ROOT[dev]"
@@ -283,8 +282,6 @@ cd "$REPO_ROOT"
 
 有真实A场景时设置 SCENE_ROOT，相关迁根/墙体测试会实际运行。
 测试中的缺资产 skip 不算视觉验收；CI/同事无外部A资产时应分别报告。
-本轮已用真实A验证，B缺纹理仍未视觉验收。
 
 不支持任意URDF免适配、任意策略免输入输出适配、SLAM、移动携物、
 双手协同抓物、PLACE、导轨动力学或新策略模型。
-本次实验结果见[运行结果](../runs/object-plusx100mm-online-unseeded-20260921/run_001/live_result.json)；历史维护记录可用 `git show 708edf0:docs/EVAL_STRUCTURE_PROGRESS.md` 查看。

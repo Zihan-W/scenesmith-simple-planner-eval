@@ -78,6 +78,15 @@ class OnlineResult:
     metrics: Mapping[str, Any]
 
 
+@dataclasses.dataclass(frozen=True)
+class _PlanningDecision:
+    world: WorldState
+    program: Any
+    plan: Any
+    action: ParameterizedSkillAction
+    deadline: float
+
+
 class JsonlTrace:
     def __init__(self, path: Path):
         self.path = Path(path)
@@ -152,6 +161,42 @@ class IncrementalTampRunner:
             predicate_arity: Mapping[str, int],
             images: tuple[Mapping[str, str], ...] = (),
             deadline_monotonic_s: float | None = None) -> OnlineResult:
+        """Drive the same planning coroutine through automatic skill execution."""
+        flow = self._steps(task=task, task_goals=task_goals,
+            initial_observation=initial_observation, initial_geometry_state=initial_geometry_state,
+            predicate_arity=predicate_arity, images=images,
+            deadline_monotonic_s=deadline_monotonic_s)
+        try:
+            decision = next(flow)
+            while True:
+                outcome = self.executor.execute(decision.action)
+                decision = flow.send(outcome)
+        except StopIteration as finished:
+            return finished.value
+        finally:
+            flow.close()
+
+    def start(self, *, state_token=None, **inputs):
+        """Create an explicit plan/execute session over the existing recovery loop.
+
+        The state callback must identify every relevant external state change.
+        SceneSmith executors provide one; other adapters must supply their own.
+        Waiting between calls consumes the same monotonic run budget.
+        """
+        from .session import PlanningSession
+
+        if state_token is None:
+            state_token = getattr(self.executor, 'planning_state_token', None)
+        if not callable(state_token):
+            raise TypeError('Split planning requires a current-state token callback')
+        if inputs.get('deadline_monotonic_s') is None:
+            inputs['deadline_monotonic_s'] = time.perf_counter() + self.limits.max_wall_time_s
+        return PlanningSession(self, self._steps(**inputs), state_token)
+
+    def _steps(self, *, task, task_goals, initial_observation,
+               initial_geometry_state, predicate_arity, images=(),
+               deadline_monotonic_s=None):
+        """Plan until execution is necessary; resume with the measured outcome."""
         self._run_started_at = time.perf_counter()
         deadline = (self._run_started_at + self.limits.max_wall_time_s
                     if deadline_monotonic_s is None else deadline_monotonic_s)
@@ -396,7 +441,12 @@ class IncrementalTampRunner:
                             if metrics["skill_executions"] >= self.limits.max_skill_executions:
                                 return self._finish(False, "skill_execution_budget", world, metrics)
                             previous_world = world
-                            outcome = self.executor.execute(action)
+                            try:
+                                outcome = yield _PlanningDecision(world, program, plan, action, deadline)
+                            except GeometryDeadlineExceeded:
+                                self.trace({'event': 'wall_time_budget_exhausted',
+                                            'stage': 'plan_execution_handoff'})
+                                return self._finish(False, 'wall_time_budget_exhausted', world, metrics)
                             metrics["skill_executions"] += 1
                             metrics["execution_time_s"] += outcome.duration_s
                             world = self.observer.observe(outcome.observation)

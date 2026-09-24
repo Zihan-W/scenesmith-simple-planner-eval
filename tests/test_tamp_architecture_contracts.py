@@ -16,7 +16,6 @@ from planner.src.skills.navigation import certified_local_map
 from planner.src.tamp.failures import ProgramFailure
 from planner.src.tamp.hierarchy import SkillSpec, SkillRegistry, PredicateGoal, WorldState
 from planner.src.tamp.proc3s import parse_proc3s_program, PROC3S_SCHEMA
-from planner.src.tamp.geometry import SamplingSolver
 from planner.src.tamp.ccsp import Proc3sCCSPSolver
 from planner.src.tamp.cutamp import CuTAMPSolver
 from planner.src.tamp.cutamp_backend.integrity import verify_installation, gpu_environment, ARTIFACT_FIELDS
@@ -44,7 +43,6 @@ class ArchitectureContractsTest(unittest.TestCase):
             ProgramFailure('', ('other',), (), attribution_scope='skill')
         failure = ProgramFailure.from_feedback({'failed_constraints':['other']})
         self.assertEqual(failure.attribution_scope, 'global')
-        self.assertFalse(SamplingSolver.capabilities.retry_after_search_failure)
         self.assertFalse(Proc3sCCSPSolver.capabilities.retry_after_search_failure)
         self.assertTrue(CuTAMPSolver.capabilities.retry_after_search_failure)
         self.assertEqual(CuTAMPSolver.capabilities.failure_context_use, 'diagnostics_only')

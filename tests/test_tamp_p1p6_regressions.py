@@ -189,7 +189,7 @@ class RegressionTests(unittest.TestCase):
                 ["approximate_tolerance_unmet", "exact_postcheck_rejected"])
 
     def test_deadline_stops_before_any_skill_command(self):
-        from planner.src.tamp.geometry import SamplingSolver
+        from planner.src.tamp.ccsp import Proc3sCCSPSolver
         from test_tamp_online import Domain, Executor, Observer, Semantic
 
         registry = picklift_registry()
@@ -201,7 +201,7 @@ class RegressionTests(unittest.TestCase):
         events = []
         runner = IncrementalTampRunner(
             semantic=Semantic(((holding,),)), registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, Domain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, Domain()),
             executor=executor, observer=Observer(("red_cube",)), trace=events.append,
             limits=RecoveryLimits(max_wall_time_s=1200),
         )
@@ -214,7 +214,7 @@ class RegressionTests(unittest.TestCase):
         self.assertEqual(events[-1]["event"], "final_result")
 
     def test_runner_passes_both_failure_streams_to_program_generator(self):
-        from planner.src.tamp.geometry import SamplingSolver
+        from planner.src.tamp.ccsp import Proc3sCCSPSolver
         from test_tamp_online import Domain, Executor, Observer, Semantic
 
         registry = picklift_registry()
@@ -235,7 +235,7 @@ class RegressionTests(unittest.TestCase):
 
         solves = []
 
-        class Solver(SamplingSolver):
+        class Solver(Proc3sCCSPSolver):
             def solve(self, *args, **kwargs):
                 solves.append(None)
                 if len(solves) == 1:

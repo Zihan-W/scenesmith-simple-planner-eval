@@ -2,7 +2,9 @@
 
 import unittest
 
-from planner.src.tamp.geometry import SamplingSolver
+from tamp_fixtures import FiniteCandidateDomain
+
+from planner.src.tamp.ccsp import Proc3sCCSPSolver
 from planner.src.tamp.hierarchy import (
     PredicateGoal, SkillProgram, SkillRegistry, SkillSpec, SkillStep, WorldState,
     picklift_registry,
@@ -32,7 +34,7 @@ class Semantic:
         return self.proposals.pop(0)
 
 
-class Domain:
+class Domain(FiniteCandidateDomain):
     def __init__(self, *, first_geometry_failure=False, blocked_skills=()):
         self.first_geometry_failure = first_geometry_failure
         self.blocked_skills = set(blocked_skills)
@@ -82,7 +84,7 @@ def run_case(registry, semantic, domain, initial, goal, *, fail_once_skill=None,
     executor = Executor(initial, fail_once_skill=fail_once_skill)
     runner = IncrementalTampRunner(
         semantic=semantic, registry=registry,
-        solver_factory=lambda world: SamplingSolver(registry, domain, batch_size=2),
+        solver_factory=lambda world: Proc3sCCSPSolver(registry, domain, seed=1),
         executor=executor, observer=Observer(("red_cube",)),
         trace=events.append, limits=limits,
     )
@@ -201,7 +203,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         executor = Executor((self.seen,))
         runner = IncrementalTampRunner(
             semantic=Semantic(((self.holding,),)), registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, ObstructedDomain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, ObstructedDomain()),
             executor=executor, observer=MeasuredObserver(("red_cube",)),
             trace=events.append,
         )
@@ -232,7 +234,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         executor = Executor((self.seen, self.empty), fail_once_skill="NavigateToPick")
         runner = IncrementalTampRunner(
             semantic=Semantic(((self.holding,),)), registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, MeasuredDomain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, MeasuredDomain()),
             executor=executor, observer=MeasuredObserver(("red_cube",)),
             trace=lambda event: None, limits=RecoveryLimits(skill_retries=0),
         )
@@ -261,7 +263,7 @@ class OnlineRecoveryTest(unittest.TestCase):
 
         def solver_factory(world):
             solving_worlds.append(world.robot["execution_count"])
-            return SamplingSolver(registry, Domain())
+            return Proc3sCCSPSolver(registry, Domain())
 
         runner = IncrementalTampRunner(
             semantic=Semantic(((self.holding,),)), registry=registry,
@@ -304,7 +306,7 @@ class OnlineRecoveryTest(unittest.TestCase):
                 executor = TerminalExecutor()
                 runner = IncrementalTampRunner(
                     semantic=Semantic(((holding,),)), registry=registry,
-                    solver_factory=lambda world: SamplingSolver(registry, Domain()),
+                    solver_factory=lambda world: Proc3sCCSPSolver(registry, Domain()),
                     executor=executor, observer=Observer(("red_cube",)),
                     trace=lambda event: None,
                 )
@@ -342,7 +344,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         registry = picklift_registry()
         runner = IncrementalTampRunner(
             semantic=Semantic(((self.holding,),)), registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, domain),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, domain, seed=1),
             executor=executor, observer=Observer(("red_cube",)),
             trace=lambda event: None, limits=RecoveryLimits(skill_retries=0),
         )
@@ -378,7 +380,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         registry = picklift_registry()
         runner = IncrementalTampRunner(
             semantic=Semantic(((self.holding,),)), registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, Domain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, Domain()),
             executor=executor, observer=Observer(("red_cube",)), trace=lambda event: None,
             limits=RecoveryLimits(skill_retries=3),
         )
@@ -425,7 +427,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         events = []
         runner = IncrementalTampRunner(
             semantic=semantic, registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, Domain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, Domain()),
             executor=BlockedExecutor(), observer=Observer(("red_cube", "drawer")),
             trace=events.append,
             limits=RecoveryLimits(geometry_retries=0, skill_replans=0, semantic_replans=1),
@@ -463,7 +465,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         registry = picklift_registry()
         runner = IncrementalTampRunner(
             semantic=semantic, registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, Domain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, Domain()),
             executor=executor, observer=Observer(("red_cube",)), trace=events.append,
             limits=RecoveryLimits(geometry_retries=0, skill_replans=1,
                                   semantic_replans=1),
@@ -499,7 +501,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         events = []
         runner = IncrementalTampRunner(
             semantic=Semantic(((self.holding,),)), registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, Domain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, Domain()),
             executor=executor, observer=Observer(("red_cube",)), trace=events.append,
             program_generator=RepositionGenerator(),
         )
@@ -546,7 +548,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         generator, executor, events = Generator(), ContactExecutor(), []
         runner = IncrementalTampRunner(
             semantic=Semantic(((self.holding,),)), registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, Domain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, Domain()),
             executor=executor, observer=Observer(("red_cube",)), trace=events.append,
             program_generator=generator, limits=RecoveryLimits(skill_replans=1),
         )
@@ -597,7 +599,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         events = []
         runner = IncrementalTampRunner(
             semantic=Semantic(((self.holding,),) * 3), registry=registry,
-            solver_factory=lambda world: SamplingSolver(registry, StationDomain()),
+            solver_factory=lambda world: Proc3sCCSPSolver(registry, StationDomain()),
             executor=executor, observer=MeasuredObserver(("red_cube",)), trace=events.append,
             program_generator=RepositionGenerator(),
             limits=RecoveryLimits(geometry_retries=0),
@@ -616,7 +618,7 @@ class OnlineRecoveryTest(unittest.TestCase):
         contexts = []
         registry = picklift_registry()
 
-        class Solver(SamplingSolver):
+        class Solver(Proc3sCCSPSolver):
             def solve(self, *args, **kwargs):
                 contexts.append(kwargs.get("failure_context"))
                 return super().solve(*args, **kwargs)

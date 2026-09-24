@@ -149,9 +149,7 @@ VLM 离线 success classifier 仍是 episode artifacts 的外部消费者；本�
   局部 IK 不提供任意目标可达性证明。违反类型/模型契约则直接异常，不吞错。
 
 左右臂可达目标的持续 abs 跟踪，世界 delta 平移/左旋转方向及 commanded-FK
-基准已在 `tests/test_cartesian_handoff.py` 做真实执行测试；目标来自合法关节
-配置的 FK，整条目标关节边已检查。只验收该小邻域最后1秒位置<1mm、姿态<1°，
-不宣称任意工作空间精度。结果入口见 progress 的整体验收表。
+Cartesian 接口不保证任意工作空间中的定位精度；实际目标仍须通过几何检查并在执行后验证。
 
 ## Task 携物与 RobotAdapter 契约
 
@@ -185,7 +183,7 @@ TAMP 的 `execute_validated_joint_goal(env=..., goal_positions=...)` 自动调�
 写死0.001。移动后同步已有针对性实际运行证据。它是静态直接边执行示例，
 不是动态重规划或完整 TAMP；单独持有 `build_planning_query()` 不会自动刷新。
 
-## 相机 hardening 契约（从已删除文档迁入）
+## 相机采样与观测契约
 
 - RobotSpec.cameras 定义安装与内参，ScenarioSpec.renderer 定义渲染器。
   `X_parent_camera_optical = X_parent_camera_mount @ X_mount_camera_optical`。
@@ -209,17 +207,3 @@ TAMP 的 `execute_validated_joint_goal(env=..., goal_positions=...)` 自动调�
 - hardening/慢相机移动腕部、版本fallback测试仍在测试集；移动底座继承同一
   CameraSystems。采样事件更新前图像与物理更新后同时间robot.q可差一个物理步，
   不能拿这个差异伪称外参错误或用最新pose覆盖缓存。
-
-## 版本化历史，不当成当前实测
-
-| 版本/阶段 | 当时验收范围 | 当前应如何使用 |
-| --- | --- | --- |
-| v0.1，25eb9a4 | 固定底座、导轨0.4m、单臂真实PickLift；固定3/3、扰动2/3，seed402是策略鲁棒性失败 | 历史记录，不能推导当前随机成功率；当时未验证第二真实机器人、PLACE、移动/导轨动力学 |
-| v0.2代码，23d656c | 可迁移相机、三相机几何/可见性人工验收及hardening | 后续相机改造应保留接口/采样契约，不代表完成视觉策略 |
-| v0.2本地/远端tag，682ba7c | 上述代码加中文全新clone Quickstart；23d656c之后两次仅文档提交 | 只读核验记录见progress；本轮不改tag |
-| b433ee6（v0.2之后的模型修复） | 修复指部contact几何、开口标定0.07628m、转换器v5 | v0.3继承该修复，首次运行需要生成本版本OBJ |
-| v0.3，API 0.3 | 配置/核心迁移、具名双臂、两底盘、静态导航、TAMP执行前同步 | 最终实现150项通过；固定PickLift一次回归不是扰动鲁棒性验证，详见[发布说明](RELEASE_ONLINE_ENV_V0.3.md) |
-
-历史回归目录：`output/online_env_final_audit/{fixed_pick_lift,randomized_pick_lift}`；
-相机图像/指标见 `docs/assets` 与相机清单。大型output是本地证据，不随Git交付。
-文档记录与仍存在的历史日志可引用，未重跑的实验不得改称本轮执行。

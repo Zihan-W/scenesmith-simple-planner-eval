@@ -56,13 +56,14 @@ def main(argv=None):
     parser.add_argument("--planner", choices=("bt", "tamp"), default="tamp")
     parser.add_argument("--tamp-mode", choices=("hierarchical", "legacy-vlm-domain"),
                         default="hierarchical")
-    parser.add_argument("--geometry-backend", choices=("sampling", "proc3s", "cutamp"),
-                        default="sampling")
+    parser.add_argument("--geometry-backend", choices=("proc3s", "cutamp"),
+                        default="proc3s", help="Geometry solver; default: proc3s")
     parser.add_argument("--shift-world-x-m", type=float, default=0.0,
                         help="Explicit target translation at reset, shared with validation")
     parser.add_argument("--cutamp-config", type=Path,
                         help="Explicit cuTAMP installation, model artifacts and GPU budgets")
-    parser.add_argument("--skill-planner", choices=("strips", "proc3s"), default="strips")
+    parser.add_argument("--skill-planner", choices=("strips", "proc3s"), default="proc3s",
+                        help="Program generator; default: proc3s")
     parser.add_argument("--request", type=Path, help="BT baseline generation request")
     parser.add_argument("--model-response", type=Path,
                         help="Recorded BT response for deterministic baseline tests")
@@ -244,50 +245,24 @@ def main(argv=None):
         experiment, seed=seed, shift_world_x_m=args.shift_world_x_m)
     if shift_protocol is not None:
         (output / "shift_protocol.json").write_text(json.dumps(shift_protocol, indent=2) + "\n")
-    task = experiment.environment_config.task_factory()
-    task = getattr(task, "task", task)
-    target = task.config.target_observation_name
-    registry = picklift_registry()
-    executor = SceneSmithSkillExecutor(
-        env=env, experiment=experiment, repository_root=repo,
-        output_root=output, observation=observation, reset_info=reset_info,
-        max_skill_steps=int(settings["max_skill_steps"]),
-        model_called=client is not None and not args.model_replay,
-        registry=registry, grasp_compensation=settings.get("grasp_compensation"),
-    )
-    scene_manifest = experiment.resolved_config["provenance"].get("scene_manifest")
-    observer = SceneSmithWorldObserver(
-        executor, target, output,
-        scene_metadata=Path(scene_manifest).with_name("scene_metadata.json")
-        if scene_manifest else None,
-    )
-    images = observer.capture_images(observation)
     debug_candidates = ()
     if args.base_candidate:
         debug_candidates = tuple(tuple(float(part) for part in value.split(","))
                                  for value in args.base_candidate)
 
     from .model_transcript import ReplayDivergence
-    from planner.src.tamp.application import build_runner
-    from planner.src.tamp.task_domain import PICK_LIFT_DOMAIN
-    runner = build_runner(semantic=semantic, client=client, settings=settings,
-        registry=registry, executor=executor, observer=observer, env=env,
+    from planner.src.tamp.application import create_session
+    session = create_session(semantic=semantic, client=client, settings=settings,
+        env=env, reset_info=reset_info, task=args.task,
         experiment=experiment, repository_root=repo, output_root=output, trace=trace,
         skill_planner=args.skill_planner, geometry_backend=args.geometry_backend,
-        seed=seed, cutamp_settings=cutamp_settings, base_candidates=debug_candidates)
+        seed=seed, cutamp_settings=cutamp_settings, base_candidates=debug_candidates,
+        model_called=client is not None and not args.model_replay,
+        deadline_monotonic_s=cli_start + recovery_limits.max_wall_time_s)
     if args.record_html:
         env.start_recording()
     try:
-        result = runner.run(
-            task=args.task,
-            task_goals=PICK_LIFT_DOMAIN.goals(target),
-            initial_observation=observation,
-            initial_geometry_state={"base_height_m":
-                experiment.environment_config.robot_adapter.base_config.base_height_m},
-            predicate_arity=registry.predicate_arity,
-            images=images,
-            deadline_monotonic_s=cli_start + recovery_limits.max_wall_time_s,
-        )
+        result = session.run()
     except ReplayDivergence as error:
         (output / "result.json").write_text(json.dumps({
             "planner": "tamp", "success": False, "reason": "model_replay_divergence",
@@ -297,6 +272,7 @@ def main(argv=None):
         }, indent=2) + "\n")
         return 2
     finally:
+        session.close()
         if client is not None:
             (output / "model_evidence.json").write_text(
                 json.dumps(client.evidence(), indent=2) + "\n")

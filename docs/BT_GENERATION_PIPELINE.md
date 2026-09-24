@@ -50,8 +50,8 @@ export OPENAI_API_KEY="你的密钥"
 `generated_bt.mmd`、`generated_bt.html`。输出目录已有任一同名文件时会拒绝覆盖。
 生成只验证 BT 结构和技能参数，不能代表仿真执行成功。
 
-新增 skill 时，在 `bt_core.py` 的 `SKILLS` 登记类型、参数和提示，并加入相应的
+新增 skill 时，在 `planner/src/bt/core.py` 的 `SKILLS` 登记类型、参数和提示，并加入相应的
 `PROFILE_SKILLS`，
 并在对应任务适配器中实现动作与计划参数校验。MDSL 解析、节点结构、
 sequence/selector tick、模型调用、重试、哈希绑定和产物写入均复用共享代码。
-新任务类型如需不同环境 schema，在 `bt_generation.py` 的 `PROFILES` 加入适配关系。
+新任务类型如需不同环境 schema，在 `planner/src/bt/generation.py` 的 `PROFILES` 加入适配关系。

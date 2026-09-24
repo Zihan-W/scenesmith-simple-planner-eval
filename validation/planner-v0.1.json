@@ -1,0 +1,85 @@
+{
+  "schema": "scenesmith.planner.release.v1",
+  "release_tag": "planner-v0.1",
+  "date": "2026-09-24",
+  "scope": "BT/TAMP planner module release; simulation package/API version unchanged",
+  "features": [
+    "TAMP automatic run and separate plan/execute session",
+    "PRoC3S defaults; optional STRIPS program generation and cuTAMP geometry",
+    "Independent sampling backend removed",
+    "Secret/artifact ignores and current-documentation cleanup"
+  ],
+  "validation": {
+    "tested_source_tree_sha256": "d4385dc5e3ca23e0827f4d457e97ea71b808f0e81c6b469466f0d2c260f0fa85",
+    "publication_changes": "Only documentation, .gitignore and this index since the tested snapshot",
+    "unchanged_non_document_files": 337,
+    "tests": {
+      "main": {
+        "log": "full-tests.log",
+        "total": 424,
+        "passed": 421,
+        "skipped": 3,
+        "seconds": 694.315
+      },
+      "isolated_torch": {
+        "log": "isolated-torch-tests.log",
+        "total": 10,
+        "passed": 10,
+        "skipped": 0,
+        "seconds": 0.005
+      }
+    },
+    "trials": [
+      {
+        "mode": "split-proc3s",
+        "geometry_backend": "proc3s",
+        "seed": 500,
+        "model_source": "strict_transcript_replay",
+        "success": true,
+        "reason": "task_goal_verified",
+        "result": "split-proc3s/trial/result.json",
+        "index": "split-proc3s/index.json"
+      },
+      {
+        "mode": "auto-cutamp",
+        "geometry_backend": "cutamp",
+        "seed": 500,
+        "model_source": "strict_transcript_replay",
+        "success": true,
+        "reason": "task_goal_verified",
+        "result": "auto-cutamp/seed_500/result.json",
+        "index": "auto-cutamp/index.json"
+      }
+    ],
+    "publication_checks": {
+      "ignore_probes": 70,
+      "validated_runtime_files_unchanged": 337,
+      "local_links": "passed",
+      "credential_scan_blobs": 1974,
+      "credential_findings": 0,
+      "reference_source_tree_sha256": "d4385dc5e3ca23e0827f4d457e97ea71b808f0e81c6b469466f0d2c260f0fa85"
+    }
+  },
+  "documentation": {
+    "removed_files": 43,
+    "guides_retained": 10,
+    "json_schemas_retained": 2
+  },
+  "assets_policy": "Keep tracked models/21-20-10_cleaned; preserve models/Zerith_Model submodule",
+  "evidence": {
+    "location": "/root/workspace/scenesmith-simple-planner-eval/runs/tamp-module-no-sampling-20260924",
+    "distribution": "Run evidence is local and intentionally excluded from Git",
+    "sha256": {
+      "full-tests.log": "6b3234ada3aef2b7e4a0cb9bcffed1b76d7bde86261c69800ba95df49e6d972f",
+      "isolated-torch-tests.log": "485fb109679baea0b202e179e835b25695dd5c8ebb3fbe24190e2d59d5b3a51f",
+      "index.json": "b53c6e4d43707ed2dd633d34193934783da563c42d07e74251f04ce17d965250",
+      "split-proc3s/provenance/validated_sources.tar.gz": "a08472adba4646d93713ef27a2b4c950c37730fd5849d895ba1cd438e76e13e9",
+      "auto-cutamp/provenance/validated_sources.tar.gz": "56f69ca1455a8cfafa61b0cb4d1d51a0f220d9660fe542d3c2b1b6fb33cd52da"
+    }
+  },
+  "limits": [
+    "Seed 500 tests used strict model transcript replay, not fresh provider calls",
+    "No cross-machine fresh CUDA build validation",
+    "Exact postchecks and existing robot control boundaries retained"
+  ]
+}

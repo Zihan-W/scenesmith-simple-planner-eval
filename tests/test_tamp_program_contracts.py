@@ -4,7 +4,11 @@ import dataclasses
 import json
 import unittest
 
-from planner.src.tamp.geometry import ExternalGeometrySolverAdapter, SamplingSolver
+from tamp_fixtures import FiniteCandidateDomain
+
+from planner.src.tamp.ccsp import Proc3sCCSPSolver
+
+from planner.src.tamp.geometry import ExternalGeometrySolverAdapter
 from planner.src.tamp.hierarchy import (
     SkillRegistry, SkillSpec, WorldState, parse_skill_program,
 )
@@ -13,7 +17,8 @@ from planner.src.tamp.hierarchy import (
 class SkillProgramContractTest(unittest.TestCase):
     def setUp(self):
         self.registry = SkillRegistry((SkillSpec(
-            "Transfer", ("object", "destination"), ("offset",), (), ()),))
+            "Transfer", ("object", "destination"), ("offset",), (), (),
+            domain_samplers={"offset": "transfer_offsets"}),))
         self.world = WorldState({"cube": {}, "bin": {}}, frozenset())
         self.document = {"schema": "scenesmith.tamp.skill_program.v2", "steps": [
             {"skill": "Transfer", "arguments": {"object": "cube", "destination": "bin"},
@@ -36,7 +41,7 @@ class SkillProgramContractTest(unittest.TestCase):
             self.parse()
 
     def solve(self):
-        class Domain:
+        class Domain(FiniteCandidateDomain):
             def samples(self, skill, state):
                 for offset in ((2, 1) if state.get("first_done") else (1,)):
                     yield {"offset": offset}
@@ -51,14 +56,14 @@ class SkillProgramContractTest(unittest.TestCase):
                 return {**state, "first_done": True}
 
         program = self.parse()
-        result = SamplingSolver(self.registry, Domain()).solve(self.world, program, {})
+        result = Proc3sCCSPSolver(self.registry, Domain()).solve(self.world, program, {})
         return program, result
 
     def test_shared_variable_is_not_overwritten_by_later_skill(self):
         _, result = self.solve()
         self.assertEqual(result.assignments, {"shared_offset": 1})
         self.assertEqual([action.geometric_parameters["offset"] for action in result.actions], [1, 1])
-        self.assertEqual(result.constraints[0].constraint, "shared_variable_conflict")
+        self.assertEqual(result.constraints, ())
 
     def test_external_adapter_rejects_changed_symbolic_task(self):
         program, result = self.solve()

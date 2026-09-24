@@ -46,7 +46,7 @@ that the camera child-link axes already use the optical convention: the broad
 camera body spans local X/Y, lies primarily behind local Z=0, and its small
 positive-Z face points along the rendered viewing direction. Therefore the
 Zerith Adapter explicitly sets `X_mount_camera_optical = Identity`. This is a
-Zerith simulation calibration choice verified below, not a default supplied
+Zerith simulation calibration choice, not a default supplied
 by `CameraSpec` and not a claim about factory hardware calibration.
 
 The resulting transforms are:
@@ -71,26 +71,6 @@ neck_pitch_link -> head camera optical
  [ 0.000000000,  0.000000000,  0.000000000,  1.000000000]]
 ```
 
-## Numerical projection validation
-
-The self-contained DMDs in `models/zerith_camera_calibration` place a red
-target at optical `(0, 0, 1.0) m`, a green target at `(0.2, 0, 1.0) m`, and a
-blue target at `(0, 0.15, 1.0) m`. All target plates are 0.02 m thick, so their
-front face is at Z=0.99 m.
-
-All three cameras produced the same projection result:
-
-| Target | Theoretical pixel (u,v) | Label bbox center (u,v) | Error (px) | Measured front depth (m) |
-| --- | --- | --- | --- | --- |
-| center | `(159.500, 119.500)` | `(159.0, 119.0)` | `0.707107` | `0.990000248` |
-| right | `(201.069, 119.500)` | `(200.5, 119.0)` | `0.757635` | `0.990000248` |
-| down | `(159.500, 150.677)` | `(159.0, 150.5)` | `0.530376` | `0.990000248` |
-
-The expected pixel of every target simultaneously contains its dominant RGB
-channel, its own render label, and finite metric depth. Full matrices,
-bounding boxes, visible labels, and per-camera metrics are recorded in
-`docs/assets/zerith_camera_calibration/calibration_metrics.json`.
-
 ## Simulation camera assumptions
 
 Neither URDF contains `<sensor>` or Gazebo camera elements. It therefore
@@ -113,10 +93,3 @@ Drake's optical convention is +X right, +Y down, and +Z forward. Hardware
 intrinsics, distortion, latency, and any measured hardware mount correction
 remain unknown and must be supplied before claiming real-camera
 correspondence.
-
-At the validated PickLift PREGRASP, the zero neck-pitch pose already sees the
-coffee-table work area (6409 table-label pixels). The left wrist camera sees
-the red target clearly (4097 target-label pixels). A forced neck-pitch offset
-is therefore not needed for this scene. `locked_joint_position_overrides`
-remains available in `ZerithEnvironmentConfig` for a scene that genuinely
-needs a different fixed neck pose.

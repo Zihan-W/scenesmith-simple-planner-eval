@@ -14,7 +14,7 @@ from urllib.error import HTTPError, URLError
 import numpy as np
 from planner.src.bt.generation import OpenAICompatibleChatClient, ProviderError
 from planner.src.tamp.cutamp import order_postcheck_candidates, postcheck_cutamp_candidates
-from planner.src.tamp.geometry import SamplingSolver
+from planner.src.tamp.ccsp import Proc3sCCSPSolver
 from planner.src.tamp.hierarchy import PredicateGoal, SkillProgram, SkillStep, picklift_registry
 from planner.src.tamp.online import IncrementalTampRunner, RecoveryLimits
 from planner.src.tamp.provenance import record_validation_commit
@@ -53,7 +53,7 @@ class ReliabilityTests(unittest.TestCase):
                     return (holding,)
             events=[]; semantic=Semantic(); executor=Executor(initial)
             runner=IncrementalTampRunner(semantic=semantic,registry=picklift_registry(),
-                solver_factory=lambda world:SamplingSolver(picklift_registry(),Domain()),
+                solver_factory=lambda world:Proc3sCCSPSolver(picklift_registry(),Domain()),
                 executor=executor,observer=Observer(('red_cube',)),trace=events.append,
                 limits=RecoveryLimits(provider_retry_delay_s=0))
             result=runner.run(task='pick',task_goals=(holding,),initial_observation=initial,
@@ -164,17 +164,6 @@ class ReliabilityTests(unittest.TestCase):
             self.assertEqual(git('show',evidence['validation_commit']+':experiments/cutamp/upstream-local.patch'),
                              b'upstream delta\n')
 
-    def test_unsupported_backend_does_not_ignore_subdomain(self):
-        from test_tamp_online import Domain
-        from test_tamp_proc3s import PRoC3SProgramTest
-        from planner.src.tamp.geometry import GeometricUnsat
-        fixture=PRoC3SProgramTest();fixture.setUp()
-        fixture.document['domains'][1]['subdomain']={'lateral':[.3,.7]}
-        program=fixture.parse()
-        with self.assertRaises(GeometricUnsat) as caught:
-            SamplingSolver(fixture.registry,Domain()).solve(fixture.world,program,{})
-        self.assertFalse(caught.exception.retryable_search)
-        self.assertEqual(caught.exception.constraints[0].reason,'unsupported_subdomain')
 
     def test_declared_grasp_subdomain_reaches_ccsp(self):
         from test_tamp_proc3s import PRoC3SProgramTest
@@ -211,7 +200,7 @@ class ReliabilityTests(unittest.TestCase):
                 self.calls+=1
                 raise PRoC3SGenerationFailure('fixture',provider_failure={'kind':'timeout','retryable':True})
         executor=Executor(initial);generator=Generator(picklift_registry())
-        runner=IncrementalTampRunner(semantic=Semantic(),registry=picklift_registry(),solver_factory=lambda w:SamplingSolver(picklift_registry(),Domain()),executor=executor,observer=Observer(('red_cube',)),trace=lambda e:None,limits=RecoveryLimits(provider_retry_delay_s=0),program_generator=generator)
+        runner=IncrementalTampRunner(semantic=Semantic(),registry=picklift_registry(),solver_factory=lambda w:Proc3sCCSPSolver(picklift_registry(),Domain()),executor=executor,observer=Observer(('red_cube',)),trace=lambda e:None,limits=RecoveryLimits(provider_retry_delay_s=0),program_generator=generator)
         result=runner.run(task='pick',task_goals=(holding,),initial_observation=initial,initial_geometry_state={},predicate_arity={'holding':1})
         self.assertEqual(result.reason,'provider_retry_exhausted');self.assertEqual(result.metrics['provider_stage_retries'],2)
         self.assertEqual(generator.calls,2);self.assertEqual(executor.calls,[])

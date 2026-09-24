@@ -50,7 +50,7 @@
 
 ## 受限 gen_domain 位置反馈
 
-cuTAMP 精确后验、PRoC3S CCSP 和普通采样器在真实几何失败时，通过 SceneSmith 域提取已检查控制参数的归一化位置。位置坐标沿用已注册 FULL envelope；不是当前缩小子域，也不是世界坐标。NavigateToPick 提供 forward/lateral，PickLift 提供 grasp lateral 投影。后者不包含手臂关节配置，不能推断相同 lateral 的其他抓姿失败。
+cuTAMP 精确后验、PRoC3S CCSP 在真实几何失败时，通过 SceneSmith 域提取已检查控制参数的归一化位置。位置坐标沿用已注册 FULL envelope；不是当前缩小子域，也不是世界坐标。NavigateToPick 提供 forward/lateral，PickLift 提供 grasp lateral 投影。后者不包含手臂关节配置，不能推断相同 lateral 的其他抓姿失败。
 
 ProgramFailure 最多携带八个不同的 sampled_failure_positions；每个包括原 program_step、已声明 variable/sampler、位置与白名单失败类别。接收端验证数值范围、物体绑定和与当前 world 一致的物理快照 token；裁掉导航前缀的当前位置抓取检查，会把 solver step 0 映回模型程序 step 1，无法唯一映射则丢弃。物理状态已改变的历史位置不进入新请求。语义 VLM 不接收这些数值。模型可据此提出注册范围内的 subdomain 修订；精确检查和子域约束继续生效。
 
@@ -84,21 +84,11 @@ finalized selection file has no selection entry. Dynamic task success and
 execution metrics remain separate. These are static ranking proxies, not a
 calibrated grasp-success probability.
 
-The historical seed 500 / solve 001 same-input comparison is backfilled in
-`validation/cutamp-20260923.json`, with original artifact hashes. First-pass
-changes particle 57 to 6: gap imbalance 9.727 → 24.695 mm, minimum lift joint
-margin 0.361595 → 0.326482 rad, absolute offset 6.989 → 14.586 mm. All three
-static components worsen, although this run's dynamic outcome improves. This
-is one paired observation, not a population quality-loss estimate. The second
-solves have different observed states and must not be presented as same-input
-quality comparisons. Original run files and archives remain immutable.
-
 `result.json`, and the acceptance summary/index trial, also expose
 `cutamp_settings` (the resolved full configuration) and `grasp_compensation`
 (null when disabled). `selection_config_recorded: false` distinguishes a
 worker terminated before recording its configuration from a configured run.
-For all five historical trials, the sibling `cutamp_seed_*.json` agrees exactly
-with that run's `planner_config.json.cutamp`; both locations exist for all
-strategies. The root acceptance `planner_config.json` is an input, whereas the
-per-seed file is the resolved configuration. Consumers should use result/index
-fields instead of inferring effective settings from an arbitrary input file.
+The root acceptance `planner_config.json` is an input, whereas the per-seed
+`planner_config.json` contains the resolved configuration. Consumers should use
+result/index fields instead of inferring effective settings from an arbitrary
+input file.

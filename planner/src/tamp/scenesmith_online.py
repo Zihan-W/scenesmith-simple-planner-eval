@@ -151,6 +151,22 @@ class SceneSmithSkillExecutor:
         """Stop issuing new skill commands after the run's wall-time limit."""
         self.deadline_monotonic_s = deadline_monotonic_s
 
+    def planning_state_token(self):
+        """Bind a split plan to the current public observation and episode state.
+
+        Observation identity changes on every public step/reset, including a
+        reset to identical coordinates. Its value digest also detects mutable
+        observation edits. Direct private-backend mutation is not supported.
+        """
+        current = self.env.observation
+        if current is not self.observation:
+            from .session import StalePlanError
+            raise StalePlanError('Environment advanced outside the TAMP executor')
+        values = {'observation': current.as_dict(),
+                  'last_navigation_goal': self.last_navigation_goal}
+        digest = hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
+        return id(current), digest
+
     def execute(self, action) -> SkillExecution:
         spec = self.registry[action.skill_name]
         if set(action.symbolic_args) != set(spec.symbolic_parameters):

@@ -3,7 +3,7 @@ import unittest
 from types import SimpleNamespace
 from planner.src.tamp.scenesmith_online import failed_pick_recovery_status, SceneSmithWorldObserver
 from planner.src.tamp.hierarchy import PredicateGoal, picklift_registry
-from planner.src.tamp.geometry import SamplingSolver
+from planner.src.tamp.ccsp import Proc3sCCSPSolver
 from planner.src.tamp.online import IncrementalTampRunner, SkillExecution
 from test_tamp_online import Semantic, Domain, Observer, Executor
 
@@ -42,7 +42,7 @@ class RecoveryPreconditionsTest(unittest.TestCase):
                     return SkillExecution(frozenset(self.facts),False,'planned_bilateral_contact_timeout',failure_details={'recovery_preconditions':{'allowed':False,'blockers':['target_finger_contact']}})
                 return super().execute(action)
         executor=ContactFailureExecutor((seen,empty));events=[];registry=picklift_registry()
-        runner=IncrementalTampRunner(semantic=Semantic(((holding,), (holding,), (holding,))),registry=registry,solver_factory=lambda world:SamplingSolver(registry,Domain(),batch_size=2),executor=executor,observer=Observer(('red_cube',)),trace=events.append)
+        runner=IncrementalTampRunner(semantic=Semantic(((holding,), (holding,), (holding,))),registry=registry,solver_factory=lambda world:Proc3sCCSPSolver(registry,Domain(),seed=1),executor=executor,observer=Observer(('red_cube',)),trace=events.append)
         result=runner.run(task='pick red_cube',task_goals=(holding,),initial_observation=frozenset((seen,empty)),initial_geometry_state={'base_height_m':.18},predicate_arity={'holding':1,'observed':1,'gripper_empty':0})
         self.assertEqual(result.reason,'recovery_preconditions_failed');self.assertFalse(result.success)
         self.assertEqual(executor.calls,['NavigateToPick','PickLift'])

@@ -3,6 +3,10 @@
 import json
 import unittest
 
+from tamp_fixtures import FiniteCandidateDomain
+
+from planner.src.tamp.ccsp import Proc3sCCSPSolver
+
 from planner.src.tamp.hierarchy import (
     PredicateGoal, SkillRegistry, SkillSpec, WorldState, parse_semantic_goals,
     picklift_registry, refine_goals,
@@ -11,7 +15,7 @@ from planner.src.tamp.semantic import (
     ModelSettings, SemanticModelError, SemanticSubgoalPlanner,
 )
 from planner.src.tamp.geometry import (
-    GeometricUnsat, SamplingSolver, abstract_constraint_feedback,
+    GeometricUnsat, abstract_constraint_feedback,
 )
 
 
@@ -49,36 +53,6 @@ class HierarchicalContractsTest(unittest.TestCase):
             "semantic_model_request", "semantic_model_error",
             "semantic_model_request", "semantic_model_response"])
 
-    def test_batch_ranking_and_trace_include_every_evaluated_candidate(self):
-        obj = ("$object",)
-        registry = SkillRegistry((SkillSpec(
-            "Reach", ("object",), ("distance",), (),
-            (PredicateGoal("reachable", obj),)),))
-        world = WorldState({"cube": {}}, frozenset())
-        program = refine_goals(world, (PredicateGoal("reachable", ("cube",)),), registry)
-
-        class Domain:
-            def samples(self, skill, state):
-                yield {"distance": 3.0}
-                yield {"distance": 1.0}
-                yield {"distance": 2.0}
-
-            def check(self, skill, candidate, state):
-                valid = candidate["distance"] != 2.0
-                return valid, "valid" if valid else "collision", {}
-
-            def rank_candidate(self, skill, candidate, checks):
-                return (candidate["distance"],)
-
-            def predict(self, skill, candidate, state):
-                return state
-
-        events = []
-        result = SamplingSolver(registry, Domain(), trace=events.append).solve(world, program, {})
-        self.assertEqual(result.assignments["distance_0"], 1.0)
-        self.assertEqual(len(events), 3)
-        self.assertEqual([e["feasible"] for e in events], [True, True, False])
-        self.assertEqual(result.constraints[0].constraint, "collision")
 
     def test_basic_pick_inserts_prerequisite_and_keeps_geometry_open(self):
         world = WorldState(
@@ -160,7 +134,7 @@ class HierarchicalContractsTest(unittest.TestCase):
             )
 
     def test_geometry_solver_tries_next_candidate_without_changing_skill(self):
-        class Domain:
+        class Domain(FiniteCandidateDomain):
             def __init__(self):
                 self.checked = []
 
@@ -193,7 +167,7 @@ class HierarchicalContractsTest(unittest.TestCase):
             world, (PredicateGoal("holding", ("red_cube",)),), picklift_registry()
         )
         domain = Domain()
-        solver = SamplingSolver(picklift_registry(), domain, batch_size=2)
+        solver = Proc3sCCSPSolver(picklift_registry(), domain, seed=1)
         result = solver.solve(world, program, {"base_height_m": 0.18})
         self.assertEqual([action.skill_name for action in result.actions],
                          ["NavigateToPick", "PickLift"])
@@ -207,7 +181,7 @@ class HierarchicalContractsTest(unittest.TestCase):
                 return False, "ik", {"message": "unreachable"}
 
         with self.assertRaises(GeometricUnsat) as failure:
-            SamplingSolver(picklift_registry(), InfeasibleDomain()).solve(
+            Proc3sCCSPSolver(picklift_registry(), InfeasibleDomain()).solve(
                 world, program, {"base_height_m": 0.18})
         self.assertTrue(failure.exception.constraints)
         abstract = abstract_constraint_feedback(

@@ -11,10 +11,6 @@
     "max_attempts": 3,
     "response_format": "json_object"
   },
-  "sampling": {
-    "max_candidates": 128,
-    "batch_size": 8
-  },
   "recovery": {
     "semantic_replans": 0,
     "skill_replans": 1,
