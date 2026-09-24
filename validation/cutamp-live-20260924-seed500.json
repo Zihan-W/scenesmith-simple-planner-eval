@@ -1,0 +1,97 @@
+{
+  "schema": "cutamp.acceptance_index.v1",
+  "source_tree_sha256": "71de4925403a163dae13f58e16f68e84253bfa294084ace14d73d9b8855ced6f",
+  "validation_commit": "0fd340547e247154cd50f6cc4073b0db28dcdc7c",
+  "planned_seeds": [
+    500
+  ],
+  "completed": 1,
+  "successes": 0,
+  "success_rate": 0.0,
+  "wilson_95_interval": [
+    0.0,
+    0.7934506856227626
+  ],
+  "reasons": {
+    "provider_retry_exhausted": 1
+  },
+  "adaptive_postcheck": null,
+  "postcheck_quality_window": 0,
+  "model_mode": "live_record",
+  "repeats": 1,
+  "experiment": "/root/workspace/scenesmith-simple-planner-eval/experiments/navigation_picklift_tamp.json",
+  "task": "Pick up the red object and hold it.",
+  "shift_world_x_m": 0.1,
+  "replay_divergences": 0,
+  "interval_assumption": "descriptive_only; repeated seeds/transcripts are correlated, not independent Bernoulli samples",
+  "scope": "live_model_and_execution_joint_outcome; not physics-only reliability",
+  "trials": [
+    {
+      "seed": 500,
+      "repetition": 0,
+      "model": {
+        "mode": "live_record",
+        "logical_calls": 11,
+        "live_provider_calls": 11,
+        "replay_sha256": null,
+        "transcript_sha256": "6d01dc64eb4a1e319109faf47f027373f74b745f1433ab460ff50d634c9cd034",
+        "recorded_calls": 11,
+        "unused_recorded_calls": 0,
+        "replay_scope": null,
+        "divergence": null,
+        "timing": "recorded_provider_latency_not_replayed"
+      },
+      "worker_seed_first_solve": 500,
+      "returncode": 2,
+      "success": false,
+      "reason": "provider_retry_exhausted",
+      "metrics": {
+        "task_success": false,
+        "subgoal_success": 0,
+        "skill_success": 0,
+        "semantic_planning_latency_s": 140.24177958699875,
+        "skill_planning_latency_s": 183.622538576019,
+        "geometry_solving_latency_s": 0.0,
+        "execution_time_s": 0.0,
+        "num_semantic_replans": 0,
+        "num_skill_replans": 0,
+        "num_geometry_retries": 0,
+        "num_skill_retries": 0,
+        "num_constraint_failures": 0,
+        "skill_executions": 0,
+        "vlm_calls": 5,
+        "llm_calls": 6,
+        "wall_time_budget_s": 1200.0,
+        "provider_stage_retries": 2,
+        "wall_time_s": 323.86503669500235
+      },
+      "selections": [],
+      "cutamp_selections": [],
+      "cutamp_settings": {
+        "gpu_python": "/root/workspace/references/paper-aligned-20260919/venv/bin/python",
+        "cutamp_root": "/root/workspace/references/paper-aligned-20260919/cuTAMP-scenesmith",
+        "kinematics_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/kinematics.json",
+        "robot_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/robot.json",
+        "multipliers": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/multipliers.json",
+        "tolerances": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/tolerances.json",
+        "grasp_calibration": "/root/workspace/scenesmith-simple-planner-eval/experiments/inputs/pick_lift/pick_lift_calibration.json",
+        "num_particles": 64,
+        "num_opt_steps": 2000,
+        "conf_lr": 0.001,
+        "max_postchecks": 24,
+        "seed": 500,
+        "integrity_manifest": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/integrity.json",
+        "solve_timeout_s": 360.0,
+        "postcheck_timeout_s": 180.0,
+        "postcheck_order": "cost_quantiles",
+        "reuse_navigation_pick_witness": true,
+        "postcheck_quality_window": 0,
+        "adaptive_postcheck": null
+      },
+      "grasp_compensation": null,
+      "selection_config_recorded": true,
+      "source_unchanged": true,
+      "result": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-live-20260924-seed500/seed_500/result.json"
+    }
+  ]
+}
