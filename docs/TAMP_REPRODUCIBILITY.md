@@ -59,3 +59,46 @@ ProgramFailure 最多携带八个不同的 sampled_failure_positions；每个包
 ## 可复用验收入口
 
 `validate_cutamp_online` 的 `--experiment PATH --task TEXT --shift-world-x-m VALUE` 可覆盖现有抓取实验默认值。换 seed、对象、起始扰动或任务阈值时复用任务/实验配置与脚本，无需复制验收实现。仍须由已注册的 TAMP 域支持实验的任务与技能；当前生产域是 NavigateToPick/PickLift，并非任意自然语言任务的自动判定器。新的任务类别应实现领域适配、成功谓词及技能安全检查，通用记录/回放、预算监督和证据统计层继续复用。
+
+## Selection quality evidence
+
+The formal `experiments/cutamp/config.json` explicitly sets
+`postcheck_quality_window: 0` (first complete exact pass). `null` scores feasible
+candidates until the existing time/count budget ends; a positive integer admits
+that many more checks after the first pass. Adaptive budget remains optional.
+
+Each `candidate_selection.json`, top-level `result.json.cutamp_selections`, and
+acceptance `summary.json` / `index.json` trial records the solve identifier,
+`selection_policy`, selected particle, `selected_score`, and named
+`selected_quality`. Policy names are `first_pass`, `quality_window`, or
+`full_budget`, prefixed with `adaptive_` when enabled; `adaptive_final_mode`
+records the final mode separately, and `stop_reason` records the actual stop.
+
+The raw tuple is minimized lexicographically:
+`[gap_imbalance_m, negative_min_lift_joint_margin_rad, abs_grasp_lateral_offset_m]`.
+Named quality exposes positive joint margin (larger is better); smaller gap
+imbalance and absolute lateral offset are preferred. Gap imbalance is the
+difference between finger gaps, **not obstacle clearance**. No selected candidate
+is represented by null, never a zero score; an interrupted solve without a
+finalized selection file has no selection entry. Dynamic task success and
+execution metrics remain separate. These are static ranking proxies, not a
+calibrated grasp-success probability.
+
+The historical seed 500 / solve 001 same-input comparison is backfilled in
+`validation/cutamp-20260923.json`, with original artifact hashes. First-pass
+changes particle 57 to 6: gap imbalance 9.727 → 24.695 mm, minimum lift joint
+margin 0.361595 → 0.326482 rad, absolute offset 6.989 → 14.586 mm. All three
+static components worsen, although this run's dynamic outcome improves. This
+is one paired observation, not a population quality-loss estimate. The second
+solves have different observed states and must not be presented as same-input
+quality comparisons. Original run files and archives remain immutable.
+
+`result.json`, and the acceptance summary/index trial, also expose
+`cutamp_settings` (the resolved full configuration) and `grasp_compensation`
+(null when disabled). `selection_config_recorded: false` distinguishes a
+worker terminated before recording its configuration from a configured run.
+For all five historical trials, the sibling `cutamp_seed_*.json` agrees exactly
+with that run's `planner_config.json.cutamp`; both locations exist for all
+strategies. The root acceptance `planner_config.json` is an input, whereas the
+per-seed file is the resolved configuration. Consumers should use result/index
+fields instead of inferring effective settings from an arbitrary input file.

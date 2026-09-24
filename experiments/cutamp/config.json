@@ -15,5 +15,6 @@
   "solve_timeout_s": 360.0,
   "postcheck_timeout_s": 180.0,
   "postcheck_order": "cost_quantiles",
-  "reuse_navigation_pick_witness": true
+  "reuse_navigation_pick_witness": true,
+  "postcheck_quality_window": 0
 }

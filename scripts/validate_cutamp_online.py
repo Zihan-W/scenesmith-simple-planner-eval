@@ -89,12 +89,16 @@ def main():
         trials.append({'seed': seed, 'repetition': repetition, 'model': model, 'worker_seed_first_solve': seed, 'returncode': code,
                        'success': bool(result['success']), 'reason': result['reason'],
                        'metrics': result.get('metrics', {}), 'selections': selections,
+                       'cutamp_selections': result['cutamp_selections'],
+                       'cutamp_settings': result['cutamp_settings'],
+                       'grasp_compensation': result['grasp_compensation'],
+                       'selection_config_recorded': result['selection_config_recorded'],
                        'source_unchanged': unchanged, 'result': str(run / 'result.json')})
         n = len(trials); k = sum(item['success'] for item in trials)
         z = 1.959963984540054
         center = (k/n + z*z/(2*n))/(1+z*z/n)
         margin = z*((k/n)*(1-k/n)/n+z*z/(4*n*n))**.5/(1+z*z/n)
-        save(output / 'summary.json', {'source_tree_sha256': evidence['source_tree_sha256'],
+        summary = {'source_tree_sha256': evidence['source_tree_sha256'],
              'validation_commit': evidence['validation_commit'], 'planned_seeds': args.seeds,
              'completed': n, 'successes': k, 'success_rate': k/n,
              'wilson_95_interval': [center-margin, center+margin] if args.repeats == 1 and not replaying else None,
@@ -108,7 +112,10 @@ def main():
              'interval_assumption': 'descriptive_only; repeated seeds/transcripts are correlated, not independent Bernoulli samples',
              'scope': ('fixed_recorded_model_conditional_execution; report per seed and transcript; not live-model reliability'
                        if replaying else 'live_model_and_execution_joint_outcome; not physics-only reliability'),
-             'trials': trials})
+             'trials': trials}
+        save(output / 'summary.json', summary)
+        # Keep the machine-readable acceptance index on the same per-trial contract.
+        save(output / 'index.json', {'schema': 'cutamp.acceptance_index.v1', **summary})
         print(json.dumps({'seed': seed, 'success': result['success'], 'reason': result['reason']}), flush=True)
     print(f'Acceptance complete: {output / "summary.json"}', flush=True)
 

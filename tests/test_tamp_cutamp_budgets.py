@@ -73,7 +73,7 @@ class BudgetTests(unittest.TestCase):
                 if params['grasp_arm_joint_positions'][0] > 1:
                     raise GeometryDeadlineExceeded()
                 return True, 'valid', {'ik':{'grasp_pose_in_target':{'arm_joint_positions':[1.]}}}
-            def rank_candidate(self,*args): return (0,)
+            def rank_candidate(self,*args): return (0, -0.1, 0)
             def predict(self,*args): return {}
         world=SimpleNamespace(objects={'target':{}}, robot={'base_link_pose':{
             'translation_m':[0,0,.2], 'quaternion_wxyz':[1,0,0,0]}})

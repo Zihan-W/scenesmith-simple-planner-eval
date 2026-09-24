@@ -20,6 +20,7 @@ from planner.src.tamp.online import (
 from planner.src.tamp.scenesmith_online import (
     SceneSmithSkillExecutor, SceneSmithWorldObserver,
 )
+from planner.src.tamp.selection_evidence import collect_run_selection_evidence
 from planner.src.tamp.semantic import ModelSettings, SemanticSubgoalPlanner
 from simulation.src.io.experiment import load_experiment
 from simulation.src.runtime.factory import make_env
@@ -292,6 +293,7 @@ def main(argv=None):
             "planner": "tamp", "success": False, "reason": "model_replay_divergence",
             "detail": str(error), "seed": seed, "model_source": "strict_replay",
             "model_evidence": client.evidence(),
+            **collect_run_selection_evidence(output),
         }, indent=2) + "\n")
         return 2
     finally:
@@ -312,6 +314,7 @@ def main(argv=None):
         "model_evidence": client.evidence() if client is not None else None,
         "success": result.success, "reason": result.reason,
         "metrics": dict(result.metrics),
+        **collect_run_selection_evidence(output),
         "final_facts": [dataclasses.asdict(fact) for fact in result.world.facts],
     }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({"success": result.success, "reason": result.reason,

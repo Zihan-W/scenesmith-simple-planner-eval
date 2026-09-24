@@ -32,7 +32,7 @@ class CuTAMPIntegrationTests(unittest.TestCase):
 
             def rank_candidate(self, skill, parameters, checks):
                 del skill, checks
-                return (-parameters["grasp_lateral_offset_m"],)
+                return (-parameters["grasp_lateral_offset_m"], -0.1, 0.0)
 
         world = SimpleNamespace(objects={"target": {}}, robot={"base_link_pose": {
             "translation_m": [0, 0, 0.2], "quaternion_wxyz": [1, 0, 0, 0]}})
@@ -58,6 +58,10 @@ class CuTAMPIntegrationTests(unittest.TestCase):
                 self.assertEqual(selection["first_pass_particle"], 0)
                 self.assertEqual(selection["selected_particle"], expected_particle)
                 self.assertFalse(selection["count_exhausted"])
+                self.assertEqual(selection["selection_policy"],
+                    "full_budget" if window is None else "first_pass" if window == 0 else "quality_window")
+                self.assertEqual(selection["selected_score"], [-expected_particle * .001, -.1, 0.0])
+                self.assertEqual(selection["selected_quality"]["min_lift_joint_margin_rad"], .1)
                 self.assertEqual(plan.actions[0].geometric_parameters[
                     "grasp_arm_joint_positions"], [0.1 + expected_particle])
 
@@ -98,7 +102,7 @@ class CuTAMPIntegrationTests(unittest.TestCase):
                 return {}
 
             def rank_candidate(self, *args):
-                return (0,)
+                return (0, -0.1, 0)
 
         world = SimpleNamespace(objects={"target": {}}, robot={"base_link_pose": {
             "translation_m": [0, 0, 0.2], "quaternion_wxyz": [1, 0, 0, 0]}})

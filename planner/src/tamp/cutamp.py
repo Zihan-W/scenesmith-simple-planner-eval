@@ -20,6 +20,7 @@ import numpy as np
 from simulation.src import Pose
 from simulation.src.robots.adapters.description import drake_pose
 
+from .selection_evidence import selection_evidence
 from .cutamp_problem import ContinuousProblemBuilder
 from .subdomains import validate_program_subdomains, candidate_in_subdomain
 from .cutamp_base_domain import base_domain_halfspaces
@@ -383,7 +384,7 @@ def postcheck_cutamp_candidates(registry, domain, world, program, candidates, in
     # Count exhaustion is independent of the reason chosen to stop. A quality
     # window and the count limit can be reached by the same completed check.
     count_exhausted = len(checks) >= max_postchecks and len(checks) < len(ordered)
-    (Path(output) / "candidate_selection.json").write_text(json.dumps({
+    selection = {
         "max_postchecks": max_postchecks,
         "stop_reason": stopped_by,
         "count_exhausted": count_exhausted,
@@ -400,7 +401,10 @@ def postcheck_cutamp_candidates(registry, domain, world, program, candidates, in
         "selection_score": "existing_domain_gap_imbalance_then_lift_joint_margin_then_offset",
         "selected_particle": selected[3] if selected is not None else None,
         "selected_score": selected[0] if selected is not None else None,
-        "configuration_replaced_by_ik": False}, indent=2) + "\n")
+        "configuration_replaced_by_ik": False}
+    selection.update(selection_evidence(selection))
+    (Path(output) / "candidate_selection.json").write_text(
+        json.dumps(selection, indent=2) + "\n")
     plan = ParameterizedSkillPlan(selected[1], selected[2], tuple(failures)) if selected else None
     return plan, checks, tuple(failures)
 

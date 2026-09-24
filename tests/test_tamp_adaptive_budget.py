@@ -42,7 +42,7 @@ class AdaptiveBudgetTests(unittest.TestCase):
             def check(self, skill, params, state):
                 q = params['grasp_arm_joint_positions']
                 return q[0] > 0, 'valid' if q[0] > 0 else 'collision', {'ik':{'grasp_pose_in_target':{'arm_joint_positions':q}}}
-            def rank_candidate(self, *args): return (0,)
+            def rank_candidate(self, *args): return (0, -0.1, 0)
             def predict(self, *args): return {}
         world = SimpleNamespace(objects={'target':{}}, robot={'base_link_pose':{
             'translation_m':[0,0,.2], 'quaternion_wxyz':[1,0,0,0]}})

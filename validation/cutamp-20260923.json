@@ -59,7 +59,92 @@
         "timing": "recorded_provider_latency_not_replayed"
       },
       "wall_time_s": 1064.0872089089826,
-      "postcheck_s": 289.5078872239974
+      "postcheck_s": 289.5078872239974,
+      "cutamp_selections": [
+        {
+          "solve": "solve_001",
+          "selection_policy": "full_budget",
+          "quality_window_after_first_pass": null,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "postcheck_wall_time",
+          "selected_particle": 57,
+          "selected_score": [
+            0.00972719522200381,
+            -0.3615951966970251,
+            0.006988679990172386
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.00972719522200381,
+            "abs_grasp_lateral_offset_m": 0.006988679990172386,
+            "min_lift_joint_margin_rad": 0.3615951966970251
+          }
+        },
+        {
+          "solve": "solve_002",
+          "selection_policy": "full_budget",
+          "quality_window_after_first_pass": null,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "postcheck_count",
+          "selected_particle": 38,
+          "selected_score": [
+            0.000352341440488204,
+            -0.3662531669259943,
+            0.0020789243280887604
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.000352341440488204,
+            "abs_grasp_lateral_offset_m": 0.0020789243280887604,
+            "min_lift_joint_margin_rad": 0.3662531669259943
+          }
+        }
+      ],
+      "selection_evidence_sources": [
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/quality_replay/seed_500/cutamp/solve_001/candidate_selection.json",
+          "sha256": "bb62d1009eebe73e598ce38882d380327b7d7a59fb29a7a5a943cacc1b2b4eab"
+        },
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/quality_replay/seed_500/cutamp/solve_002/candidate_selection.json",
+          "sha256": "b86d5a5d66868bb639b4856f9cb25becdbe30790d5ff102195fc32f8ec5a4323"
+        }
+      ],
+      "cutamp_settings": {
+        "gpu_python": "/root/workspace/references/paper-aligned-20260919/venv/bin/python",
+        "cutamp_root": "/root/workspace/references/paper-aligned-20260919/cuTAMP-scenesmith",
+        "kinematics_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/kinematics.json",
+        "robot_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/robot.json",
+        "multipliers": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/multipliers.json",
+        "tolerances": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/tolerances.json",
+        "grasp_calibration": "/root/workspace/scenesmith-simple-planner-eval/experiments/inputs/pick_lift/pick_lift_calibration.json",
+        "num_particles": 64,
+        "num_opt_steps": 2000,
+        "conf_lr": 0.001,
+        "max_postchecks": 24,
+        "seed": 500,
+        "integrity_manifest": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/integrity.json",
+        "solve_timeout_s": 360.0,
+        "postcheck_timeout_s": 180.0,
+        "postcheck_order": "cost_quantiles",
+        "reuse_navigation_pick_witness": true,
+        "postcheck_quality_window": null,
+        "adaptive_postcheck": null
+      },
+      "grasp_compensation": null,
+      "selection_config_recorded": true
     },
     {
       "strategy": "firstpass_replay",
@@ -79,7 +164,92 @@
         "timing": "recorded_provider_latency_not_replayed"
       },
       "wall_time_s": 542.7938357099774,
-      "postcheck_s": 26.604711480991682
+      "postcheck_s": 26.604711480991682,
+      "cutamp_selections": [
+        {
+          "solve": "solve_001",
+          "selection_policy": "first_pass",
+          "quality_window_after_first_pass": 0,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "first_pass_found",
+          "selected_particle": 53,
+          "selected_score": [
+            0.023420003858617946,
+            -0.3473204666791432,
+            0.01041094958782196
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.023420003858617946,
+            "abs_grasp_lateral_offset_m": 0.01041094958782196,
+            "min_lift_joint_margin_rad": 0.3473204666791432
+          }
+        },
+        {
+          "solve": "solve_002",
+          "selection_policy": "first_pass",
+          "quality_window_after_first_pass": 0,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "first_pass_found",
+          "selected_particle": 54,
+          "selected_score": [
+            0.0067032964659012925,
+            -0.3575591920704253,
+            0.005546053871512413
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.0067032964659012925,
+            "abs_grasp_lateral_offset_m": 0.005546053871512413,
+            "min_lift_joint_margin_rad": 0.3575591920704253
+          }
+        }
+      ],
+      "selection_evidence_sources": [
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/firstpass_replay/seed_1758317394/cutamp/solve_001/candidate_selection.json",
+          "sha256": "64d85cd8e90e8335c7bcd13a84b4eb3abab2f70fc6ccf5a48d992f7efebc1600"
+        },
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/firstpass_replay/seed_1758317394/cutamp/solve_002/candidate_selection.json",
+          "sha256": "535404c4d279fad14b4df261d38e0466dd13dcf5d4825ea95997bbdebd980799"
+        }
+      ],
+      "cutamp_settings": {
+        "gpu_python": "/root/workspace/references/paper-aligned-20260919/venv/bin/python",
+        "cutamp_root": "/root/workspace/references/paper-aligned-20260919/cuTAMP-scenesmith",
+        "kinematics_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/kinematics.json",
+        "robot_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/robot.json",
+        "multipliers": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/multipliers.json",
+        "tolerances": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/tolerances.json",
+        "grasp_calibration": "/root/workspace/scenesmith-simple-planner-eval/experiments/inputs/pick_lift/pick_lift_calibration.json",
+        "num_particles": 64,
+        "num_opt_steps": 2000,
+        "conf_lr": 0.001,
+        "max_postchecks": 24,
+        "seed": 1758317394,
+        "integrity_manifest": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/integrity.json",
+        "solve_timeout_s": 360.0,
+        "postcheck_timeout_s": 180.0,
+        "postcheck_order": "cost_quantiles",
+        "reuse_navigation_pick_witness": true,
+        "postcheck_quality_window": 0,
+        "adaptive_postcheck": null
+      },
+      "grasp_compensation": null,
+      "selection_config_recorded": true
     },
     {
       "strategy": "firstpass_replay",
@@ -99,7 +269,92 @@
         "timing": "recorded_provider_latency_not_replayed"
       },
       "wall_time_s": 512.9106152029999,
-      "postcheck_s": 13.45169548704871
+      "postcheck_s": 13.45169548704871,
+      "cutamp_selections": [
+        {
+          "solve": "solve_001",
+          "selection_policy": "first_pass",
+          "quality_window_after_first_pass": 0,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "first_pass_found",
+          "selected_particle": 6,
+          "selected_score": [
+            0.02469460562104901,
+            -0.32648213137475113,
+            0.014585892669856548
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.02469460562104901,
+            "abs_grasp_lateral_offset_m": 0.014585892669856548,
+            "min_lift_joint_margin_rad": 0.32648213137475113
+          }
+        },
+        {
+          "solve": "solve_002",
+          "selection_policy": "first_pass",
+          "quality_window_after_first_pass": 0,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "first_pass_found",
+          "selected_particle": 44,
+          "selected_score": [
+            0.005708559865532028,
+            -0.32612084575005995,
+            0.000640401616692543
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.005708559865532028,
+            "abs_grasp_lateral_offset_m": 0.000640401616692543,
+            "min_lift_joint_margin_rad": 0.32612084575005995
+          }
+        }
+      ],
+      "selection_evidence_sources": [
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/firstpass_replay/seed_500/cutamp/solve_001/candidate_selection.json",
+          "sha256": "5d7dd1373d7c530f55f24ef3e07bfe456b10b1683de3cf2f372a12e73e8621d5"
+        },
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/firstpass_replay/seed_500/cutamp/solve_002/candidate_selection.json",
+          "sha256": "f12b95e3007cd08fbfec9694ec405e03cd2369d63651d9e99a644cda14eaf54a"
+        }
+      ],
+      "cutamp_settings": {
+        "gpu_python": "/root/workspace/references/paper-aligned-20260919/venv/bin/python",
+        "cutamp_root": "/root/workspace/references/paper-aligned-20260919/cuTAMP-scenesmith",
+        "kinematics_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/kinematics.json",
+        "robot_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/robot.json",
+        "multipliers": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/multipliers.json",
+        "tolerances": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/tolerances.json",
+        "grasp_calibration": "/root/workspace/scenesmith-simple-planner-eval/experiments/inputs/pick_lift/pick_lift_calibration.json",
+        "num_particles": 64,
+        "num_opt_steps": 2000,
+        "conf_lr": 0.001,
+        "max_postchecks": 24,
+        "seed": 500,
+        "integrity_manifest": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/integrity.json",
+        "solve_timeout_s": 360.0,
+        "postcheck_timeout_s": 180.0,
+        "postcheck_order": "cost_quantiles",
+        "reuse_navigation_pick_witness": true,
+        "postcheck_quality_window": 0,
+        "adaptive_postcheck": null
+      },
+      "grasp_compensation": null,
+      "selection_config_recorded": true
     },
     {
       "strategy": "firstpass_replay",
@@ -119,7 +374,92 @@
         "timing": "recorded_provider_latency_not_replayed"
       },
       "wall_time_s": 541.0204567009932,
-      "postcheck_s": 21.5265481150127
+      "postcheck_s": 21.5265481150127,
+      "cutamp_selections": [
+        {
+          "solve": "solve_001",
+          "selection_policy": "first_pass",
+          "quality_window_after_first_pass": 0,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "first_pass_found",
+          "selected_particle": 59,
+          "selected_score": [
+            0.010464766275748189,
+            -0.36649385928943135,
+            0.0030995719134807587
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.010464766275748189,
+            "abs_grasp_lateral_offset_m": 0.0030995719134807587,
+            "min_lift_joint_margin_rad": 0.36649385928943135
+          }
+        },
+        {
+          "solve": "solve_002",
+          "selection_policy": "first_pass",
+          "quality_window_after_first_pass": 0,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "first_pass_found",
+          "selected_particle": 24,
+          "selected_score": [
+            0.011836967033210253,
+            -0.3113287660684285,
+            0.0080795893445611
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.011836967033210253,
+            "abs_grasp_lateral_offset_m": 0.0080795893445611,
+            "min_lift_joint_margin_rad": 0.3113287660684285
+          }
+        }
+      ],
+      "selection_evidence_sources": [
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/firstpass_replay/seed_501/cutamp/solve_001/candidate_selection.json",
+          "sha256": "48f331555d2df31034162203867af8ec7f627eadea53e83f0d9e4e14a3f6d4f0"
+        },
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/firstpass_replay/seed_501/cutamp/solve_002/candidate_selection.json",
+          "sha256": "e2cc014eae6c60a09c455a81faf0de2f92307668272f791a51afd7b2db5cc463"
+        }
+      ],
+      "cutamp_settings": {
+        "gpu_python": "/root/workspace/references/paper-aligned-20260919/venv/bin/python",
+        "cutamp_root": "/root/workspace/references/paper-aligned-20260919/cuTAMP-scenesmith",
+        "kinematics_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/kinematics.json",
+        "robot_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/robot.json",
+        "multipliers": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/multipliers.json",
+        "tolerances": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/tolerances.json",
+        "grasp_calibration": "/root/workspace/scenesmith-simple-planner-eval/experiments/inputs/pick_lift/pick_lift_calibration.json",
+        "num_particles": 64,
+        "num_opt_steps": 2000,
+        "conf_lr": 0.001,
+        "max_postchecks": 24,
+        "seed": 501,
+        "integrity_manifest": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/integrity.json",
+        "solve_timeout_s": 360.0,
+        "postcheck_timeout_s": 180.0,
+        "postcheck_order": "cost_quantiles",
+        "reuse_navigation_pick_witness": true,
+        "postcheck_quality_window": 0,
+        "adaptive_postcheck": null
+      },
+      "grasp_compensation": null,
+      "selection_config_recorded": true
     },
     {
       "strategy": "compensation_replay",
@@ -139,7 +479,97 @@
         "timing": "recorded_provider_latency_not_replayed"
       },
       "wall_time_s": 805.7012965879985,
-      "postcheck_s": 283.1997028240585
+      "postcheck_s": 283.1997028240585,
+      "cutamp_selections": [
+        {
+          "solve": "solve_001",
+          "selection_policy": "full_budget",
+          "quality_window_after_first_pass": null,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "postcheck_wall_time",
+          "selected_particle": 57,
+          "selected_score": [
+            0.00972719522200381,
+            -0.3615951966970251,
+            0.006988679990172386
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.00972719522200381,
+            "abs_grasp_lateral_offset_m": 0.006988679990172386,
+            "min_lift_joint_margin_rad": 0.3615951966970251
+          }
+        },
+        {
+          "solve": "solve_002",
+          "selection_policy": "full_budget",
+          "quality_window_after_first_pass": null,
+          "adaptive_final_mode": null,
+          "candidate_order": "cost_quantiles",
+          "stop_reason": "postcheck_count",
+          "selected_particle": 38,
+          "selected_score": [
+            0.000352341440488204,
+            -0.3662531669259943,
+            0.0020789243280887604
+          ],
+          "selected_score_fields": [
+            "gap_imbalance_m",
+            "negative_min_lift_joint_margin_rad",
+            "abs_grasp_lateral_offset_m"
+          ],
+          "score_order": "lexicographic_minimize",
+          "selected_quality": {
+            "gap_imbalance_m": 0.000352341440488204,
+            "abs_grasp_lateral_offset_m": 0.0020789243280887604,
+            "min_lift_joint_margin_rad": 0.3662531669259943
+          }
+        }
+      ],
+      "selection_evidence_sources": [
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/compensation_replay/seed_500/cutamp/solve_001/candidate_selection.json",
+          "sha256": "bb62d1009eebe73e598ce38882d380327b7d7a59fb29a7a5a943cacc1b2b4eab"
+        },
+        {
+          "path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-reproducible-20260923-v4/compensation_replay/seed_500/cutamp/solve_002/candidate_selection.json",
+          "sha256": "b86d5a5d66868bb639b4856f9cb25becdbe30790d5ff102195fc32f8ec5a4323"
+        }
+      ],
+      "cutamp_settings": {
+        "gpu_python": "/root/workspace/references/paper-aligned-20260919/venv/bin/python",
+        "cutamp_root": "/root/workspace/references/paper-aligned-20260919/cuTAMP-scenesmith",
+        "kinematics_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/kinematics.json",
+        "robot_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/robot.json",
+        "multipliers": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/multipliers.json",
+        "tolerances": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/tolerances.json",
+        "grasp_calibration": "/root/workspace/scenesmith-simple-planner-eval/experiments/inputs/pick_lift/pick_lift_calibration.json",
+        "num_particles": 64,
+        "num_opt_steps": 2000,
+        "conf_lr": 0.001,
+        "max_postchecks": 24,
+        "seed": 500,
+        "integrity_manifest": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/integrity.json",
+        "solve_timeout_s": 360.0,
+        "postcheck_timeout_s": 180.0,
+        "postcheck_order": "cost_quantiles",
+        "reuse_navigation_pick_witness": true,
+        "postcheck_quality_window": null,
+        "adaptive_postcheck": null
+      },
+      "grasp_compensation": {
+        "max_attempts": 3,
+        "max_step_m": 0.01,
+        "max_total_m": 0.03,
+        "height_margin_m": 0.006
+      },
+      "selection_config_recorded": true
     }
   ],
   "artifacts": {
@@ -250,5 +680,68 @@
     "Single-finger release/regrasp remains disabled by user decision.",
     "No second CUDA host was available for a fresh cross-host build.",
     "Three fixed-model seeds do not establish population reliability or variance decomposition."
-  ]
+  ],
+  "selection_quality_backfill": {
+    "scope": "Derived from immutable historical candidate_selection.json; not a rerun of the new reporting code.",
+    "seed": 500,
+    "solve": "solve_001",
+    "same_input_evidence": "runs/cutamp-reproducible-20260923-v4/pair_comparison.json",
+    "quality_window": {
+      "solve": "solve_001",
+      "selection_policy": "full_budget",
+      "quality_window_after_first_pass": null,
+      "adaptive_final_mode": null,
+      "candidate_order": "cost_quantiles",
+      "stop_reason": "postcheck_wall_time",
+      "selected_particle": 57,
+      "selected_score": [
+        0.00972719522200381,
+        -0.3615951966970251,
+        0.006988679990172386
+      ],
+      "selected_score_fields": [
+        "gap_imbalance_m",
+        "negative_min_lift_joint_margin_rad",
+        "abs_grasp_lateral_offset_m"
+      ],
+      "score_order": "lexicographic_minimize",
+      "selected_quality": {
+        "gap_imbalance_m": 0.00972719522200381,
+        "abs_grasp_lateral_offset_m": 0.006988679990172386,
+        "min_lift_joint_margin_rad": 0.3615951966970251
+      }
+    },
+    "first_pass": {
+      "solve": "solve_001",
+      "selection_policy": "first_pass",
+      "quality_window_after_first_pass": 0,
+      "adaptive_final_mode": null,
+      "candidate_order": "cost_quantiles",
+      "stop_reason": "first_pass_found",
+      "selected_particle": 6,
+      "selected_score": [
+        0.02469460562104901,
+        -0.32648213137475113,
+        0.014585892669856548
+      ],
+      "selected_score_fields": [
+        "gap_imbalance_m",
+        "negative_min_lift_joint_margin_rad",
+        "abs_grasp_lateral_offset_m"
+      ],
+      "score_order": "lexicographic_minimize",
+      "selected_quality": {
+        "gap_imbalance_m": 0.02469460562104901,
+        "abs_grasp_lateral_offset_m": 0.014585892669856548,
+        "min_lift_joint_margin_rad": 0.32648213137475113
+      }
+    },
+    "first_pass_minus_quality": {
+      "gap_imbalance_m": 0.014967410399045198,
+      "abs_grasp_lateral_offset_m": 0.007597212679684162,
+      "min_lift_joint_margin_rad": -0.035113065322273984
+    },
+    "interpretation": "First-pass worsens all three static rank components in this paired solve. Static rank is not a prediction or guarantee of dynamic success; second solves have different observed states and are not same-input comparisons.",
+    "config_consistency": "All five trials: sibling cutamp_seed config equals resolved per-run planner_config.cutamp exactly."
+  }
 }

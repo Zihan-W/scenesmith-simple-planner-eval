@@ -6,6 +6,8 @@ import signal
 import subprocess
 import time
 
+from .selection_evidence import collect_run_selection_evidence
+
 
 def supervise_simulation(command, *, output, started_at, max_wall_time_s):
     """Terminate this worker process group at deadline and retain a final result.
@@ -44,7 +46,8 @@ def supervise_simulation(command, *, output, started_at, max_wall_time_s):
                   "reason": "wall_time_budget_exhausted" if timed_out else "worker_process_error",
                   "metrics": {"wall_time_s": elapsed, "wall_time_budget_s": max_wall_time_s},
                   "supervision": evidence, "partial_trace": "tamp_trace.jsonl",
-                  "recording_may_be_incomplete": True}
+                  "recording_may_be_incomplete": True,
+                  **collect_run_selection_evidence(output)}
         temporary = output / "result.json.tmp"
         temporary.write_text(json.dumps(result, indent=2) + "\n")
         temporary.replace(result_path)

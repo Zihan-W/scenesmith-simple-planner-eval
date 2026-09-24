@@ -94,7 +94,7 @@ class ReliabilityTests(unittest.TestCase):
                 self.calls.append(skill.skill)
                 return self.valid,'valid' if self.valid else 'pick_ik_grasp',{'ik':{'grasp_pose_in_target':{'arm_joint_positions':[.1]}}}
             def predict(self,skill,candidate,state): return dict(state)
-            def rank_candidate(self,*args): return (0.,)
+            def rank_candidate(self,*args): return (0., -0.1, 0.)
         world=SimpleNamespace(objects={'target':{}},robot={'base_link_pose':{'translation_m':[0,0,.2],'quaternion_wxyz':[1,0,0,0]}})
         program=SkillProgram((SkillStep('NavigateToPick',{'object':'target'},{'base_pose':'b'}),SkillStep('PickLift',{'object':'target'},{'grasp_pose':'g','approach_pose':'a'})))
         candidate={'particle_index':0,'optimizer_feasible':True,'hard_constraint_cost':0.,'base_world_pose':[0,0,.2,1,0,0,0],'arm_joint_names':['arm'],'arm_joint_positions':[.1],'grasp_lateral_offset_m':0.}
