@@ -1,0 +1,509 @@
+{
+  "schema": "validation.selection_evidence_index.v1",
+  "implementation": {
+    "implementation_commit": "49fb6c3bdc6fcd8de6cd7902a5b78085dec44680",
+    "source_tree_sha256": "71de4925403a163dae13f58e16f68e84253bfa294084ace14d73d9b8855ced6f",
+    "all_manifest_files_match_committed_blobs": true
+  },
+  "verification": {
+    "source_tree_sha256": "71de4925403a163dae13f58e16f68e84253bfa294084ace14d73d9b8855ced6f",
+    "regression": {
+      "tests": 407,
+      "passed": 404,
+      "skipped": 3,
+      "seconds": 685.207
+    },
+    "trials": [
+      {
+        "strategy": "firstpass",
+        "seed": 500,
+        "success": true,
+        "reason": "task_goal_verified",
+        "metrics": {
+          "task_success": true,
+          "subgoal_success": 1,
+          "skill_success": 2,
+          "semantic_planning_latency_s": 0.0014642079768236727,
+          "skill_planning_latency_s": 0.001923571981023997,
+          "geometry_solving_latency_s": 322.67891035601497,
+          "execution_time_s": 179.81986326002516,
+          "num_semantic_replans": 0,
+          "num_skill_replans": 0,
+          "num_geometry_retries": 0,
+          "num_skill_retries": 0,
+          "num_constraint_failures": 0,
+          "skill_executions": 2,
+          "vlm_calls": 1,
+          "llm_calls": 2,
+          "wall_time_budget_s": 1200.0,
+          "provider_stage_retries": 0,
+          "wall_time_s": 510.1148483369907
+        },
+        "model": {
+          "mode": "strict_replay",
+          "logical_calls": 3,
+          "live_provider_calls": 0,
+          "replay_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+          "transcript_sha256": "6b66a9120731995d1e4379cfef66f571b551b8928be45efb877ad88a09a0861c",
+          "recorded_calls": 6,
+          "unused_recorded_calls": 3,
+          "replay_scope": "matched_request_prefix",
+          "divergence": null,
+          "timing": "recorded_provider_latency_not_replayed"
+        },
+        "cutamp_settings": {
+          "gpu_python": "/root/workspace/references/paper-aligned-20260919/venv/bin/python",
+          "cutamp_root": "/root/workspace/references/paper-aligned-20260919/cuTAMP-scenesmith",
+          "kinematics_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/kinematics.json",
+          "robot_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/robot.json",
+          "multipliers": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/multipliers.json",
+          "tolerances": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/tolerances.json",
+          "grasp_calibration": "/root/workspace/scenesmith-simple-planner-eval/experiments/inputs/pick_lift/pick_lift_calibration.json",
+          "num_particles": 64,
+          "num_opt_steps": 2000,
+          "conf_lr": 0.001,
+          "max_postchecks": 24,
+          "seed": 500,
+          "integrity_manifest": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/integrity.json",
+          "solve_timeout_s": 360.0,
+          "postcheck_timeout_s": 180.0,
+          "postcheck_order": "cost_quantiles",
+          "reuse_navigation_pick_witness": true,
+          "postcheck_quality_window": 0,
+          "adaptive_postcheck": null
+        },
+        "grasp_compensation": null,
+        "selection_config_recorded": true,
+        "cutamp_selections": [
+          {
+            "solve": "solve_001",
+            "selection_policy": "first_pass",
+            "quality_window_after_first_pass": 0,
+            "adaptive_final_mode": null,
+            "candidate_order": "cost_quantiles",
+            "stop_reason": "first_pass_found",
+            "selected_particle": 6,
+            "selected_score": [
+              0.02469460562104901,
+              -0.32648213137475113,
+              0.014585892669856548
+            ],
+            "selected_score_fields": [
+              "gap_imbalance_m",
+              "negative_min_lift_joint_margin_rad",
+              "abs_grasp_lateral_offset_m"
+            ],
+            "score_order": "lexicographic_minimize",
+            "selected_quality": {
+              "gap_imbalance_m": 0.02469460562104901,
+              "abs_grasp_lateral_offset_m": 0.014585892669856548,
+              "min_lift_joint_margin_rad": 0.32648213137475113
+            }
+          },
+          {
+            "solve": "solve_002",
+            "selection_policy": "first_pass",
+            "quality_window_after_first_pass": 0,
+            "adaptive_final_mode": null,
+            "candidate_order": "cost_quantiles",
+            "stop_reason": "first_pass_found",
+            "selected_particle": 44,
+            "selected_score": [
+              0.005708559865532028,
+              -0.32612084575005995,
+              0.000640401616692543
+            ],
+            "selected_score_fields": [
+              "gap_imbalance_m",
+              "negative_min_lift_joint_margin_rad",
+              "abs_grasp_lateral_offset_m"
+            ],
+            "score_order": "lexicographic_minimize",
+            "selected_quality": {
+              "gap_imbalance_m": 0.005708559865532028,
+              "abs_grasp_lateral_offset_m": 0.000640401616692543,
+              "min_lift_joint_margin_rad": 0.32612084575005995
+            }
+          }
+        ],
+        "dynamic": {
+          "max_lift_m": 0.08142223371537927,
+          "final_task": {
+            "task_name": "pick_lift",
+            "target": "pick_target",
+            "lift_m": 0.08130506267811544,
+            "required_lift_m": 0.08,
+            "held_above_threshold_s": 3.0999999999993832,
+            "required_hold_s": 3.0,
+            "finger_contacts": [
+              true,
+              true
+            ],
+            "bilateral_gripper_contact": true,
+            "support_contact": false,
+            "unexpected_target_contacts": [],
+            "target_translational_speed_m_s": 0.0003416575107621523,
+            "target_rotational_speed_rad_s": 0.022829429480899638,
+            "success": true,
+            "evaluation": {
+              "success": true,
+              "reason": "lift_held",
+              "metrics": {
+                "lift_m": 0.08130506267811544,
+                "held_above_threshold_s": 3.0999999999993832,
+                "stable_lift": true,
+                "finger_contacts": [
+                  true,
+                  true
+                ],
+                "bilateral_gripper_contact": true,
+                "support_contact": false,
+                "unexpected_target_contacts": [],
+                "target_translational_speed_m_s": 0.0003416575107621523,
+                "target_rotational_speed_rad_s": 0.022829429480899638
+              }
+            }
+          },
+          "compensation_history": []
+        },
+        "result_sha256": "ef6ca3945a641bf83fef709c8da5864f15d7a05bb14e477f1a7175759044f34c",
+        "index_sha256": "ed6e146566dd5813d19a73c143e2d83782b103b88c23d8b8d8728ea1149e6e4f"
+      },
+      {
+        "strategy": "firstpass_compensation",
+        "seed": 500,
+        "success": true,
+        "reason": "task_goal_verified",
+        "metrics": {
+          "task_success": true,
+          "subgoal_success": 1,
+          "skill_success": 2,
+          "semantic_planning_latency_s": 0.00143916200613603,
+          "skill_planning_latency_s": 0.0019079680205322802,
+          "geometry_solving_latency_s": 324.1156325190095,
+          "execution_time_s": 184.0690773660026,
+          "num_semantic_replans": 0,
+          "num_skill_replans": 0,
+          "num_geometry_retries": 0,
+          "num_skill_retries": 0,
+          "num_constraint_failures": 0,
+          "skill_executions": 2,
+          "vlm_calls": 1,
+          "llm_calls": 2,
+          "wall_time_budget_s": 1200.0,
+          "provider_stage_retries": 0,
+          "wall_time_s": 515.9376297080016
+        },
+        "model": {
+          "mode": "strict_replay",
+          "logical_calls": 3,
+          "live_provider_calls": 0,
+          "replay_sha256": "c5583e88249bfed676322b7b44a390c5599391353e6cfae0c344c8e909822e8f",
+          "transcript_sha256": "6b66a9120731995d1e4379cfef66f571b551b8928be45efb877ad88a09a0861c",
+          "recorded_calls": 6,
+          "unused_recorded_calls": 3,
+          "replay_scope": "matched_request_prefix",
+          "divergence": null,
+          "timing": "recorded_provider_latency_not_replayed"
+        },
+        "cutamp_settings": {
+          "gpu_python": "/root/workspace/references/paper-aligned-20260919/venv/bin/python",
+          "cutamp_root": "/root/workspace/references/paper-aligned-20260919/cuTAMP-scenesmith",
+          "kinematics_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/kinematics.json",
+          "robot_template": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/robot.json",
+          "multipliers": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/multipliers.json",
+          "tolerances": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/tolerances.json",
+          "grasp_calibration": "/root/workspace/scenesmith-simple-planner-eval/experiments/inputs/pick_lift/pick_lift_calibration.json",
+          "num_particles": 64,
+          "num_opt_steps": 2000,
+          "conf_lr": 0.001,
+          "max_postchecks": 24,
+          "seed": 500,
+          "integrity_manifest": "/root/workspace/scenesmith-simple-planner-eval/experiments/cutamp/integrity.json",
+          "solve_timeout_s": 360.0,
+          "postcheck_timeout_s": 180.0,
+          "postcheck_order": "cost_quantiles",
+          "reuse_navigation_pick_witness": true,
+          "postcheck_quality_window": 0,
+          "adaptive_postcheck": null
+        },
+        "grasp_compensation": {
+          "max_attempts": 3,
+          "max_step_m": 0.01,
+          "max_total_m": 0.03,
+          "height_margin_m": 0.006
+        },
+        "selection_config_recorded": true,
+        "cutamp_selections": [
+          {
+            "solve": "solve_001",
+            "selection_policy": "first_pass",
+            "quality_window_after_first_pass": 0,
+            "adaptive_final_mode": null,
+            "candidate_order": "cost_quantiles",
+            "stop_reason": "first_pass_found",
+            "selected_particle": 6,
+            "selected_score": [
+              0.02469460562104901,
+              -0.32648213137475113,
+              0.014585892669856548
+            ],
+            "selected_score_fields": [
+              "gap_imbalance_m",
+              "negative_min_lift_joint_margin_rad",
+              "abs_grasp_lateral_offset_m"
+            ],
+            "score_order": "lexicographic_minimize",
+            "selected_quality": {
+              "gap_imbalance_m": 0.02469460562104901,
+              "abs_grasp_lateral_offset_m": 0.014585892669856548,
+              "min_lift_joint_margin_rad": 0.32648213137475113
+            }
+          },
+          {
+            "solve": "solve_002",
+            "selection_policy": "first_pass",
+            "quality_window_after_first_pass": 0,
+            "adaptive_final_mode": null,
+            "candidate_order": "cost_quantiles",
+            "stop_reason": "first_pass_found",
+            "selected_particle": 44,
+            "selected_score": [
+              0.005708559865532028,
+              -0.32612084575005995,
+              0.000640401616692543
+            ],
+            "selected_score_fields": [
+              "gap_imbalance_m",
+              "negative_min_lift_joint_margin_rad",
+              "abs_grasp_lateral_offset_m"
+            ],
+            "score_order": "lexicographic_minimize",
+            "selected_quality": {
+              "gap_imbalance_m": 0.005708559865532028,
+              "abs_grasp_lateral_offset_m": 0.000640401616692543,
+              "min_lift_joint_margin_rad": 0.32612084575005995
+            }
+          }
+        ],
+        "dynamic": {
+          "max_lift_m": 0.08142223371537927,
+          "final_task": {
+            "task_name": "pick_lift",
+            "target": "pick_target",
+            "lift_m": 0.08130506267811544,
+            "required_lift_m": 0.08,
+            "held_above_threshold_s": 3.0999999999993832,
+            "required_hold_s": 3.0,
+            "finger_contacts": [
+              true,
+              true
+            ],
+            "bilateral_gripper_contact": true,
+            "support_contact": false,
+            "unexpected_target_contacts": [],
+            "target_translational_speed_m_s": 0.0003416575107621523,
+            "target_rotational_speed_rad_s": 0.022829429480899638,
+            "success": true,
+            "evaluation": {
+              "success": true,
+              "reason": "lift_held",
+              "metrics": {
+                "lift_m": 0.08130506267811544,
+                "held_above_threshold_s": 3.0999999999993832,
+                "stable_lift": true,
+                "finger_contacts": [
+                  true,
+                  true
+                ],
+                "bilateral_gripper_contact": true,
+                "support_contact": false,
+                "unexpected_target_contacts": [],
+                "target_translational_speed_m_s": 0.0003416575107621523,
+                "target_rotational_speed_rad_s": 0.022829429480899638
+              }
+            }
+          },
+          "compensation_history": []
+        },
+        "result_sha256": "5439441774cff65b1b5489a0b328deb09ed23d479006795bd15c80f2b1cd6286",
+        "index_sha256": "2e8da380eab9888883ca927d7f2e7d1ead08ab0e2f1f184d7988c5ee77e68bb8"
+      }
+    ],
+    "pair_comparison": [
+      {
+        "solve": "solve_001",
+        "static_declarations_equal": true,
+        "movable_spheres_equal": true,
+        "candidate_assignments_equal": true,
+        "selected_particle": [
+          6,
+          6
+        ],
+        "selected_scores_equal": true
+      },
+      {
+        "solve": "solve_002",
+        "static_declarations_equal": true,
+        "movable_spheres_equal": true,
+        "candidate_assignments_equal": true,
+        "selected_particle": [
+          44,
+          44
+        ],
+        "selected_scores_equal": true
+      }
+    ],
+    "reporting_consistency_verified": true,
+    "scope": "Current-source first-pass vs first-pass+compensation; fixed-model seed 500 only. Concurrent regression makes wall times unsuitable for performance claims. Historical quality-policy controls remain on their original implementation snapshot.",
+    "historical_quality_comparison": {
+      "scope": "Derived from immutable historical candidate_selection.json; not a rerun of the new reporting code.",
+      "seed": 500,
+      "solve": "solve_001",
+      "same_input_evidence": "runs/cutamp-reproducible-20260923-v4/pair_comparison.json",
+      "quality_window": {
+        "solve": "solve_001",
+        "selection_policy": "full_budget",
+        "quality_window_after_first_pass": null,
+        "adaptive_final_mode": null,
+        "candidate_order": "cost_quantiles",
+        "stop_reason": "postcheck_wall_time",
+        "selected_particle": 57,
+        "selected_score": [
+          0.00972719522200381,
+          -0.3615951966970251,
+          0.006988679990172386
+        ],
+        "selected_score_fields": [
+          "gap_imbalance_m",
+          "negative_min_lift_joint_margin_rad",
+          "abs_grasp_lateral_offset_m"
+        ],
+        "score_order": "lexicographic_minimize",
+        "selected_quality": {
+          "gap_imbalance_m": 0.00972719522200381,
+          "abs_grasp_lateral_offset_m": 0.006988679990172386,
+          "min_lift_joint_margin_rad": 0.3615951966970251
+        }
+      },
+      "first_pass": {
+        "solve": "solve_001",
+        "selection_policy": "first_pass",
+        "quality_window_after_first_pass": 0,
+        "adaptive_final_mode": null,
+        "candidate_order": "cost_quantiles",
+        "stop_reason": "first_pass_found",
+        "selected_particle": 6,
+        "selected_score": [
+          0.02469460562104901,
+          -0.32648213137475113,
+          0.014585892669856548
+        ],
+        "selected_score_fields": [
+          "gap_imbalance_m",
+          "negative_min_lift_joint_margin_rad",
+          "abs_grasp_lateral_offset_m"
+        ],
+        "score_order": "lexicographic_minimize",
+        "selected_quality": {
+          "gap_imbalance_m": 0.02469460562104901,
+          "abs_grasp_lateral_offset_m": 0.014585892669856548,
+          "min_lift_joint_margin_rad": 0.32648213137475113
+        }
+      },
+      "first_pass_minus_quality": {
+        "gap_imbalance_m": 0.014967410399045198,
+        "abs_grasp_lateral_offset_m": 0.007597212679684162,
+        "min_lift_joint_margin_rad": -0.035113065322273984
+      },
+      "interpretation": "First-pass worsens all three static rank components in this paired solve. Static rank is not a prediction or guarantee of dynamic success; second solves have different observed states and are not same-input comparisons.",
+      "config_consistency": "All five trials: sibling cutamp_seed config equals resolved per-run planner_config.cutamp exactly."
+    }
+  },
+  "artifacts": {
+    "evidence.tar.gz": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-selection-20260924.evidence.tar.gz",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/evidence.tar.gz",
+      "sha256": "9788a744a5b75d1a0d59d29ae893fe19296445f1b1171bc56ad67de36a0ecb3b",
+      "bytes": 800980651
+    },
+    "REPORT.md": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-selection-20260924/REPORT.md",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/REPORT.md",
+      "sha256": "1aab1c8edaf9b48647c3ab905d56b321bc4f95efb6ccb7f40819ffada4b41cf7",
+      "bytes": 2873
+    },
+    "repair.patch": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-selection-20260924/repair.patch",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/repair.patch",
+      "sha256": "2285bc09be30d5adde5eab2479463cb8ad446c1bc378643e42168f62a754861a",
+      "bytes": 47787
+    },
+    "verification.json": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-selection-20260924/verification.json",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/verification.json",
+      "sha256": "5468ead264a1c15501cd7cbdf7190677b01766f029b8cd594813e8603dcc176f",
+      "bytes": 15902
+    },
+    "publication.json": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-selection-20260924/publication.json",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/publication.json",
+      "sha256": "f5c94edb3a64fd138f63b4925fdc6db52d60670619a0fdab736d4acd27f6940e",
+      "bytes": 218
+    },
+    "source_manifest.json": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-selection-20260924/provenance/source_manifest.json",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/source_manifest.json",
+      "sha256": "8a7d8c20c96e7644a6ba30a8a35777cd8342494e327bba34d2250c11fa5c54d0",
+      "bytes": 41715
+    },
+    "validated_sources.tar.gz": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-selection-20260924/provenance/validated_sources.tar.gz",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/validated_sources.tar.gz",
+      "sha256": "878844931b7ca80ecf64c061c5e3f5eae152fab9a69ac88202878dcf3a9c1b60",
+      "bytes": 690843
+    },
+    "validation.bundle": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/runs/cutamp-selection-20260924/ref_archive/validation.bundle",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/validation.bundle",
+      "sha256": "e6cd5019963905f9303e5b35890d63b04937b65c88162037770cd210985f128b",
+      "bytes": 37534331
+    },
+    "historical-index.json": {
+      "remote_path": "/root/workspace/scenesmith-simple-planner-eval/validation/cutamp-20260923.json",
+      "local_copy_path": "/home/hchen82/cutamp-selection-20260924/historical-index.json",
+      "sha256": "8b6728799843cf48305937db2642c1109574c40a72ccbdcc7c6e26dfb735d507",
+      "bytes": 32925
+    }
+  },
+  "validation_ref_archive": {
+    "schema": "validation.ref_archive.v1",
+    "bundle": "validation.bundle",
+    "bundle_sha256": "e6cd5019963905f9303e5b35890d63b04937b65c88162037770cd210985f128b",
+    "refs": {
+      "refs/validation/cutamp-reproducible-firstpass-20260923-v4": "3717b1c711d8f88b0a9d93dc0dd55ec6b284e61c",
+      "refs/validation/cutamp-reproducible-quality-20260923-v4": "d4d0f24675ecae2290c25ef107538aeb5ddf0737"
+    },
+    "retained": {
+      "refs/validation/current": "49fb6c3bdc6fcd8de6cd7902a5b78085dec44680",
+      "refs/validation/selection-firstpass_compensation-20260924": "1269e55c71c61a9bfc1a03c14c9b1980a088e6bc",
+      "refs/validation/selection-firstpass-20260924": "6a1dd8492955c89912e55f12adc0d829f32e745c"
+    },
+    "fresh_repository_restore_verified": true,
+    "pruned": true
+  },
+  "limitations": [
+    "No calibrated quality acceptance threshold or population quality-loss estimate.",
+    "First-pass compensation was enabled but not triggered in seed 500; no incremental benefit demonstrated.",
+    "Historical quality-policy controls remain on their original source snapshot."
+  ],
+  "copy_status": "all nine artifacts copied and SHA256 verified on local host; entire evidence archive read through successfully",
+  "copy_verification": {
+    "all_copies_match": true,
+    "archive_read_through_verified": true,
+    "artifact_count": 9,
+    "archive_regular_files": 3803,
+    "archive_data_bytes": 1469258439,
+    "receipt_sha256": "0acb102f73a94188b428ba3702ad96e02641b9afdf2dbb43c54a9ecbb00d7f34"
+  }
+}
